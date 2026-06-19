@@ -1,15 +1,17 @@
-const express = require('express');
+onst express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-
+const fs = require('fs');
+const path = require('path');
+ 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
+ 
 // IDs das planilhas
 const SHEET_CPE_ID = '14_loVs5PklVuyxLVWkxKP2uJhn8inxTovCv9DcYb9Xg';
 const SHEET_REPASSES_ID = '1nU9jcXC6zhtA_lnYrUDVDvF0U-4YONPU';
-
+ 
 // Função para converter CSV em JSON
 function csvToJson(csv) {
   const lines = csv.trim().split('\n');
@@ -40,13 +42,11 @@ function csvToJson(csv) {
   
   return result;
 }
-
+ 
 // Função para ler planilha via export CSV
 async function lerPlanilha(sheetId) {
   try {
     const resultado = {};
-    
-    // Tenta ler via Google Sheets export
     const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
     
     const response = await axios.get(sheetUrl, { timeout: 10000 });
@@ -59,7 +59,7 @@ async function lerPlanilha(sheetId) {
     return { 'Erro': [{ mensagem: error.message }] };
   }
 }
-
+ 
 // API endpoint
 app.get('/api/dados', async (req, res) => {
   try {
@@ -81,22 +81,29 @@ app.get('/api/dados', async (req, res) => {
     });
   }
 });
-
+ 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
-
+ 
 // Rota raiz (serve o dashboard)
 app.get('/', (req, res) => {
-  res.send(getDashboardHTML());
+  try {
+    const dashboardPath = path.join(__dirname, 'dashboard.html');
+    
+    if (fs.existsSync(dashboardPath)) {
+      const html = fs.readFileSync(dashboardPath, 'utf8');
+      res.send(html);
+    } else {
+      res.status(500).send('Arquivo dashboard.html não encontrado');
+    }
+  } catch (err) {
+    console.error('Erro ao servir dashboard:', err);
+    res.status(500).send('Erro ao carregar dashboard: ' + err.message);
+  }
 });
-
-// Função que retorna o HTML do dashboard
-function getDashboardHTML() {
-  return require('fs').readFileSync(__dirname + '/dashboard.html', 'utf8');
-}
-
+ 
 // Inicia servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
