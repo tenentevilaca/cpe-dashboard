@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard CPE 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #FAF8F3;
+    --bg-card: #FFFFFF;
+    --bg-soft: #F2EFE6;
+    --ink: #1A1A1A;
+    --ink-soft: #5A5A5A;
+    --ink-mute: #8A8A8A;
+    --line: #E0DCD0;
+    --black: #373435;
+    --gold: #A08F63;
+    --gold-light: #C4B287;
+    --positive: #6B5B3A;
+    --shadow: 0 1px 3px rgba(26,26,26,0.04), 0 4px 16px rgba(26,26,26,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .header {
+    background: var(--black);
+    color: #FFF;
+    padding: 20px 40px;
+    border-bottom: 3px solid var(--gold);
+  }
+
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1600px;
+    margin: 0 auto;
+    gap: 24px;
+  }
+
+  .header-info h1 {
+    font-family: 'Source Serif Pro', serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .header-info .subtitle {
+    font-size: 12px;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gold-light);
+  }
+
+  .header-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .refresh-btn {
+    background: var(--gold);
+    color: var(--black);
+    border: none;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .refresh-btn:hover { background: var(--gold-light); }
+  .refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .refresh-btn.loading .icon { animation: spin 1s linear infinite; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .last-update {
+    font-size: 10px;
+    opacity: 0.75;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .status-line {
+    background: rgba(255,255,255,0.08);
+    padding: 8px 40px;
+    text-align: center;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .status-line.error { background: #8B1A1A; color: #FFF; }
+  .status-line.success { background: rgba(160, 143, 99, 0.4); }
+  .status-line.loading { background: rgba(160, 143, 99, 0.3); }
+
+  .main {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 28px 40px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--ink-mute);
+  }
+
+  .empty-state h2 {
+    font-family: 'Source Serif Pro', serif;
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+
+  .data-display {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .data-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .data-card h3 {
+    font-family: 'Source Serif Pro', serif;
+    font-size: 18px;
+    color: var(--black);
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: 8px;
+  }
+
+  .data-sheet {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--bg-soft);
+    border-left: 4px solid var(--gold);
+    border-radius: 4px;
+  }
+
+  .data-sheet strong {
+    display: block;
+    font-size: 13px;
+    color: var(--black);
+    margin-bottom: 4px;
+  }
+
+  .data-sheet .count {
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 768px) {
+    .header, .main { padding: 20px; }
+    .data-display { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-top">
+    <div class="header-info">
+      <div class="subtitle">Estado-Maior do CPE | Exercício 2026</div>
+      <h1>Dashboard Orçamentário</h1>
+    </div>
+    <div class="header-controls">
+      <button class="refresh-btn" onclick="carregarDados()">
+        <span class="icon">🔄</span>
+        <span>Atualizar Dados</span>
+      </button>
+      <div class="last-update" id="last-update">—</div>
+    </div>
+  </div>
+</header>
+
+<div class="status-line" id="status-line">Carregando dados...</div>
+
+<main class="main" id="main">
+  <div class="empty-state">
+    <h2>Carregando...</h2>
+  </div>
+</main>
+
+<script>
+async function carregarDados() {
+  const btn = document.querySelector('.refresh-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  setStatus('Buscando dados...', 'loading');
+  
+  try {
+    const response = await fetch('/api/dados');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const json = await response.json();
+    if (json.status !== 'ok') throw new Error(json.mensagem || 'Erro desconhecido');
+    
+    setStatus('✓ Dados carregados com sucesso', 'success');
+    atualizarTimestamp();
+    renderizarDados(json.data);
+    
+  } catch (err) {
+    console.error(err);
+    setStatus(`⚠ Erro: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+function setStatus(msg, tipo) {
+  const el = document.getElementById('status-line');
+  el.textContent = msg;
+  el.className = 'status-line ' + (tipo || 'default');
+}
+
+function atualizarTimestamp() {
+  const agora = new Date().toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+  document.getElementById('last-update').textContent = 'Atualizado: ' + agora;
+}
+
+function renderizarDados(data) {
+  const main = document.getElementById('main');
+  
+  if (!data) {
+    main.innerHTML = '<div class="empty-state"><h2>Erro ao carregar dados</h2></div>';
+    return;
+  }
+  
+  let html = '<div class="data-display">';
+  
+  if (data.cpe && Object.keys(data.cpe).length > 0) {
+    html += '<div class="data-card"><h3>📊 CPE</h3>';
+    for (const [nomeAba, dados] of Object.entries(data.cpe)) {
+      const qtd = Array.isArray(dados) ? dados.length : 0;
+      html += `<div class="data-sheet"><strong>${nomeAba}</strong><span class="count">${qtd} registros</span></div>`;
+    }
+    html += '</div>';
+  }
+  
+  if (data.repasses && Object.keys(data.repasses).length > 0) {
+    html += '<div class="data-card"><h3>💰 Repasses</h3>';
+    for (const [nomeAba, dados] of Object.entries(data.repasses)) {
+      const qtd = Array.isArray(dados) ? dados.length : 0;
+      html += `<div class="data-sheet"><strong>${nomeAba}</strong><span class="count">${qtd} registros</span></div>`;
+    }
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  main.innerHTML = html;
+}
+
+window.addEventListener('load', carregarDados);
+</script>
+
+</body>
+</html>
