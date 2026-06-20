@@ -180,26 +180,27 @@ function parseControle(linhas) {
 
 // RESUMO: saldos em idx 1, colunas E,J,O (idx 4,9,14)
 function parseResumoRepasses(linhas) {
-  const r = linhas[1] || [];
+  const r1 = linhas[1] || [];
+  const r5 = linhas[4] || [];
   return {
     saldos: {
-      DPRF: num(r[4]),
-      DER: num(r[9]),
-      SEMAD: num(r[14])
+      DPRF: num(r1[4]),
+      DER: num(r1[9]),
+      SEMAD: num(r1[14])
     },
     porElemento: {
-      DPRF: { '30': 0, '37': 0, '39': 0, '40': 0 },
-      DER: { '30': 0, '37': 0, '39': 0, '40': 0 },
-      SEMAD: { '30': 0, '37': 0, '39': 0 }
+      DPRF: { '30': num(r5[4]), '37': num(r5[5]), '39': num(r5[6]), '40': num(r5[7]) },
+      DER: { '30': num(r5[9]), '37': num(r5[10]), '39': num(r5[11]), '40': num(r5[12]) },
+      SEMAD: { '30': num(r5[14]), '37': num(r5[15]), '39': num(r5[16]) }
     }
   };
 }
 
-// CONDENSADO: totais em L5 (idx 4), colunas O,P (idx 14,15)
+// CONDENSADO: totais em L6 (idx 5), colunas O,P (idx 14,15)
 function parseCondensado(linhas) {
   let desc = 0, rep = 0;
-  // Procura especificamente na linha 5 (idx 4)
-  const r = linhas[4] || [];
+  // Procura especificamente na linha 6 (idx 5)
+  const r = linhas[5] || [];
   if (r.length > 15) {
     desc = num(r[14]);
     rep = num(r[15]);
