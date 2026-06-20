@@ -330,21 +330,40 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // ====== DEBUG ======
 app.get('/debug', async (req, res) => {
   try {
-    const [lControle, lResumo, lContratos] = await Promise.all([
+    const [lProg8320, lProg5220, lControle, lResumo, lContratos] = await Promise.all([
+      lerAbaBruta(SHEET_CPE, 'PROGRAMAÇÃO 83.20'),
+      lerAbaBruta(SHEET_CPE, 'PROGRAMAÇÃO 52.20'),
       lerAbaBruta(SHEET_CPE, 'controle de descentralizações'),
       lerAbaBruta(SHEET_REPASSES, 'RESUMO'),
       lerAbaBruta(SHEET_CPE, 'CONTRATOS SERVIÇOS ESSENCIAIS')
     ]);
+
+    const prog8320 = parsePrograma(lProg8320, 'DER', 7);
+    const prog5220 = parsePrograma(lProg5220, 'SEMAD', 3);
+    const controle = parseControle(lControle);
+    const resumo = parseResumoRepasses(lResumo);
+    const contratos = parseContratos(lContratos);
+
     res.json({
-      controle_L6: lControle[5],
-      controle_parsed: parseControle(lControle),
-      resumo_L10: lResumo[9],
-      resumo_parsed: parseResumoRepasses(lResumo),
-      contratos_header_L2: lContratos[1],
-      contratos_parsed: parseContratos(lContratos)
+      programacao: {
+        DER: { itens: prog8320.itens.length, total: prog8320.totalPlanejado, sample: prog8320.itens[0] },
+        SEMAD: { itens: prog5220.itens.length, total: prog5220.totalPlanejado, sample: prog5220.itens[0] }
+      },
+      controle: {
+        raw_L6: lControle[5],
+        parsed: controle
+      },
+      repasses: {
+        raw_L10: lResumo[9],
+        parsed: resumo
+      },
+      contratos: {
+        total: contratos.length,
+        sample: contratos[0]
+      }
     });
   } catch (e) {
-    res.status(500).json({ erro: e.message });
+    res.status(500).json({ erro: e.message, stack: e.stack });
   }
 });
 
