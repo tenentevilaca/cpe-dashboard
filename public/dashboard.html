@@ -1,546 +1,473 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel de Convênios CPE</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    :root {
-      --preto: #373435;
-      --dourado: #A08F63;
-      --branco: #FFFFFF;
-      --texto-mute: #888;
-      --bg: #f9f9f9;
-      --border: #ddd;
-      --verde: #4CAF50;
-      --amarelo: #FFC107;
-      --vermelho: #f44336;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--bg);
-      color: var(--preto);
-      padding: 20px;
-    }
-
-    header {
-      background: var(--preto);
-      color: var(--branco);
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    header h1 { font-size: 28px; }
-    header .controls { display: flex; gap: 10px; }
-    
-    .header-escudo {
-      width: 60px;
-      height: 60px;
-      margin-right: 20px;
-      display: flex;
-      align-items: center;
-    }
-    
-    .header-escudo img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-    
-    header .header-top {
-      display: flex;
-      align-items: center;
-    }
-    
-    button {
-      background: var(--dourado);
-      color: var(--preto);
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: all 0.3s;
-    }
-
-    button:hover {
-      background: #b39f75;
-      transform: translateY(-2px);
-    }
-
-    button:disabled {
-      background: var(--texto-mute);
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .loading { display: none; color: var(--branco); }
-    .loading.active { display: inline; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-
-    .card {
-      background: var(--branco);
-      padding: 20px;
-      border-radius: 8px;
-      border-left: 4px solid var(--dourado);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    .card.alert-red { border-left-color: var(--vermelho); }
-    .card.alert-yellow { border-left-color: var(--amarelo); }
-    .card.alert-green { border-left-color: var(--verde); }
-
-    .card-label {
-      font-size: 12px;
-      color: var(--texto-mute);
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    .card-value {
-      font-size: 24px;
-      font-weight: bold;
-      color: var(--preto);
-      margin-bottom: 8px;
-    }
-
-    .card-detail {
-      font-size: 13px;
-      color: var(--texto-mute);
-      line-height: 1.6;
-    }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: bold;
-      color: var(--preto);
-      margin-top: 40px;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid var(--dourado);
-    }
-
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-
-    .chart-container {
-      background: var(--branco);
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      position: relative;
-      height: 350px;
-    }
-
-    canvas { max-height: 300px !important; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--branco);
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    th {
-      background: var(--preto);
-      color: var(--branco);
-      padding: 12px;
-      text-align: left;
-      font-weight: 600;
-    }
-
-    td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    tr:hover { background: #f5f5f5; }
-
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: bold;
-    }
-
-    .badge-green { background: #c8e6c9; color: #2e7d32; }
-    .badge-yellow { background: #fff9c4; color: #f57f17; }
-    .badge-red { background: #ffcdd2; color: #c62828; }
-
-    .fmt { text-align: right; font-family: monospace; }
-
-    .table-wrapper {
-      overflow-x: auto;
-      margin-bottom: 30px;
-      border-radius: 8px;
-    }
-
-    .error {
-      background: #ffebee;
-      color: #c62828;
-      padding: 15px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-    }
-
-    .success {
-      background: #e8f5e9;
-      color: #2e7d32;
-      padding: 15px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard CPE 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--preto:#373435;--dourado:#A08F63;--dourado-claro:#C4B287;--bg:#FAF8F3;--bg-card:#FFFFFF;--bg-soft:#F2EFE6;--texto:#373435;--texto-soft:#5A5A5A;--texto-mute:#8A8A8A;--linha:#E0DCD0;--positivo:#6B5B3A;--aviso:#B47B2A;--perigo:#8B1A1A;--sombra:0 1px 3px rgba(55,52,53,.04),0 4px 16px rgba(55,52,53,.04)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--texto);line-height:1.5;min-height:100vh}
+.header{background:var(--preto);color:#FFF;padding:20px 40px;border-bottom:3px solid var(--dourado)}
+.header-top{display:flex;justify-content:space-between;align-items:center;max-width:1600px;margin:0 auto;gap:24px}
+.header-escudo{width:90px;height:90px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.header-escudo img{width:100%;height:100%;object-fit:contain}
+.header-info h1{font-family:'Source Serif Pro',serif;font-size:26px;color:#FFF}
+.header-info .subtitle{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.5px;color:var(--dourado-claro)}
+.refresh-btn{background:var(--dourado);color:var(--preto);border:none;padding:10px 18px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.refresh-btn:hover{background:var(--dourado-claro)}
+.last-update{font-size:10px;color:#FFF;opacity:.75;font-family:'JetBrains Mono',monospace;margin-top:4px;text-align:right}
+.status-line{background:rgba(255,255,255,.08);padding:8px 40px;text-align:center;font-size:11px;color:#FFF;font-family:'JetBrains Mono',monospace}
+.status-line.error{background:var(--perigo)}.status-line.success{background:rgba(160,143,99,.4)}
+.main{max-width:1600px;margin:0 auto;padding:28px 40px}
+.tabs-nav{display:flex;gap:4px;border-bottom:2px solid var(--linha);margin-bottom:24px;flex-wrap:wrap}
+.tab-btn{background:transparent;border:none;padding:12px 20px;font-size:13px;font-weight:600;color:var(--texto-soft);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;font-family:inherit}
+.tab-btn.active{color:var(--preto);border-bottom-color:var(--dourado)}
+.tab-content{display:none}.tab-content.active{display:block}
+.filtro-bar{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:16px 20px;margin-bottom:20px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;box-shadow:var(--sombra)}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-mute)}
+.fg select{background:var(--bg);border:1px solid var(--linha);padding:8px 12px;border-radius:4px;font-size:13px;color:var(--texto);cursor:pointer;font-family:inherit;min-width:180px}
+.section-title{font-family:'Source Serif Pro',serif;font-size:20px;font-weight:700;margin:32px 0 16px;padding-bottom:8px;border-bottom:2px solid var(--dourado);display:flex;align-items:baseline;gap:12px;color:var(--texto)}
+.section-title:first-child{margin-top:0}
+.section-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dourado)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpi-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.kpi-grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.kpi{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:18px 20px;box-shadow:var(--sombra);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--preto)}
+.kpi.gold::before{background:var(--dourado)}.kpi.positivo::before{background:var(--positivo)}.kpi.aviso::before{background:var(--aviso)}.kpi.perigo::before{background:var(--perigo)}
+.kpi-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-mute);margin-bottom:6px}
+.kpi-value{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--texto);margin-bottom:4px;word-break:break-word}
+.kpi-value.alerta{color:var(--perigo)}.kpi-value.av{color:var(--aviso)}
+.kpi-detail{font-size:11px;color:var(--texto-soft)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.charts-grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.chart-card{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:20px 24px;box-shadow:var(--sombra)}
+.chart-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-soft);margin-bottom:16px}
+.chart-container{position:relative;height:340px}
+.chart-container.tall{height:420px}
+.table-card{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;overflow:hidden;box-shadow:var(--sombra);margin-top:16px}
+.table-header{padding:18px 24px;border-bottom:1px solid var(--linha);display:flex;justify-content:space-between;align-items:center}
+.table-header h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-soft)}
+.table-meta{font-size:11px;color:var(--texto-mute);font-family:'JetBrains Mono',monospace}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--bg-soft)}
+th{padding:12px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--texto-soft);border-bottom:1px solid var(--linha);white-space:nowrap}
+th.num{text-align:right}
+td{padding:10px 14px;border-bottom:1px solid var(--linha);color:var(--texto)}
+td.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px}
+td.code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--texto-soft)}
+tbody tr:hover{background:var(--bg-soft)}
+tr.vencido{background:#FFEBEE}tr.crit{background:#FFE0B2}tr.alerta-row{background:#FFF9C4}
+.tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.tag-verde{background:#C8E6C9;color:#1B5E20;border:1px solid #66BB6A}
+.tag-amarelo{background:#FFF9C4;color:#5D4E00;border:1px solid #FBC02D;font-weight:700}
+.tag-vermelho{background:#FFAB91;color:#B71C1C;border:1px solid #C62828;font-weight:700}
+.bar-mini{width:100%;height:5px;background:var(--bg-soft);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar-fill{height:100%}.bar-low{background:var(--positivo)}.bar-mid{background:var(--aviso)}.bar-high{background:var(--perigo)}
+.pct-mini{font-size:10px;color:var(--texto-mute);font-family:'JetBrains Mono',monospace}
+.footer{max-width:1600px;margin:40px auto 0;padding:24px 40px 32px;border-top:1px solid var(--linha);font-size:11px;color:var(--texto-mute);text-align:center}
+@media(max-width:1200px){.kpi-grid,.kpi-grid-5{grid-template-columns:repeat(2,1fr)}.charts-grid,.charts-grid-2-1{grid-template-columns:1fr}}
+@media(max-width:768px){.header,.main,.status-line{padding-left:20px;padding-right:20px}.kpi-grid,.kpi-grid-3,.kpi-grid-5{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <header>
-    <div style="display: flex; align-items: center; gap: 20px; flex: 1;">
-      <img src="escudo.png" alt="Escudo PMMG" style="width: 70px; height: 70px; object-fit: contain;">
-      <div>
-        <h1>📊 Painel de Convênios CPE 2026</h1>
-        <p style="font-size: 12px; margin-top: 5px; opacity: 0.8;">Polícia Militar de Minas Gerais</p>
-      </div>
+<header class="header"><div class="header-top">
+  <div class="header-escudo"><img src="escudo.png" alt="Escudo PMMG CPE"></div>
+  <div class="header-info"><div class="subtitle">Estado-Maior do CPE | Exercício 2026</div><h1>Dashboard Orçamentário</h1></div>
+  <div><button class="refresh-btn" onclick="carregar()">🔄 Atualizar Dados</button><div class="last-update" id="upd">—</div></div>
+</div></header>
+<div class="status-line" id="status">Carregando...</div>
+<main class="main" id="main"><div style="text-align:center;padding:60px">Carregando dados...</div></main>
+<script>
+const CONV = { DPRF: 13086500.92, DER: 9000000.00, SEMAD: 12500000.00 };
+const CONV_DPRF_VARIAVEL = true;
+let D = null;
+let charts = {};
+let filtroFonte = 'TODAS';
+
+const fmt = v => (v==null||isNaN(v)) ? 'R$ 0,00' : 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = v => (v==null||isNaN(v)) ? '-' : (v*100).toFixed(1).replace('.',',')+'%';
+const eixoBR = v => 'R$ '+Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
+
+async function carregar(){
+  setStatus('Buscando dados das planilhas...','');
+  try{
+    const r = await fetch('/api/dados');
+    D = await r.json();
+    if(D.status!=='ok') throw new Error(D.msg||'erro');
+    setStatus('✓ Dados carregados com sucesso','success');
+    document.getElementById('upd').textContent='Atualizado: '+new Date().toLocaleString('pt-BR');
+    render();
+  }catch(e){ setStatus('⚠ Erro: '+e.message,'error'); }
+}
+function setStatus(m,t){const e=document.getElementById('status');e.textContent=m;e.className='status-line '+t;}
+
+function destroyCharts(){ Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}}); charts={}; }
+
+// ===== Agregações =====
+function elementosConsolidados(){
+  const map = {};
+  ['DER','SEMAD','DPRF'].forEach(f=>{
+    const prog = D.programacao[f];
+    if(!prog) return;
+    prog.itens.forEach(it=>{
+      const key = f+'|'+it.elemento;
+      if(!map[key]) map[key]={fonte:f,elemento:it.elemento,descricao:it.descricao,planejado:0,recebido:0,empenhado:0,saldoRepasse:0};
+      map[key].planejado += it.soma;
+    });
+  });
+  const pe = D.repasses.resumo.porElemento;
+  ['DPRF','DER','SEMAD'].forEach(f=>{
+    if(!pe[f]) return;
+    Object.entries(pe[f]).forEach(([elem,saldo])=>{
+      const key=f+'|'+elem;
+      if(!map[key]) map[key]={fonte:f,elemento:elem,descricao:'Elemento '+elem,planejado:0,recebido:0,empenhado:0,saldoRepasse:0};
+      map[key].saldoRepasse = saldo;
+    });
+  });
+  D.contratos.forEach(c=>{
+    Object.keys(map).forEach(key=>{
+      if(map[key].elemento===c.elemento) map[key].empenhado += 0;
+    });
+  });
+  return Object.values(map);
+}
+
+function totaisContratos(){
+  const cs=D.contratos;
+  let total=0,emp=0,saldo=0,aEmp=0;
+  const stat={vencido:0,crit:0,alerta:0,vigente:0,semData:0};
+  cs.forEach(c=>{
+    total+=c.valorTotal; emp+=c.empenhado; saldo+=c.saldoEmpenho; aEmp+=c.aEmpenhar;
+    const d=c.dias;
+    if(d===null||d===undefined) stat.semData++;
+    else if(d<0) stat.vencido++;
+    else if(d<=30) stat.crit++;
+    else if(d<=60) stat.alerta++;
+    else stat.vigente++;
+  });
+  return {total,emp,saldo,aEmp,stat,n:cs.length};
+}
+
+// ===== Render principal =====
+function render(){
+  document.getElementById('main').innerHTML = `
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-t="visao">📊 Visão Geral</button>
+      <button class="tab-btn" data-t="programacao">📅 Programação</button>
+      <button class="tab-btn" data-t="contratos">📋 Contratos</button>
+      <button class="tab-btn" data-t="repasses">💰 Repasses</button>
     </div>
-    <div class="controls">
-      <button id="btnAtualizar" onclick="atualizar()">
-        <span id="loadingText"></span>
-        🔄 Atualizar
-      </button>
+    <div class="tab-content active" id="t-visao"></div>
+    <div class="tab-content" id="t-programacao"></div>
+    <div class="tab-content" id="t-contratos"></div>
+    <div class="tab-content" id="t-repasses"></div>
+    <footer class="footer">Dashboard CPE 2026 — Conectado às planilhas CPE + Repasses · Atualização automática ao editar as planilhas</footer>
+  `;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',e=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
+    e.target.classList.add('active');
+    document.getElementById('t-'+e.target.dataset.t).classList.add('active');
+  }));
+  renderVisao();
+  renderProgramacao();
+  renderContratos();
+  renderRepasses();
+}
+
+// ===== ABA VISÃO GERAL =====
+function renderVisao(){
+  const c = totaisContratos();
+  const ctrl = D.controle;
+  const planTotal = (D.programacao.DER?.totalPlanejado||0)+(D.programacao.SEMAD?.totalPlanejado||0)+(D.programacao.DPRF?.totalPlanejado||0);
+  const recTotal = ctrl.DPRF.recebido+ctrl.DER.recebido+ctrl.SEMAD.recebido;
+  const convTotal = CONV.DPRF+CONV.DER+CONV.SEMAD;
+  const saldoRepTotal = D.repasses.resumo.saldos.DPRF+D.repasses.resumo.saldos.DER+D.repasses.resumo.saldos.SEMAD;
+
+  document.getElementById('t-visao').innerHTML = `
+    <h2 class="section-title"><span class="section-num">01</span>Resumo Geral dos Convênios</h2>
+    <div class="kpi-grid-5">
+      <div class="kpi gold"><div class="kpi-label">Convênios (Total)</div><div class="kpi-value">${fmt(convTotal)}</div><div class="kpi-detail">DPRF estimativo + DER + SEMAD</div></div>
+      <div class="kpi"><div class="kpi-label">Planejado (Total PT)</div><div class="kpi-value">${fmt(planTotal)}</div><div class="kpi-detail">${fmtPct(planTotal/convTotal)} dos convênios</div></div>
+      <div class="kpi positivo"><div class="kpi-label">Recebido até o momento</div><div class="kpi-value">${fmt(recTotal)}</div><div class="kpi-detail">${fmtPct(recTotal/convTotal)} dos convênios</div></div>
+      <div class="kpi aviso"><div class="kpi-label">Empenhado (Contratos)</div><div class="kpi-value">${fmt(c.emp)}</div><div class="kpi-detail">${c.n} contratos essenciais</div></div>
+      <div class="kpi ${saldoRepTotal>0?'positivo':''}"><div class="kpi-label">Saldo Disponível (Repasses)</div><div class="kpi-value">${fmt(saldoRepTotal)}</div><div class="kpi-detail">Recurso ainda em caixa</div></div>
     </div>
-  </header>
 
-  <div id="statusMsg"></div>
+    <h2 class="section-title"><span class="section-num">02</span>Situação por Convênio</h2>
+    <div class="kpi-grid-3" id="cards-convenio"></div>
 
-  <!-- KPIs SALDO E RECEBIMENTOS -->
-  <div class="section-title">💰 Recursos - Situação Atual</div>
-  <div class="grid" id="cards-recursos"></div>
-
-  <!-- ALERTAS CONTRATOS -->
-  <div class="section-title">⚠️ Alertas - Contratos por Vigência</div>
-  <div class="grid" id="cards-alertas"></div>
-
-  <!-- GRÁFICOS -->
-  <div class="section-title">📈 Análise</div>
-  <div class="charts-grid">
-    <div class="chart-container">
-      <h3 style="margin-bottom: 15px; font-size: 14px;">Repasses por Fonte</h3>
-      <canvas id="chart-repasses"></canvas>
+    <h2 class="section-title"><span class="section-num">03</span>Visão Consolidada</h2>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Convênio × Recebido × Planejado por Fonte</div><div class="chart-container"><canvas id="ch-fontes"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Recebido vs A Receber (Total)</div><div class="chart-container"><canvas id="ch-receb"></canvas></div></div>
     </div>
-    <div class="chart-container">
-      <h3 style="margin-bottom: 15px; font-size: 14px;">Recebido vs A Receber</h3>
-      <canvas id="chart-recebimento"></canvas>
+
+    <h2 class="section-title"><span class="section-num">04</span>Alerta de Contratos</h2>
+    <div class="kpi-grid-3">
+      <div class="kpi perigo"><div class="kpi-label">🔴 Vencidos / ≤30 dias</div><div class="kpi-value ${(c.stat.vencido+c.stat.crit)>0?'alerta':''}">${c.stat.vencido+c.stat.crit}</div><div class="kpi-detail">${c.stat.vencido} vencidos · ${c.stat.crit} críticos</div></div>
+      <div class="kpi aviso"><div class="kpi-label">🟡 Vencendo em até 60 dias</div><div class="kpi-value ${c.stat.alerta>0?'av':''}">${c.stat.alerta}</div><div class="kpi-detail">Requerem atenção</div></div>
+      <div class="kpi positivo"><div class="kpi-label">🟢 Vigentes (>60 dias)</div><div class="kpi-value">${c.stat.vigente}</div><div class="kpi-detail">Em dia</div></div>
     </div>
-  </div>
+  `;
 
-  <!-- CONTRATOS -->
-  <div class="section-title">📋 Contratos de Serviços Essenciais</div>
-  <div class="table-wrapper">
-    <table id="table-contratos">
-      <thead>
-        <tr>
-          <th>Elemento</th>
-          <th>Empresa</th>
-          <th>Objeto</th>
-          <th>Fim Vigência</th>
-          <th>Dias</th>
-          <th>Valor Total</th>
-          <th>Empenhado</th>
-          <th>Saldo Empenho</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  const fontes=[{k:'DPRF',nome:'DPRF (73.10)',obs:'Estimativo · repasses trimestrais'},{k:'DER',nome:'DER (83.20)',obs:'Fixo'},{k:'SEMAD',nome:'SEMAD (52.20)',obs:'Fixo'}];
+  document.getElementById('cards-convenio').innerHTML = fontes.map(f=>{
+    const conv=CONV[f.k], rec=ctrl[f.k].recebido, plan=D.programacao[f.k]?.totalPlanejado||0, saldo=D.repasses.resumo.saldos[f.k];
+    return `<div class="kpi gold"><div class="kpi-label">${f.nome}</div>
+      <div class="kpi-value">${fmt(conv)}</div>
+      <div class="kpi-detail" style="margin-top:8px;line-height:1.8">
+        Planejado: <strong>${fmt(plan)}</strong><br>
+        Recebido: <strong>${fmt(rec)}</strong> (${fmtPct(rec/conv)})<br>
+        Saldo em caixa: <strong>${fmt(saldo)}</strong><br>
+        <span style="color:var(--texto-mute)">${f.obs}</span>
+      </div></div>`;
+  }).join('');
 
-  <!-- PROGRAMAÇÃO -->
-  <div class="section-title">📌 Programação de Gastos</div>
-  <div class="table-wrapper">
-    <table id="table-programacao">
-      <thead>
-        <tr>
-          <th>Fonte</th>
-          <th>Elemento</th>
-          <th>Descrição</th>
-          <th>Total Planejado</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  charts.fontes = new Chart(document.getElementById('ch-fontes'),{
+    type:'bar',
+    data:{labels:['DPRF (73.10)','DER (83.20)','SEMAD (52.20)'],datasets:[
+      {label:'Convênio',data:[CONV.DPRF,CONV.DER,CONV.SEMAD],backgroundColor:'#C4B287'},
+      {label:'Planejado',data:[D.programacao.DPRF?.totalPlanejado||0,D.programacao.DER?.totalPlanejado||0,D.programacao.SEMAD?.totalPlanejado||0],backgroundColor:'#A08F63'},
+      {label:'Recebido',data:[ctrl.DPRF.recebido,ctrl.DER.recebido,ctrl.SEMAD.recebido],backgroundColor:'#373435'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.dataset.label+': '+fmt(x.parsed.y)}}},scales:{y:{ticks:{callback:eixoBR}}}}
+  });
 
-  <script>
-    const API_URL = '/api/dados';
-    let chartRepasses = null;
-    let chartRecebimento = null;
+  const aReceber = Math.max(0, convTotal - recTotal);
+  charts.receb = new Chart(document.getElementById('ch-receb'),{
+    type:'doughnut',
+    data:{labels:['Recebido','A Receber'],datasets:[{data:[recTotal,aReceber],backgroundColor:['#6B5B3A','#C4B287'],borderWidth:2,borderColor:'#FFF'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.label+': '+fmt(x.parsed)}}},cutout:'60%'}
+  });
+}
 
-    function fmt(v) {
-      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
-    }
+// ===== ABA PROGRAMAÇÃO =====
+function renderProgramacao(){
+  const el = document.getElementById('t-programacao');
+  el.innerHTML = `
+    <div class="filtro-bar">
+      <div class="fg"><label>Fonte / Convênio</label><select id="fp-fonte">
+        <option value="TODAS">Todas as Fontes</option>
+        <option value="DER">DER (83.20)</option>
+        <option value="SEMAD">SEMAD (52.20)</option>
+        <option value="DPRF">DPRF (73.10 - Superávit)</option>
+      </select></div>
+      <div class="fg"><label>Elemento</label><select id="fp-elem"><option value="TODOS">Todos os Elementos</option></select></div>
+    </div>
+    <h2 class="section-title"><span class="section-num">P1</span>Totais Planejados</h2>
+    <div class="kpi-grid" id="prog-kpis"></div>
+    <h2 class="section-title"><span class="section-num">P2</span>Planejamento Mês a Mês</h2>
+    <div class="chart-card"><div class="chart-title">Distribuição Mensal do Planejado</div><div class="chart-container tall"><canvas id="ch-mensal"></canvas></div></div>
+    <h2 class="section-title"><span class="section-num">P3</span>Planejado por Elemento</h2>
+    <div class="chart-card"><div class="chart-title">Total do Plano de Trabalho por Elemento</div><div class="chart-container tall"><canvas id="ch-prog-elem"></canvas></div></div>
+    <h2 class="section-title"><span class="section-num">P4</span>Detalhamento</h2>
+    <div id="prog-tabela"></div>
+  `;
+  document.getElementById('fp-fonte').addEventListener('change',atualizarProg);
+  document.getElementById('fp-elem').addEventListener('change',atualizarProg);
+  popularElemProg('TODAS');
+  atualizarProg();
+}
 
-    function fmtPct(v) {
-      return (v * 100).toFixed(1) + '%';
-    }
+function itensProg(fonte){
+  let itens=[];
+  const fontes = fonte==='TODAS' ? ['DER','SEMAD','DPRF'] : [fonte];
+  fontes.forEach(f=>{ if(D.programacao[f]) D.programacao[f].itens.forEach(it=>itens.push({...it,fonte:f})); });
+  return itens;
+}
 
-    async function atualizar() {
-      const btn = document.getElementById('btnAtualizar');
-      const loading = document.getElementById('loadingText');
-      btn.disabled = true;
-      loading.textContent = 'Atualizando...';
+function popularElemProg(fonte){
+  const sel=document.getElementById('fp-elem');
+  if(!sel) return;
+  const elems=[...new Set(itensProg(fonte).map(i=>i.elemento))].filter(Boolean).sort((a,b)=>a-b);
+  sel.innerHTML='<option value="TODOS">Todos os Elementos</option>'+elems.map(e=>'<option value="'+e+'">Elemento '+e+'</option>').join('');
+}
 
-      try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
-        const dados = await res.json();
-        
-        if (dados.status !== 'ok') throw new Error(dados.msg || 'Erro desconhecido');
+function atualizarProg(){
+  const fonte=document.getElementById('fp-fonte').value;
+  const elem=document.getElementById('fp-elem').value;
+  if(document.activeElement && document.activeElement.id==='fp-fonte') popularElemProg(fonte);
 
-        renderizar(dados);
-        mostrarMensagem('success', '✅ Dados atualizados com sucesso!');
-      } catch (e) {
-        console.error(e);
-        mostrarMensagem('error', '❌ Erro ao atualizar: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        loading.textContent = '';
-      }
-    }
+  let itens=itensProg(fonte);
+  if(elem!=='TODOS') itens=itens.filter(i=>i.elemento===elem);
 
-    function mostrarMensagem(tipo, texto) {
-      const div = document.getElementById('statusMsg');
-      div.className = tipo;
-      div.textContent = texto;
-      setTimeout(() => div.textContent = '', 5000);
-    }
+  const totalPlan=itens.reduce((s,i)=>s+i.soma,0);
+  const mensal={}; MESES_JS.forEach(m=>mensal[m]=0);
+  itens.forEach(i=>MESES_JS.forEach(m=>mensal[m]+=(i.meses[m]||0)));
+  const jaPlanejado=mensal['JANEIRO']+mensal['FEVEREIRO']+mensal['MARÇO']+mensal['ABRIL']+mensal['MAIO']+mensal['JUNHO'];
 
-    function renderizar(D) {
-      renderizarRecursos(D);
-      renderizarAlertas(D);
-      renderizarGraficos(D);
-      renderizarContratos(D);
-      renderizarProgramacao(D);
-    }
+  document.getElementById('prog-kpis').innerHTML = `
+    <div class="kpi gold"><div class="kpi-label">Total Planejado (PT)</div><div class="kpi-value">${fmt(totalPlan)}</div><div class="kpi-detail">${itens.length} itens de despesa</div></div>
+    <div class="kpi"><div class="kpi-label">Planejado 1º Semestre</div><div class="kpi-value">${fmt(jaPlanejado)}</div><div class="kpi-detail">Jan a Jun</div></div>
+    <div class="kpi positivo"><div class="kpi-label">Planejado 2º Semestre</div><div class="kpi-value">${fmt(totalPlan-jaPlanejado)}</div><div class="kpi-detail">Jul a Dez</div></div>
+    <div class="kpi"><div class="kpi-label">Média Mensal</div><div class="kpi-value">${fmt(totalPlan/12)}</div><div class="kpi-detail">Distribuição linear</div></div>
+  `;
 
-    function renderizarRecursos(D) {
-      const { repasses, controle } = D;
-      const html = [
-        {
-          titulo: '💰 DPRF (73.10)',
-          saldo: repasses.resumo.saldos.DPRF,
-          recebido: controle.DPRF.recebido,
-          descr: 'Estimativo · repasses trimestrais'
-        },
-        {
-          titulo: '💰 DER (83.20)',
-          saldo: repasses.resumo.saldos.DER,
-          recebido: controle.DER.recebido,
-          descr: 'Fixo · R$ 9.000.000'
-        },
-        {
-          titulo: '💰 SEMAD (52.20)',
-          saldo: repasses.resumo.saldos.SEMAD,
-          recebido: controle.SEMAD.recebido,
-          descr: 'Fixo · R$ 12.500.000'
-        }
-      ].map(c => `
-        <div class="card">
-          <div class="card-label">${c.titulo}</div>
-          <div class="card-value" style="color: var(--dourado);">${fmt(c.saldo)}</div>
-          <div class="card-detail">
-            Recebido: <strong>${fmt(c.recebido)}</strong><br>
-            <span style="color: var(--texto-mute)">${c.descr}</span>
-          </div>
-        </div>
-      `).join('');
-      document.getElementById('cards-recursos').innerHTML = html;
-    }
+  if(charts.mensal) charts.mensal.destroy();
+  charts.mensal = new Chart(document.getElementById('ch-mensal'),{
+    type:'bar',
+    data:{labels:MESES_JS.map(m=>m.substring(0,3)),datasets:[{label:'Planejado',data:MESES_JS.map(m=>mensal[m]),backgroundColor:'#A08F63'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>fmt(x.parsed.y)}}},scales:{y:{ticks:{callback:eixoBR}}}}
+  });
 
-    function renderizarAlertas(D) {
-      const { contratos } = D;
-      const vencidos = contratos.filter(c => c.dias !== null && c.dias <= 0).length;
-      const criticos = contratos.filter(c => c.dias !== null && c.dias > 0 && c.dias <= 30).length;
-      const alertas = contratos.filter(c => c.dias !== null && c.dias > 30 && c.dias <= 60).length;
-      const vigentes = contratos.filter(c => c.dias !== null && c.dias > 60).length;
+  const porElem={};
+  itens.forEach(i=>{ if(!porElem[i.elemento])porElem[i.elemento]={elem:i.elemento,desc:i.descricao,val:0}; porElem[i.elemento].val+=i.soma; });
+  const arr=Object.values(porElem).filter(x=>x.val>0).sort((a,b)=>b.val-a.val);
+  if(charts.progElem) charts.progElem.destroy();
+  charts.progElem = new Chart(document.getElementById('ch-prog-elem'),{
+    type:'bar',
+    data:{labels:arr.map(x=>'El.'+x.elem+' - '+String(x.desc).substring(0,22)),datasets:[{label:'Planejado',data:arr.map(x=>x.val),backgroundColor:'#373435'}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>fmt(x.parsed.x)}}},scales:{x:{ticks:{callback:eixoBR}}}}
+  });
 
-      const html = `
-        <div class="card ${vencidos > 0 ? 'alert-red' : ''}">
-          <div class="card-label">🔴 Vencidos</div>
-          <div class="card-value">${vencidos}</div>
-          <div class="card-detail">Ação urgente necessária</div>
-        </div>
-        <div class="card ${criticos > 0 ? 'alert-red' : ''}">
-          <div class="card-label">🔴 Críticos (≤30 dias)</div>
-          <div class="card-value">${criticos}</div>
-          <div class="card-detail">Vencimento iminente</div>
-        </div>
-        <div class="card ${alertas > 0 ? 'alert-yellow' : ''}">
-          <div class="card-label">🟡 Alertas (≤60 dias)</div>
-          <div class="card-value">${alertas}</div>
-          <div class="card-detail">Requerem atenção</div>
-        </div>
-        <div class="card ${vigentes > 0 ? 'alert-green' : ''}">
-          <div class="card-label">🟢 Vigentes (&gt;60 dias)</div>
-          <div class="card-value">${vigentes}</div>
-          <div class="card-detail">Em dia</div>
-        </div>
-      `;
-      document.getElementById('cards-alertas').innerHTML = html;
-    }
+  let html='<div class="table-card"><div class="table-header"><h3>Itens de Despesa Planejados</h3><span class="table-meta">'+itens.length+' itens · '+fmt(totalPlan)+'</span></div><div style="overflow-x:auto;max-height:520px"><table><thead><tr><th>Fonte</th><th>Elem.</th><th>Descrição</th><th class="num">Jan-Jun</th><th class="num">Jul-Dez</th><th class="num">Total PT</th></tr></thead><tbody>';
+  itens.sort((a,b)=>b.soma-a.soma).forEach(i=>{
+    const sem1=i.meses['JANEIRO']+i.meses['FEVEREIRO']+i.meses['MARÇO']+i.meses['ABRIL']+i.meses['MAIO']+i.meses['JUNHO'];
+    html+='<tr><td><span class="tag tag-verde">'+i.fonte+'</span></td><td class="code">'+i.elemento+'</td><td>'+i.descricao+'</td><td class="num">'+fmt(sem1)+'</td><td class="num">'+fmt(i.soma-sem1)+'</td><td class="num"><strong>'+fmt(i.soma)+'</strong></td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  document.getElementById('prog-tabela').innerHTML=html;
+}
 
-    function renderizarGraficos(D) {
-      const { repasses, controle } = D;
-      const fontes = ['DPRF', 'DER', 'SEMAD'];
+// ===== ABA CONTRATOS =====
+function renderContratos(){
+  const c=totaisContratos();
+  const el=document.getElementById('t-contratos');
+  el.innerHTML=`
+    <h2 class="section-title"><span class="section-num">C1</span>Panorama dos Contratos</h2>
+    <div class="kpi-grid">
+      <div class="kpi gold"><div class="kpi-label">Valor Total dos Contratos</div><div class="kpi-value">${fmt(c.total)}</div><div class="kpi-detail">${c.n} contratos vigentes</div></div>
+      <div class="kpi aviso"><div class="kpi-label">Empenhado</div><div class="kpi-value">${fmt(c.emp)}</div><div class="kpi-detail">${fmtPct(c.emp/c.total)} do total</div></div>
+      <div class="kpi"><div class="kpi-label">Saldo de Empenho</div><div class="kpi-value">${fmt(c.saldo)}</div><div class="kpi-detail">Disponível nos empenhos</div></div>
+      <div class="kpi perigo"><div class="kpi-label">A Empenhar (cumprir contrato)</div><div class="kpi-value">${fmt(c.aEmp)}</div><div class="kpi-detail">Necessário até fim da vigência</div></div>
+    </div>
+    <h2 class="section-title"><span class="section-num">C2</span>Alerta de Vigência</h2>
+    <div class="kpi-grid-3">
+      <div class="kpi perigo"><div class="kpi-label">🔴 Vencidos / ≤30 dias</div><div class="kpi-value ${(c.stat.vencido+c.stat.crit)>0?'alerta':''}">${c.stat.vencido+c.stat.crit}</div><div class="kpi-detail">${c.stat.vencido} vencidos · ${c.stat.crit} críticos (≤30d)</div></div>
+      <div class="kpi aviso"><div class="kpi-label">🟡 Vencendo em até 60 dias</div><div class="kpi-value ${c.stat.alerta>0?'av':''}">${c.stat.alerta}</div><div class="kpi-detail">Planejar renovação</div></div>
+      <div class="kpi positivo"><div class="kpi-label">🟢 Vigentes (>60 dias)</div><div class="kpi-value">${c.stat.vigente}</div><div class="kpi-detail">Em dia</div></div>
+    </div>
+    <h2 class="section-title"><span class="section-num">C3</span>Distribuição</h2>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Contratos por Status de Vigência</div><div class="chart-container"><canvas id="ch-cont-status"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Empenhado vs A Empenhar</div><div class="chart-container"><canvas id="ch-cont-emp"></canvas></div></div>
+    </div>
+    <h2 class="section-title"><span class="section-num">C4</span>Contratos por Vigência (mais críticos primeiro)</h2>
+    <div id="cont-tabela"></div>
+  `;
 
-      // Gráfico Repasses
-      const ctxRep = document.getElementById('chart-repasses').getContext('2d');
-      if (chartRepasses) chartRepasses.destroy();
-      chartRepasses = new Chart(ctxRep, {
-        type: 'bar',
-        data: {
-          labels: fontes,
-          datasets: [
-            {
-              label: 'Total Planejado',
-              data: [13086500.92, 9000000, 12500000],
-              backgroundColor: '#373435',
-              borderColor: '#373435',
-              borderWidth: 1
-            },
-            {
-              label: 'Saldo Disponível',
-              data: [
-                repasses.resumo.saldos.DPRF,
-                repasses.resumo.saldos.DER,
-                repasses.resumo.saldos.SEMAD
-              ],
-              backgroundColor: '#A08F63',
-              borderColor: '#A08F63',
-              borderWidth: 1
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'top' } },
-          scales: { y: { beginAtZero: true } }
-        }
-      });
+  charts.contStatus = new Chart(document.getElementById('ch-cont-status'),{
+    type:'doughnut',
+    data:{labels:['Vencidos','Críticos ≤30d','Alerta ≤60d','Vigentes >60d','Sem data'],datasets:[{data:[c.stat.vencido,c.stat.crit,c.stat.alerta,c.stat.vigente,c.stat.semData],backgroundColor:['#B71C1C','#E67E22','#FBC02D','#6B5B3A','#9E9E9E'],borderWidth:2,borderColor:'#FFF'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}},cutout:'55%'}
+  });
+  charts.contEmp = new Chart(document.getElementById('ch-cont-emp'),{
+    type:'doughnut',
+    data:{labels:['Empenhado','A Empenhar'],datasets:[{data:[c.emp,c.aEmp],backgroundColor:['#A08F63','#C4B287'],borderWidth:2,borderColor:'#FFF'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.label+': '+fmt(x.parsed)}}},cutout:'60%'}
+  });
 
-      // Gráfico Recebimento
-      const ctxRec = document.getElementById('chart-recebimento').getContext('2d');
-      if (chartRecebimento) chartRecebimento.destroy();
-      chartRecebimento = new Chart(ctxRec, {
-        type: 'bar',
-        data: {
-          labels: fontes,
-          datasets: [
-            {
-              label: 'Recebido',
-              data: [controle.DPRF.recebido, controle.DER.recebido, controle.SEMAD.recebido],
-              backgroundColor: '#4CAF50'
-            },
-            {
-              label: 'A Receber',
-              data: [
-                controle.DPRF.previsto - controle.DPRF.recebido,
-                controle.DER.previsto - controle.DER.recebido,
-                controle.SEMAD.previsto - controle.SEMAD.recebido
-              ],
-              backgroundColor: '#FFC107'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          indexAxis: 'x',
-          plugins: { legend: { position: 'top' } },
-          scales: { x: { stacked: true }, y: { stacked: true } }
-        }
-      });
-    }
+  const cs=[...D.contratos].sort((a,b)=>{
+    if(a.dias===null)return 1; if(b.dias===null)return -1; return a.dias-b.dias;
+  });
+  let html='<div class="table-card"><div class="table-header"><h3>Contratos com Etiquetas de Vigência</h3><span class="table-meta">'+cs.length+' contratos</span></div><div style="overflow-x:auto;max-height:600px"><table><thead><tr><th>Status</th><th class="num">Dias</th><th>Elem.</th><th>Empresa</th><th>Objeto</th><th>Fim Vigência</th><th class="num">Valor Total</th><th class="num">Empenhado</th><th class="num">A Empenhar</th></tr></thead><tbody>';
+  cs.forEach(c=>{
+    let rc='',tag='tag-verde',lbl='🟢 VIGENTE';
+    const d=c.dias;
+    if(d===null){tag='';lbl='—';}
+    else if(d<0){rc='vencido';tag='tag-vermelho';lbl='🔴 VENCIDO';}
+    else if(d<=30){rc='crit';tag='tag-vermelho';lbl='🔴 ≤30 DIAS';}
+    else if(d<=60){rc='alerta-row';tag='tag-amarelo';lbl='🟡 ≤60 DIAS';}
+    const fim=c.fimVigencia?String(c.fimVigencia).split(' ')[0].split('T')[0]:'-';
+    html+='<tr class="'+rc+'"><td><span class="tag '+tag+'">'+lbl+'</span></td><td class="num"><strong>'+(d!==null?d:'-')+'</strong></td><td class="code">'+c.elemento+'</td><td>'+c.empresa+'</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.objeto+'</td><td class="code">'+fim+'</td><td class="num">'+fmt(c.valorTotal)+'</td><td class="num">'+fmt(c.empenhado)+'</td><td class="num">'+fmt(c.aEmpenhar)+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  document.getElementById('cont-tabela').innerHTML=html;
+}
 
-    function renderizarContratos(D) {
-      const { contratos } = D;
-      const tbody = document.getElementById('table-contratos').querySelector('tbody');
-      
-      if (contratos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--texto-mute);">Nenhum contrato encontrado</td></tr>';
-        return;
-      }
+// ===== ABA REPASSES =====
+function renderRepasses(){
+  const r=D.repasses;
+  const ctrl=D.controle;
+  const el=document.getElementById('t-repasses');
+  const saldoTotal=r.resumo.saldos.DPRF+r.resumo.saldos.DER+r.resumo.saldos.SEMAD;
 
-      tbody.innerHTML = contratos.map(c => {
-        let status = '🟢 Vigente';
-        let classe = 'badge-green';
-        if (c.dias !== null) {
-          if (c.dias <= 0) { status = '🔴 Vencido'; classe = 'badge-red'; }
-          else if (c.dias <= 30) { status = '🔴 Crítico'; classe = 'badge-red'; }
-          else if (c.dias <= 60) { status = '🟡 Alerta'; classe = 'badge-yellow'; }
-        }
-        return `
-          <tr>
-            <td><strong>${c.elemento}</strong></td>
-            <td>${c.empresa}</td>
-            <td>${c.objeto}</td>
-            <td>${c.fimVigencia}</td>
-            <td>${c.dias !== null ? c.dias + ' dias' : '-'}</td>
-            <td class="fmt">${fmt(c.valorTotal)}</td>
-            <td class="fmt">${fmt(c.empenhado)}</td>
-            <td class="fmt">${fmt(c.saldoEmpenho)}</td>
-            <td><span class="status-badge ${classe}">${status}</span></td>
-          </tr>
-        `;
-      }).join('');
-    }
+  el.innerHTML=`
+    <h2 class="section-title"><span class="section-num">R1</span>Saldos Disponíveis (em caixa)</h2>
+    <div class="kpi-grid">
+      <div class="kpi gold"><div class="kpi-label">Saldo Total Disponível</div><div class="kpi-value">${fmt(saldoTotal)}</div><div class="kpi-detail">Soma das 3 fontes</div></div>
+      <div class="kpi positivo"><div class="kpi-label">DPRF (73.10)</div><div class="kpi-value">${fmt(r.resumo.saldos.DPRF)}</div><div class="kpi-detail">Recebido: ${fmt(ctrl.DPRF.recebido)}</div></div>
+      <div class="kpi positivo"><div class="kpi-label">DER (83.20)</div><div class="kpi-value">${fmt(r.resumo.saldos.DER)}</div><div class="kpi-detail">Recebido: ${fmt(ctrl.DER.recebido)}</div></div>
+      <div class="kpi positivo"><div class="kpi-label">SEMAD (52.20)</div><div class="kpi-value">${fmt(r.resumo.saldos.SEMAD)}</div><div class="kpi-detail">Recebido: ${fmt(ctrl.SEMAD.recebido)}</div></div>
+    </div>
 
-    function renderizarProgramacao(D) {
-      const { programacao } = D;
-      const tbody = document.getElementById('table-programacao').querySelector('tbody');
-      const itens = [
-        ...programacao.DER.itens,
-        ...programacao.SEMAD.itens,
-        ...programacao.DPRF.itens
-      ];
+    <h2 class="section-title"><span class="section-num">R2</span>Convênio × Recebido × A Receber</h2>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Por Fonte: Convênio, Recebido e A Receber</div><div class="chart-container"><canvas id="ch-rep-fonte"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Saldo Disponível por Fonte</div><div class="chart-container"><canvas id="ch-rep-saldo"></canvas></div></div>
+    </div>
 
-      if (itens.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--texto-mute);">Nenhuma programação encontrada</td></tr>';
-        return;
-      }
+    <h2 class="section-title"><span class="section-num">R3</span>Saldo Disponível por Elemento</h2>
+    <div class="filtro-bar">
+      <div class="fg"><label>Fonte</label><select id="fr-fonte">
+        <option value="DPRF">DPRF (73.10)</option>
+        <option value="SEMAD">SEMAD (52.20)</option>
+        <option value="DER">DER (83.20)</option>
+      </select></div>
+    </div>
+    <div class="chart-card"><div class="chart-title">Saldo por Elemento (selecione a fonte)</div><div class="chart-container"><canvas id="ch-rep-elem"></canvas></div></div>
 
-      tbody.innerHTML = itens.map(i => `
-        <tr>
-          <td><strong>${i.fonte}</strong></td>
-          <td>${i.elemento}</td>
-          <td>${i.descricao}</td>
-          <td class="fmt">${fmt(i.soma)}</td>
-        </tr>
-      `).join('');
-    }
+    <h2 class="section-title"><span class="section-num">R4</span>Movimentação dos Repasses</h2>
+    <div class="kpi-grid-3" id="rep-cond"></div>
+  `;
 
-    // Carrega na inicialização
-    window.addEventListener('load', atualizar);
-  </script>
+  charts.repFonte = new Chart(document.getElementById('ch-rep-fonte'),{
+    type:'bar',
+    data:{labels:['DPRF (73.10)','DER (83.20)','SEMAD (52.20)'],datasets:[
+      {label:'Convênio',data:[CONV.DPRF,CONV.DER,CONV.SEMAD],backgroundColor:'#C4B287'},
+      {label:'Recebido',data:[ctrl.DPRF.recebido,ctrl.DER.recebido,ctrl.SEMAD.recebido],backgroundColor:'#A08F63'},
+      {label:'A Receber',data:[Math.max(0,CONV.DPRF-ctrl.DPRF.recebido),Math.max(0,CONV.DER-ctrl.DER.recebido),Math.max(0,CONV.SEMAD-ctrl.SEMAD.recebido)],backgroundColor:'#373435'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.dataset.label+': '+fmt(x.parsed.y)}}},scales:{y:{ticks:{callback:eixoBR}}}}
+  });
+
+  charts.repSaldo = new Chart(document.getElementById('ch-rep-saldo'),{
+    type:'doughnut',
+    data:{labels:['DPRF','DER','SEMAD'],datasets:[{data:[r.resumo.saldos.DPRF,r.resumo.saldos.DER,r.resumo.saldos.SEMAD],backgroundColor:['#A08F63','#C4B287','#373435'],borderWidth:2,borderColor:'#FFF'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.label+': '+fmt(x.parsed)}}},cutout:'60%'}
+  });
+
+  document.getElementById('fr-fonte').addEventListener('change',e=>renderRepElem(e.target.value));
+  renderRepElem('DPRF');
+
+  document.getElementById('rep-cond').innerHTML=['DPRF','DER','SEMAD'].map(f=>{
+    const cd=r.condensados[f]||{descentralizado:0,repassado:0};
+    return `<div class="kpi gold"><div class="kpi-label">${f}</div>
+      <div class="kpi-value">${fmt(cd.repassado)}</div>
+      <div class="kpi-detail" style="margin-top:6px;line-height:1.7">Total descentralizado: <strong>${fmt(cd.descentralizado)}</strong><br>Total repassado: <strong>${fmt(cd.repassado)}</strong></div></div>`;
+  }).join('');
+}
+
+function renderRepElem(fonte){
+  const pe=D.repasses.resumo.porElemento[fonte]||{};
+  const nomesElem={'30':'Consumo (30)','37':'Limpeza (37)','39':'Serviços (39)','40':'Comunicação/TI (40)'};
+  const entries=Object.entries(pe).filter(([k,v])=>true);
+  if(charts.repElem) charts.repElem.destroy();
+  charts.repElem = new Chart(document.getElementById('ch-rep-elem'),{
+    type:'bar',
+    data:{labels:entries.map(([k])=>nomesElem[k]||('Elem '+k)),datasets:[{label:'Saldo Disponível',data:entries.map(([k,v])=>v),backgroundColor:'#A08F63'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>fmt(x.parsed.y)}}},scales:{y:{ticks:{callback:eixoBR}}}}
+  });
+}
+
+const MESES_JS=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+window.addEventListener('load',carregar);
+</script>
 </body>
 </html>
