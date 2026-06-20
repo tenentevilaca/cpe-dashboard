@@ -22,8 +22,7 @@ const ABAS_REPASSES = [
   'RESUMO',
   'DPRF- CONDENSADO',
   'DER- CONDENSADO',
-  'SEMAD- CONDENSADO',
-  'AJUSTE'
+  'SEMAD- CONDENSADO'
 ];
  
 function parseCSVLine(line) {
@@ -536,7 +535,7 @@ function renderDebug() {
     html += '<div class="aba-section"><strong>✓ ' + nomeAba + '</strong> (' + (dadosAba.rows?.length || 0) + ' linhas)<br>';
     html += '<span style="color: var(--texto-soft);">Colunas:</span> ' + (dadosAba.headers || []).join(' | ') + '</div>';
   }
-  html += '<br><strong style="font-size: 14px;">💰 PLANILHA REPASSES (5 abas: RESUMO, DPRF- CONDENSADO, DER- CONDENSADO, SEMAD- CONDENSADO, AJUSTE):</strong><br><br>';
+  html += '<br><strong style="font-size: 14px;">💰 PLANILHA REPASSES (4 abas: RESUMO, DPRF- CONDENSADO, DER- CONDENSADO, SEMAD- CONDENSADO):</strong><br><br>';
   if (Object.keys(state.repasses).length === 0) {
     html += '<div style="color: var(--perigo);">⚠ Nenhuma aba encontrada</div>';
   } else {
