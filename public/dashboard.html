@@ -76,7 +76,7 @@ tr.vencido{background:#FFEBEE}tr.crit{background:#FFE0B2}tr.alerta-row{backgroun
 </head>
 <body>
 <header class="header"><div class="header-top">
-  <div class="header-escudo"><img src="escudo.jpg" alt="Escudo PMMG CPE"></div>
+  <div class="header-escudo"><img src="escudo.jpg" alt="Escudo PMMG CPE" style="width: 130px; height: 130px;"></div>
   <div class="header-info"><div class="subtitle">Estado-Maior do CPE | Exercício 2026</div><h1>Dashboard Orçamentário</h1></div>
   <div><button class="refresh-btn" onclick="carregar()">🔄 Atualizar Dados</button><div class="last-update" id="upd">—</div></div>
 </div></header>
@@ -416,6 +416,7 @@ function renderRepasses(){
     <h2 class="section-title"><span class="section-num">R3</span>Saldo Disponível por Elemento</h2>
     <div class="filtro-bar">
       <div class="fg"><label>Fonte</label><select id="fr-fonte">
+        <option value="TODAS">Todas as Fontes</option>
         <option value="DPRF">DPRF (73.10)</option>
         <option value="SEMAD">SEMAD (52.20)</option>
         <option value="DER">DER (83.20)</option>
@@ -444,7 +445,7 @@ function renderRepasses(){
   });
 
   document.getElementById('fr-fonte').addEventListener('change',e=>renderRepElem(e.target.value));
-  renderRepElem('DPRF');
+  renderRepElem('TODAS');
 
   document.getElementById('rep-cond').innerHTML=['DPRF','DER','SEMAD'].map(f=>{
     const cd=r.condensados[f]||{descentralizado:0,repassado:0};
@@ -455,9 +456,22 @@ function renderRepasses(){
 }
 
 function renderRepElem(fonte){
-  const pe=D.repasses.resumo.porElemento[fonte]||{};
   const nomesElem={'30':'Consumo (30)','37':'Limpeza (37)','39':'Serviços (39)','40':'Comunicação/TI (40)'};
-  const entries=Object.entries(pe).filter(([k,v])=>true);
+  let entries=[];
+  
+  if(fonte==='TODAS'){
+    // Combina elementos de todas as fontes
+    const allElem={'30':0,'37':0,'39':0,'40':0};
+    ['DPRF','DER','SEMAD'].forEach(f=>{
+      const pe=D.repasses.resumo.porElemento[f]||{};
+      Object.entries(pe).forEach(([k,v])=>{ allElem[k]=(allElem[k]||0)+v; });
+    });
+    entries=Object.entries(allElem);
+  }else{
+    const pe=D.repasses.resumo.porElemento[fonte]||{};
+    entries=Object.entries(pe).filter(([k,v])=>true);
+  }
+  
   if(charts.repElem) charts.repElem.destroy();
   charts.repElem = new Chart(document.getElementById('ch-rep-elem'),{
     type:'bar',
