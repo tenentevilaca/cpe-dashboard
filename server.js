@@ -195,18 +195,14 @@ function parseResumoRepasses(linhas) {
   };
 }
 
-// CONDENSADO: totais em linha com "TOTAL DESCENTRALIZADO", colunas O,P (idx 14,15)
+// CONDENSADO: totais em L5 (idx 4), colunas O,P (idx 14,15)
 function parseCondensado(linhas) {
   let desc = 0, rep = 0;
-  for (let i = 0; i < linhas.length; i++) {
-    const r = linhas[i] || [];
-    const totalDesc = num(r[14]);
-    const totalRep = num(r[15]);
-    if (totalDesc > 0 || totalRep > 0) {
-      desc = totalDesc;
-      rep = totalRep;
-      break;
-    }
+  // Procura especificamente na linha 5 (idx 4)
+  const r = linhas[4] || [];
+  if (r.length > 15) {
+    desc = num(r[14]);
+    rep = num(r[15]);
   }
   return { descentralizado: desc, repassado: rep };
 }
@@ -271,19 +267,14 @@ app.get('/debug-repasses', async (req, res) => {
     ]);
 
     res.json({
-      resumo_L18_saldo_elementos: lResumo[17],
-      resumo_L18_parsed: {
-        DPRF_30: lResumo[17]?.[4],
-        DPRF_37: lResumo[17]?.[5],
-        DPRF_39: lResumo[17]?.[6],
-        DPRF_40: lResumo[17]?.[7],
-        DER_30: lResumo[17]?.[9],
-        DER_37: lResumo[17]?.[10],
-        SEMAD_30: lResumo[17]?.[14]
-      },
-      dprf_condensado_primeiras10: lDprfCond.slice(0, 10),
-      der_condensado_primeiras10: lDerCond.slice(0, 10),
-      semad_condensado_primeiras10: lSemadCond.slice(0, 10)
+      resumo_total_linhas: lResumo.length,
+      resumo_L18_idx17: lResumo[17],
+      resumo_todas_linhas: lResumo,
+      condensado_teste: {
+        DPRF_L5: lDprfCond[4],
+        DER_L5: lDerCond[4],
+        SEMAD_L5: lSemadCond[4]
+      }
     });
   } catch (e) {
     res.status(500).json({ erro: e.message });
