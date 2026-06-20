@@ -260,6 +260,36 @@ app.get('/api/dados', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// ====== DEBUG REPASSES ======
+app.get('/debug-repasses', async (req, res) => {
+  try {
+    const [lResumo, lDprfCond, lDerCond, lSemadCond] = await Promise.all([
+      lerAbaBruta(SHEET_REPASSES, 'RESUMO'),
+      lerAbaBruta(SHEET_REPASSES, 'DPRF- CONDENSADO'),
+      lerAbaBruta(SHEET_REPASSES, ' DER- CONDENSADO'),
+      lerAbaBruta(SHEET_REPASSES, 'SEMAD- CONDENSADO')
+    ]);
+
+    res.json({
+      resumo_L18_saldo_elementos: lResumo[17],
+      resumo_L18_parsed: {
+        DPRF_30: lResumo[17]?.[4],
+        DPRF_37: lResumo[17]?.[5],
+        DPRF_39: lResumo[17]?.[6],
+        DPRF_40: lResumo[17]?.[7],
+        DER_30: lResumo[17]?.[9],
+        DER_37: lResumo[17]?.[10],
+        SEMAD_30: lResumo[17]?.[14]
+      },
+      dprf_condensado_primeiras10: lDprfCond.slice(0, 10),
+      der_condensado_primeiras10: lDerCond.slice(0, 10),
+      semad_condensado_primeiras10: lSemadCond.slice(0, 10)
+    });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
 const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
