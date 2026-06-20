@@ -327,7 +327,7 @@ app.get('/api/dados', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// ====== DEBUG ======
+// ====== DEBUG - ESTRUTURA COMPLETA ======
 app.get('/debug', async (req, res) => {
   try {
     const [lProg8320, lProg5220, lControle, lResumo, lContratos] = await Promise.all([
@@ -338,29 +338,13 @@ app.get('/debug', async (req, res) => {
       lerAbaBruta(SHEET_CPE, 'CONTRATOS SERVIÇOS ESSENCIAIS')
     ]);
 
-    const prog8320 = parsePrograma(lProg8320, 'DER', 7);
-    const prog5220 = parsePrograma(lProg5220, 'SEMAD', 3);
-    const controle = parseControle(lControle);
-    const resumo = parseResumoRepasses(lResumo);
-    const contratos = parseContratos(lContratos);
-
+    // Mostrar primeiras 30 linhas de cada aba
     res.json({
-      programacao: {
-        DER: { itens: prog8320.itens.length, total: prog8320.totalPlanejado, sample: prog8320.itens[0] },
-        SEMAD: { itens: prog5220.itens.length, total: prog5220.totalPlanejado, sample: prog5220.itens[0] }
-      },
-      controle: {
-        raw_L6: lControle[5],
-        parsed: controle
-      },
-      repasses: {
-        raw_L10: lResumo[9],
-        parsed: resumo
-      },
-      contratos: {
-        total: contratos.length,
-        sample: contratos[0]
-      }
+      prog83_primeiras30: lProg8320.slice(0, 30),
+      prog52_primeiras30: lProg5220.slice(0, 30),
+      controle_primeiras15: lControle.slice(0, 15),
+      resumo_primeiras25: lResumo.slice(0, 25),
+      contratos_primeiras10: lContratos.slice(0, 10)
     });
   } catch (e) {
     res.status(500).json({ erro: e.message, stack: e.stack });
