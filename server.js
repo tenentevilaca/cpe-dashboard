@@ -30,9 +30,10 @@ async function lerAbaBruta(sheetId, nomeAba) {
     const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(nomeAba)}`;
     const res = await axios.get(url, { timeout: 20000 });
     const linhas = res.data.split(/\r?\n/).map(l => parseCSVLine(l));
+    console.log(`✓ Aba "${nomeAba}" carregada com ${linhas.length} linhas`);
     return linhas;
   } catch (e) {
-    console.error(`Erro ao ler aba "${nomeAba}":`, e.message);
+    console.error(`✗ Erro ao ler aba "${nomeAba}":`, e.message);
     return [];
   }
 }
@@ -41,22 +42,13 @@ async function lerAbaBruta(sheetId, nomeAba) {
 function num(v) {
   if (v === null || v === undefined || v === '' || v === '-') return 0;
   if (typeof v === 'number') return v;
-  let s = String(v).replace(/R\$/g, '').replace(/\s/g, '').replace(/\u00a0/g, '').trim();
-  if (s === '' || s === '-') return 0;
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  let s = String(v).trim().replace(/R\$/g, '').replace(/\./g, '').replace(/\s/g, '');
+  if (s.includes(',')) s = s.replace(',', '.');
   const n = parseFloat(s);
   return (isNaN(n) || Math.abs(n) < 0.001) ? 0 : n;
 }
 
 const MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
-
-function encontrarColuna(hdr, palavras) {
-  for (let i = 0; i < hdr.length; i++) {
-    const h = String(hdr[i] || '').trim().toUpperCase();
-    if (palavras.some(p => h.includes(p))) return i;
-  }
-  return -1;
-}
 
 function calcularDiasVigencia(dataFim) {
   if (!dataFim) return null;
@@ -71,31 +63,30 @@ function calcularDiasVigencia(dataFim) {
 
 // ====== PARSERS ESPECÍFICOS ======
 
-// PROGRAMAÇÃO 83.20 e 52.20
 function parsePrograma(linhas, fonte, headerIdx) {
   const hdr = linhas[headerIdx] || [];
-  const colMes = {};
-  let colDesc = -1, colElem = -1, colSoma = -1;
+  const colMes = {}, col = {};
   
   hdr.forEach((h, i) => {
     const H = String(h).trim().toUpperCase();
-    MESES.forEach(m => { if (H === m) colMes[m] = i; });
-    if (H.includes('DESCRI')) colDesc = i;
-    if (H.includes('ELEM')) colElem = i;
-    if (H.includes('SOMA') || H.includes('TOTAL')) colSoma = i;
+    MESES.forEach(m => { if (H === m || H.startsWith(m)) colMes[m] = i; });
+    if (H.includes('DESCRI')) col.desc = i;
+    if (H.includes('ELEM')) col.elem = i;
+    if (H.includes('SOMA') || H.includes('TOTAL PT')) col.soma = i;
   });
 
   const itens = [];
   let totalPlanejado = 0;
-  const planejMensal = {}; MESES.forEach(m => planejMensal[m] = 0);
+  const planejMensal = {};
+  MESES.forEach(m => planejMensal[m] = 0);
 
   for (let i = headerIdx + 1; i < linhas.length; i++) {
     const r = linhas[i];
     if (!r || r.length === 0) continue;
-    const desc = colDesc >= 0 ? String(r[colDesc] || '').trim() : '';
-    const elem = colElem >= 0 ? String(r[colElem] || '').trim() : '';
+    const desc = col.desc >= 0 ? String(r[col.desc] || '').trim() : '';
+    const elem = col.elem >= 0 ? String(r[col.elem] || '').trim() : '';
     if (!desc || !elem) continue;
-    if (desc.toUpperCase().includes('VALOR MENSAL') || desc.toUpperCase().includes('VALOR TRIMESTRAL')) continue;
+    if (desc.toUpperCase().includes('VALOR MENSAL')) continue;
 
     const meses = {};
     let somaItem = 0;
@@ -106,10 +97,10 @@ function parsePrograma(linhas, fonte, headerIdx) {
       planejMensal[m] += val;
     });
 
-    if (somaItem === 0 && colSoma >= 0) somaItem = num(r[colSoma]);
+    if (somaItem === 0 && col.soma >= 0) somaItem = num(r[col.soma]);
     if (somaItem > 0) {
       totalPlanejado += somaItem;
-      const elemNum = elem.split('.')[0].split('-')[0].trim();
+      const elemNum = String(elem).split('.')[0].split('-')[0].trim();
       itens.push({ elemento: elemNum, descricao: desc, fonte, meses, soma: somaItem });
     }
   }
@@ -117,32 +108,31 @@ function parsePrograma(linhas, fonte, headerIdx) {
   return { fonte, itens, totalPlanejado, planejMensal };
 }
 
-// SUPERÁVIT 73.10
 function parseSuperavit(linhas) {
   const headerIdx = 3;
   const hdr = linhas[headerIdx] || [];
-  const colMes = {};
-  let colDesc = -1, colElem = -1, colSoma = -1;
+  const colMes = {}, col = {};
   
   hdr.forEach((h, i) => {
     const H = String(h).trim().toUpperCase();
-    MESES.forEach(m => { if (H === m) colMes[m] = i; });
-    if (H.includes('DESCRI')) colDesc = i;
-    if (H === 'ELEMENTO') colElem = i;
-    if (H.includes('SOMA') || H.includes('TOTAL')) colSoma = i;
+    MESES.forEach(m => { if (H === m || H.startsWith(m)) colMes[m] = i; });
+    if (H.includes('DESCRI')) col.desc = i;
+    if (H === 'ELEMENTO') col.elem = i;
+    if (H.includes('SOMA') || H.includes('TOTAL')) col.soma = i;
   });
 
   const itens = [];
   let totalPlanejado = 0;
-  const planejMensal = {}; MESES.forEach(m => planejMensal[m] = 0);
+  const planejMensal = {};
+  MESES.forEach(m => planejMensal[m] = 0);
 
   for (let i = headerIdx + 1; i < linhas.length; i++) {
     const r = linhas[i];
-    if (!r || r.length === 0) continue;
-    const desc = colDesc >= 0 ? String(r[colDesc] || '').trim() : '';
-    const elem = colElem >= 0 ? String(r[colElem] || '').trim() : '';
+    if (!r) continue;
+    const desc = col.desc >= 0 ? String(r[col.desc] || '').trim() : '';
+    const elem = col.elem >= 0 ? String(r[col.elem] || '').trim() : '';
     if (!desc || !elem) continue;
-    if (desc.toUpperCase().includes('TOTAL MENSAL') || elem.toUpperCase().includes('TOTAL')) continue;
+    if (desc.toUpperCase().includes('TOTAL')) continue;
 
     const meses = {};
     let somaItem = 0;
@@ -152,17 +142,16 @@ function parseSuperavit(linhas) {
       somaItem += val;
       planejMensal[m] += val;
     });
-    if (somaItem === 0 && colSoma >= 0) somaItem = num(r[colSoma]);
+    if (somaItem === 0 && col.soma >= 0) somaItem = num(r[col.soma]);
     if (somaItem > 0) {
       totalPlanejado += somaItem;
-      const elemNum = elem.split('.')[0].split('-')[0].trim();
+      const elemNum = String(elem).split('.')[0].split('-')[0].trim();
       itens.push({ elemento: elemNum, descricao: desc, fonte: 'DPRF', meses, soma: somaItem });
     }
   }
   return { fonte: 'DPRF', itens, totalPlanejado, planejMensal };
 }
 
-// CONTRATOS (header em L2 = índice 1)
 function parseContratos(linhas) {
   const headerIdx = 1;
   const hdr = linhas[headerIdx] || [];
@@ -175,7 +164,7 @@ function parseContratos(linhas) {
     if (H.includes('EMPRESA')) col.empresa = i;
     if (H === 'OBJETO') col.objeto = i;
     if (H.includes('FIM DA VIG')) col.fimVig = i;
-    if (H.includes('FIM (DIAS)') || H.includes('FIM(DIAS)')) col.dias = i;
+    if (H.includes('FIM (DIAS)')) col.dias = i;
     if (H.includes('VALOR TOTAL')) col.valorTotal = i;
     if (H.includes('VALOR EMPENHADO')) col.empenhado = i;
     if (H.includes('SALDO DE EMPENHO')) col.saldoEmp = i;
@@ -186,15 +175,15 @@ function parseContratos(linhas) {
   const contratos = [];
   for (let i = headerIdx + 1; i < linhas.length; i++) {
     const r = linhas[i];
-    if (!r || r.length === 0) continue;
-    const empresa = col.empresa !== undefined ? String(r[col.empresa] || '').trim() : '';
+    if (!r) continue;
+    const empresa = col.empresa >= 0 ? String(r[col.empresa] || '').trim() : '';
     if (!empresa) continue;
     
     const valorTotal = num(r[col.valorTotal]);
     if (valorTotal === 0) continue;
 
     let dias = null;
-    if (col.dias !== undefined) {
+    if (col.dias >= 0) {
       const d = r[col.dias];
       if (d && d !== '' && d !== '-') {
         const dn = num(d);
@@ -202,8 +191,7 @@ function parseContratos(linhas) {
       }
     }
     
-    // Se não encontrou dias na coluna, calcula da vigência
-    if (dias === null && col.fimVig !== undefined) {
+    if (dias === null && col.fimVig >= 0) {
       dias = calcularDiasVigencia(r[col.fimVig]);
     }
 
@@ -221,53 +209,61 @@ function parseContratos(linhas) {
       aEmpenhar: num(r[col.aEmpenhar])
     });
   }
+  console.log(`✓ ${contratos.length} contratos carregados`);
   return contratos;
 }
 
-// CONTROLE DE DESCENTRALIZAÇÕES (L6 = índice 5)
 function parseControle(linhas) {
+  // L6 (idx 5) tem valores: B=DPRF prev, C=DPRF receb, D=dif, E=DER prev, F=DER receb, G=dif, H=SEMAD prev, I=SEMAD receb, J=dif
   const r = linhas[5] || [];
-  return {
+  const ctrl = {
     DPRF: { previsto: num(r[1]), recebido: num(r[2]), diferenca: num(r[3]) },
     DER: { previsto: num(r[4]), recebido: num(r[5]), diferenca: num(r[6]) },
     SEMAD: { previsto: num(r[7]), recebido: num(r[8]), diferenca: num(r[9]) }
   };
+  console.log(`✓ Controle carregado - DPRF: R$${ctrl.DPRF.recebido}, DER: R$${ctrl.DER.recebido}, SEMAD: R$${ctrl.SEMAD.recebido}`);
+  return ctrl;
 }
 
-// RESUMO DE REPASSES (busca valores em linhas 10-11, colunas E, J, O)
 function parseResumoRepasses(linhas) {
-  // Tenta L10 e L11 para saldo atual
   let saldos = { DPRF: 0, DER: 0, SEMAD: 0 };
   
-  for (let i = 9; i <= 10; i++) {
+  // Busca nos valores em L10-L11 (índices 9-10)
+  for (let i = 9; i <= 11; i++) {
     const r = linhas[i] || [];
-    const d = num(r[4]) || num(r[5]);
-    const er = num(r[9]) || num(r[10]);
-    const s = num(r[14]) || num(r[15]);
-    if (d > 0 || er > 0 || s > 0) {
-      saldos = { DPRF: d, DER: er, SEMAD: s };
+    if (!r || r.length < 15) continue;
+    
+    // Colunas E (4), J (9), O (14)
+    const dprfVal = num(r[4]);
+    const derVal = num(r[9]);
+    const semadVal = num(r[14]);
+    
+    if (dprfVal > 0 || derVal > 0 || semadVal > 0) {
+      saldos = { DPRF: dprfVal, DER: derVal, SEMAD: semadVal };
+      console.log(`✓ Saldos encontrados - DPRF: R$${dprfVal}, DER: R$${derVal}, SEMAD: R$${semadVal}`);
       break;
     }
   }
 
-  // Tenta encontrar saldo por elemento (geralmente na linha com "SALDO")
   const porElemento = {
     DPRF: { '30': 0, '37': 0, '39': 0, '40': 0 },
     DER: { '30': 0, '37': 0, '39': 0, '40': 0 },
-    SEMAD: { '30': 0, '37': 0, '39': 0, '40': 0 }
+    SEMAD: { '30': 0, '37': 0, '39': 0 }
   };
 
   return { saldos, porElemento };
 }
 
-// CONDENSADO: pega valores de REPASSADO (L8, coluna O=14 ou similar)
 function parseCondensado(linhas) {
   let descentralizado = 0, repassado = 0;
   
-  for (let i = 6; i <= 8; i++) {
+  for (let i = 6; i <= 9; i++) {
     const r = linhas[i] || [];
+    if (!r || r.length < 16) continue;
+    
     const desc = num(r[14]);
     const rep = num(r[15]);
+    
     if (desc > 0 || rep > 0) {
       descentralizado = desc;
       repassado = rep;
@@ -280,9 +276,8 @@ function parseCondensado(linhas) {
 
 // ====== API ======
 app.get('/api/dados', async (req, res) => {
+  console.log('\n📊 Buscando dados...');
   try {
-    console.log('Buscando dados das planilhas...');
-    
     const [
       lProg8320, lProg5220, lSuper, lContratos, lControle,
       lResumo, lDprfCond, lDerCond, lSemadCond
@@ -310,10 +305,7 @@ app.get('/api/dados', async (req, res) => {
       SEMAD: parseCondensado(lSemadCond)
     };
 
-    console.log('Dados carregados com sucesso');
-    console.log('Saldos:', resumoRep.saldos);
-    console.log('Recebidos:', controle);
-    console.log('Total contratos:', contratos.length);
+    console.log('\n✓ Todos os dados carregados com sucesso!\n');
 
     res.json({
       status: 'ok',
@@ -324,17 +316,16 @@ app.get('/api/dados', async (req, res) => {
       repasses: { resumo: resumoRep, condensados }
     });
   } catch (e) {
-    console.error('Erro ao processar dados:', e);
+    console.error('✗ ERRO:', e);
     res.status(500).json({ status: 'erro', msg: e.message });
   }
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// ====== STATIC FILES ======
 const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Dashboard CPE rodando na porta ' + PORT));
+app.listen(PORT, () => console.log(`\n🚀 Dashboard CPE rodando na porta ${PORT}\n`));
