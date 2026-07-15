@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -257,6 +259,18 @@ app.get('/api/dados', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// ====== ÁGUA / HIDRÔMETROS ======
+app.get('/api/agua', (req, res) => {
+  try {
+    const dados = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'agua.json'), 'utf-8'));
+    res.json(dados);
+  } catch (e) {
+    console.error('ERRO /api/agua:', e);
+    res.status(500).json({ status: 'erro', msg: e.message });
+  }
+});
+app.get('/agua', (req, res) => res.sendFile(path.join(__dirname, 'public', 'agua.html')));
+
 // ====== DEBUG REPASSES ======
 app.get('/debug-repasses', async (req, res) => {
   try {
@@ -282,7 +296,6 @@ app.get('/debug-repasses', async (req, res) => {
   }
 });
 
-const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 

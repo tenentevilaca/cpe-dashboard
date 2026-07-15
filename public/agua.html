@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consumo de Água — CPE 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="/vendor/chart.umd.js"></script>
+<style>
+:root{--preto:#373435;--dourado:#A08F63;--dourado-claro:#C4B287;--bg:#FAF8F3;--bg-card:#FFFFFF;--bg-soft:#F2EFE6;--texto:#373435;--texto-soft:#5A5A5A;--texto-mute:#8A8A8A;--linha:#E0DCD0;--positivo:#6B5B3A;--aviso:#B47B2A;--perigo:#8B1A1A;--sombra:0 1px 3px rgba(55,52,53,.04),0 4px 16px rgba(55,52,53,.04);
+--normal:#2E7D32;--n1:#F9A825;--n2:#EF6C00;--n3:#C62828}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--texto);line-height:1.5;min-height:100vh}
+.header{background:var(--preto);color:#FFF;padding:20px 40px;border-bottom:3px solid var(--dourado)}
+.header-top{display:flex;justify-content:space-between;align-items:center;max-width:1600px;margin:0 auto;gap:24px}
+.header-escudo{width:90px;height:90px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.header-escudo img{width:100%;height:100%;object-fit:contain}
+.header-info h1{font-family:'Source Serif Pro',serif;font-size:26px;color:#FFF}
+.header-info .subtitle{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.5px;color:var(--dourado-claro)}
+.header-actions{display:flex;align-items:center;gap:12px}
+.nav-link{background:transparent;color:var(--dourado-claro);border:1px solid var(--dourado-claro);padding:9px 16px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block}
+.nav-link:hover{background:rgba(196,178,135,.15)}
+.refresh-btn{background:var(--dourado);color:var(--preto);border:none;padding:10px 18px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.refresh-btn:hover{background:var(--dourado-claro)}
+.last-update{font-size:10px;color:#FFF;opacity:.75;font-family:'JetBrains Mono',monospace;margin-top:4px;text-align:right}
+.status-line{background:rgba(255,255,255,.08);padding:8px 40px;text-align:center;font-size:11px;color:#FFF;font-family:'JetBrains Mono',monospace}
+.status-line.error{background:var(--perigo)}.status-line.success{background:rgba(160,143,99,.4)}
+.main{max-width:1600px;margin:0 auto;padding:28px 40px}
+.tabs-nav{display:flex;gap:4px;border-bottom:2px solid var(--linha);margin-bottom:24px;flex-wrap:wrap}
+.tab-btn{background:transparent;border:none;padding:12px 20px;font-size:13px;font-weight:600;color:var(--texto-soft);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;font-family:inherit}
+.tab-btn.active{color:var(--preto);border-bottom-color:var(--dourado)}
+.tab-content{display:none}.tab-content.active{display:block}
+.filtro-bar{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:16px 20px;margin-bottom:20px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;box-shadow:var(--sombra)}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-mute)}
+.fg select{background:var(--bg);border:1px solid var(--linha);padding:8px 12px;border-radius:4px;font-size:13px;color:var(--texto);cursor:pointer;font-family:inherit;min-width:180px}
+.section-title{font-family:'Source Serif Pro',serif;font-size:20px;font-weight:700;margin:32px 0 16px;padding-bottom:8px;border-bottom:2px solid var(--dourado);display:flex;align-items:baseline;gap:12px;color:var(--texto)}
+.section-title:first-child{margin-top:0}
+.section-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dourado)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpi-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpi{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:18px 20px;box-shadow:var(--sombra);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--preto)}
+.kpi.gold::before{background:var(--dourado)}.kpi.positivo::before{background:var(--normal)}
+.kpi.n1::before{background:var(--n1)}.kpi.n2::before{background:var(--n2)}.kpi.n3::before{background:var(--n3)}
+.kpi-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-mute);margin-bottom:6px}
+.kpi-value{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:600;color:var(--texto);margin-bottom:4px;word-break:break-word}
+.kpi-value.alerta{color:var(--n3)}.kpi-value.av{color:var(--n2)}
+.kpi-detail{font-size:11px;color:var(--texto-soft)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.charts-grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.chart-card{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:20px 24px;box-shadow:var(--sombra)}
+.chart-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-soft);margin-bottom:16px}
+.chart-container{position:relative;height:340px}
+.chart-container.tall{height:460px}
+.table-card{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;overflow:hidden;box-shadow:var(--sombra);margin-top:16px}
+.table-header{padding:18px 24px;border-bottom:1px solid var(--linha);display:flex;justify-content:space-between;align-items:center}
+.table-header h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-soft)}
+.table-meta{font-size:11px;color:var(--texto-mute);font-family:'JetBrains Mono',monospace}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--bg-soft)}
+th{padding:12px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--texto-soft);border-bottom:1px solid var(--linha);white-space:nowrap}
+th.num{text-align:right}
+td{padding:10px 14px;border-bottom:1px solid var(--linha);color:var(--texto)}
+td.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px}
+td.code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--texto-soft)}
+tbody tr:hover{background:var(--bg-soft)}
+tr.row-n1{background:#FFF9C4}tr.row-n2{background:#FFE0B2}tr.row-n3{background:#FFCDD2}
+.tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.tag-verde{background:#C8E6C9;color:#1B5E20;border:1px solid #66BB6A}
+.tag-n1{background:#FFF9C4;color:#5D4E00;border:1px solid #FBC02D;font-weight:700}
+.tag-n2{background:#FFE0B2;color:#E65100;border:1px solid #FB8C00;font-weight:700}
+.tag-n3{background:#C62828;color:#FFF;border:1px solid #8B1A1A;font-weight:700}
+.bar-mini{width:100%;height:5px;background:var(--bg-soft);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar-fill{height:100%}.bar-low{background:var(--normal)}.bar-n1{background:var(--n1)}.bar-n2{background:var(--n2)}.bar-n3{background:var(--n3)}
+.pct-mini{font-size:10px;color:var(--texto-mute);font-family:'JetBrains Mono',monospace}
+.legend-criterios{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.legend-item{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:10px 16px;font-size:12px;box-shadow:var(--sombra)}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.footer{max-width:1600px;margin:40px auto 0;padding:24px 40px 32px;border-top:1px solid var(--linha);font-size:11px;color:var(--texto-mute);text-align:center}
+@media(max-width:1200px){.kpi-grid,.kpi-grid-4{grid-template-columns:repeat(2,1fr)}.charts-grid,.charts-grid-2-1{grid-template-columns:1fr}}
+@media(max-width:768px){.header,.main,.status-line{padding-left:20px;padding-right:20px}.kpi-grid,.kpi-grid-3,.kpi-grid-4{grid-template-columns:1fr}.header-top{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header class="header"><div class="header-top">
+    <div class="header-escudo"><img src="data:image/jpeg;base64,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" alt="Escudo PMMG CPE" style="width: 130px; height: 130px;"></div>
+  <div class="header-info"><div class="subtitle">Estado-Maior do CPE | Controle de Hidrômetros 2026</div><h1>Painel de Consumo de Água</h1></div>
+  <div class="header-actions">
+    <a class="nav-link" href="/">📊 Orçamento</a>
+    <div><button class="refresh-btn" onclick="carregar()">🔄 Atualizar Dados</button><div class="last-update" id="upd">—</div></div>
+  </div>
+</div></header>
+<div class="status-line" id="status">Carregando...</div>
+<main class="main" id="main"><div style="text-align:center;padding:60px">Carregando dados...</div></main>
+<script>
+let D = null;
+let charts = {};
+
+const fmtM3 = v => (v==null||isNaN(v)) ? '0 m³' : Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0})+' m³';
+const fmtPct = v => (v==null||isNaN(v)) ? '—' : (v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const fmtData = s => { if(!s) return '—'; const [y,m,d]=s.split('-'); return d+'/'+m+'/'+y; };
+
+function tierInfo(t){
+  return [
+    {label:'NORMAL', tag:'tag-verde', bar:'bar-low', row:'', emoji:'🟢', cor:'#2E7D32'},
+    {label:'ALERTA NÍVEL 1 (10% a 30%)', tag:'tag-n1', bar:'bar-n1', row:'row-n1', emoji:'🟡', cor:'#F9A825'},
+    {label:'ALERTA NÍVEL 2 (31% a 50%)', tag:'tag-n2', bar:'bar-n2', row:'row-n2', emoji:'🟠', cor:'#EF6C00'},
+    {label:'ALERTA CRÍTICO (acima de 50%)', tag:'tag-n3', bar:'bar-n3', row:'row-n3', emoji:'🔴', cor:'#C62828'}
+  ][t];
+}
+
+async function carregar(){
+  setStatus('Buscando dados das leituras...','');
+  try{
+    const r = await fetch('/api/agua');
+    D = await r.json();
+    if(D.status==='erro') throw new Error(D.msg||'erro');
+    setStatus('✓ Dados carregados com sucesso','success');
+    document.getElementById('upd').textContent='Atualizado: '+new Date().toLocaleString('pt-BR');
+    render();
+  }catch(e){ setStatus('⚠ Erro: '+e.message,'error'); }
+}
+function setStatus(m,t){const e=document.getElementById('status');e.textContent=m;e.className='status-line '+t;}
+function destroyCharts(){ Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}}); charts={}; }
+
+function render(){
+  document.getElementById('main').innerHTML = `
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-t="visao">📊 Visão Geral</button>
+      <button class="tab-btn" data-t="unidades">💧 Unidades</button>
+      <button class="tab-btn" data-t="leituras">📄 Histórico de Leituras</button>
+      <button class="tab-btn" data-t="criterios">⚙️ Critérios de Alerta</button>
+    </div>
+    <div class="tab-content active" id="t-visao"></div>
+    <div class="tab-content" id="t-unidades"></div>
+    <div class="tab-content" id="t-leituras"></div>
+    <div class="tab-content" id="t-criterios"></div>
+    <footer class="footer">Painel de Consumo de Água — CPE 2026 · Controle de Hidrômetros por Fração · Simulação de acompanhamento mensal</footer>
+  `;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',e=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
+    e.target.classList.add('active');
+    document.getElementById('t-'+e.target.dataset.t).classList.add('active');
+  }));
+  renderVisao();
+  renderUnidades();
+  renderLeituras();
+  renderCriterios();
+}
+
+// ===== ABA VISÃO GERAL =====
+function renderVisao(){
+  const us = D.unidades;
+  const totalConsumoAtual = us.reduce((s,u)=>s+u.consumoAtual,0);
+  const totalConsumoAnterior = us.reduce((s,u)=>s+u.consumoAnterior,0);
+  const contagem = [0,0,0,0];
+  us.forEach(u=>contagem[u.tier]++);
+  const totalAlertas = contagem[1]+contagem[2]+contagem[3];
+  const pior = [...us].sort((a,b)=>b.variacaoAtual-a.variacaoAtual)[0];
+
+  document.getElementById('t-visao').innerHTML = `
+    <h2 class="section-title"><span class="section-num">01</span>Resumo Geral do Consumo</h2>
+    <div class="kpi-grid-4">
+      <div class="kpi gold"><div class="kpi-label">Unidades Monitoradas</div><div class="kpi-value">${us.length}</div><div class="kpi-detail">Frações com hidrômetro cadastrado</div></div>
+      <div class="kpi"><div class="kpi-label">Consumo Total Atual</div><div class="kpi-value">${fmtM3(totalConsumoAtual)}</div><div class="kpi-detail">Mês corrente · anterior: ${fmtM3(totalConsumoAnterior)}</div></div>
+      <div class="kpi ${totalAlertas>0?'n2':'positivo'}"><div class="kpi-label">Alertas Ativos</div><div class="kpi-value ${totalAlertas>0?'alerta':''}">${totalAlertas}</div><div class="kpi-detail">${contagem[1]} nível 1 · ${contagem[2]} nível 2 · ${contagem[3]} crítico</div></div>
+      <div class="kpi n3"><div class="kpi-label">Maior Variação Registrada</div><div class="kpi-value alerta">${fmtPct(pior.variacaoAtual)}</div><div class="kpi-detail">${pior.fracao}</div></div>
+    </div>
+
+    <h2 class="section-title"><span class="section-num">02</span>Distribuição de Alertas por Nível</h2>
+    <div class="kpi-grid-4">
+      <div class="kpi positivo"><div class="kpi-label">🟢 Consumo Normal (&lt;10%)</div><div class="kpi-value">${contagem[0]}</div><div class="kpi-detail">Dentro da variação esperada</div></div>
+      <div class="kpi n1"><div class="kpi-label">🟡 Alerta Nível 1 (10% a 30%)</div><div class="kpi-value">${contagem[1]}</div><div class="kpi-detail">Atenção · monitorar próxima leitura</div></div>
+      <div class="kpi n2"><div class="kpi-label">🟠 Alerta Nível 2 (31% a 50%)</div><div class="kpi-value">${contagem[2]}</div><div class="kpi-detail">Investigar possível vazamento</div></div>
+      <div class="kpi n3"><div class="kpi-label">🔴 Alerta Crítico (acima de 50%)</div><div class="kpi-value ${contagem[3]>0?'alerta':''}">${contagem[3]}</div><div class="kpi-detail">Ação imediata recomendada</div></div>
+    </div>
+
+    <h2 class="section-title"><span class="section-num">03</span>Visão Consolidada</h2>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Variação de Consumo por Unidade (%)</div><div id="var-nota" style="font-size:11px;color:var(--texto-mute);margin:-10px 0 12px"></div><div class="chart-container tall"><canvas id="ch-var"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Distribuição de Alertas</div><div class="chart-container tall"><canvas id="ch-dist"></canvas></div></div>
+    </div>
+  `;
+
+  const ordenado = [...us].sort((a,b)=>a.variacaoAtual-b.variacaoAtual);
+  const EIXO_MAX = 100;
+  const valoresReais = ordenado.map(u=>+(u.variacaoAtual*100).toFixed(1));
+  const valoresGrafico = valoresReais.map(v=>Math.min(v,EIXO_MAX));
+  const truncados = ordenado.filter((u,i)=>valoresReais[i]>EIXO_MAX);
+  document.getElementById('var-nota').textContent = truncados.length
+    ? '⚠ '+truncados.map(u=>u.fracao).join(', ')+' com variação real acima de '+EIXO_MAX+'% — barra truncada, passe o mouse para ver o valor exato.'
+    : '';
+  try{
+    charts.var = new Chart(document.getElementById('ch-var'),{
+      type:'bar',
+      data:{labels:ordenado.map(u=>u.fracao), datasets:[{
+        label:'Variação (%)',
+        data:valoresGrafico,
+        backgroundColor:ordenado.map(u=>tierInfo(u.tier).cor)
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>'Variação real: '+valoresReais[x.dataIndex].toLocaleString('pt-BR',{minimumFractionDigits:1})+'%'}}},
+        scales:{x:{max:EIXO_MAX,ticks:{callback:v=>v+'%'}}}
+      }
+    });
+
+    charts.dist = new Chart(document.getElementById('ch-dist'),{
+      type:'doughnut',
+      data:{labels:['Normal (<10%)','Nível 1 (10-30%)','Nível 2 (31-50%)','Crítico (>50%)'],
+        datasets:[{data:contagem,backgroundColor:['#2E7D32','#F9A825','#EF6C00','#C62828'],borderWidth:2,borderColor:'#FFF'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.label+': '+x.parsed+' unidade(s)'}}},cutout:'60%'}
+    });
+  }catch(e){ console.error('Chart indisponível:', e); }
+}
+
+// ===== ABA UNIDADES =====
+function renderUnidades(){
+  const el = document.getElementById('t-unidades');
+  el.innerHTML = `
+    <div class="filtro-bar">
+      <div class="fg"><label>Nível de Alerta</label><select id="fu-tier">
+        <option value="TODOS">Todos os níveis</option>
+        <option value="3">🔴 Crítico (acima de 50%)</option>
+        <option value="2">🟠 Nível 2 (31% a 50%)</option>
+        <option value="1">🟡 Nível 1 (10% a 30%)</option>
+        <option value="0">🟢 Normal (abaixo de 10%)</option>
+      </select></div>
+    </div>
+    <h2 class="section-title"><span class="section-num">U1</span>Consumo Atual × Anterior por Unidade</h2>
+    <div class="chart-card"><div class="chart-title">Comparativo de Consumo Mensal (m³)</div><div class="chart-container tall"><canvas id="ch-comp"></canvas></div></div>
+    <h2 class="section-title"><span class="section-num">U2</span>Situação de Cada Fração</h2>
+    <div id="unidades-tabela"></div>
+  `;
+  document.getElementById('fu-tier').addEventListener('change',atualizarUnidades);
+  atualizarUnidades();
+}
+
+function atualizarUnidades(){
+  const filtro = document.getElementById('fu-tier').value;
+  let us = [...D.unidades];
+  if(filtro!=='TODOS') us = us.filter(u=>String(u.tier)===filtro);
+  us.sort((a,b)=>b.variacaoAtual-a.variacaoAtual);
+
+  try{
+    if(charts.comp) charts.comp.destroy();
+    charts.comp = new Chart(document.getElementById('ch-comp'),{
+      type:'bar',
+      data:{labels:us.map(u=>u.fracao),datasets:[
+        {label:'Consumo Anterior',data:us.map(u=>u.consumoAnterior),backgroundColor:'#C4B287'},
+        {label:'Consumo Atual',data:us.map(u=>u.consumoAtual),backgroundColor:us.map(u=>tierInfo(u.tier).cor)}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>x.dataset.label+': '+fmtM3(x.parsed.x)}}},
+        scales:{x:{ticks:{callback:v=>v+' m³'}}}
+      }
+    });
+  }catch(e){ console.error('Chart indisponível:', e); }
+
+  let html='<div class="table-card"><div class="table-header"><h3>Frações Cadastradas</h3><span class="table-meta">'+us.length+' unidade(s)</span></div><div style="overflow-x:auto;max-height:560px"><table><thead><tr><th>Status</th><th>Fração</th><th class="num">Consumo Anterior</th><th class="num">Consumo Atual</th><th class="num">Variação</th><th>Última Leitura</th></tr></thead><tbody>';
+  us.forEach(u=>{
+    const ti = tierInfo(u.tier);
+    const pctBar = Math.min(100, Math.abs(u.variacaoAtual)*100);
+    html+='<tr class="'+ti.row+'"><td><span class="tag '+ti.tag+'">'+ti.emoji+' '+ti.label+'</span></td>'
+      +'<td><strong>'+u.fracao+'</strong></td>'
+      +'<td class="num">'+fmtM3(u.consumoAnterior)+'</td>'
+      +'<td class="num">'+fmtM3(u.consumoAtual)+'</td>'
+      +'<td class="num"><strong>'+fmtPct(u.variacaoAtual)+'</strong><div class="bar-mini"><div class="bar-fill '+ti.bar+'" style="width:'+pctBar+'%"></div></div></td>'
+      +'<td class="code">'+fmtData(u.leituras[u.leituras.length-1].data)+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  document.getElementById('unidades-tabela').innerHTML=html;
+}
+
+// ===== ABA LEITURAS (histórico) =====
+function renderLeituras(){
+  const el = document.getElementById('t-leituras');
+  el.innerHTML = `
+    <div class="filtro-bar">
+      <div class="fg"><label>Fração</label><select id="fl-fracao"><option value="TODAS">Todas as Frações</option>
+        ${D.unidades.map(u=>'<option value="'+u.fracao+'">'+u.fracao+'</option>').join('')}
+      </select></div>
+    </div>
+    <h2 class="section-title"><span class="section-num">L1</span>Todos os Lançamentos de Leitura</h2>
+    <div id="leituras-tabela"></div>
+  `;
+  document.getElementById('fl-fracao').addEventListener('change',atualizarLeituras);
+  atualizarLeituras();
+}
+
+function atualizarLeituras(){
+  const filtro = document.getElementById('fl-fracao').value;
+  let linhas = [];
+  D.unidades.forEach(u=>{
+    if(filtro!=='TODAS' && u.fracao!==filtro) return;
+    u.leituras.forEach(l=>linhas.push({...l, fracao:u.fracao, tier: l.variacao==null?-1: (l.variacao>=0.5?3:l.variacao>=0.31?2:l.variacao>=0.10?1:0)}));
+  });
+  linhas.sort((a,b)=> a.fracao===b.fracao ? a.data.localeCompare(b.data) : a.fracao.localeCompare(b.fracao));
+
+  let html='<div class="table-card"><div class="table-header"><h3>Histórico de Leituras</h3><span class="table-meta">'+linhas.length+' lançamento(s)</span></div><div style="overflow-x:auto;max-height:600px"><table><thead><tr><th>Data</th><th>Fração</th><th class="num">Leitura Anterior</th><th class="num">Leitura Atual</th><th class="num">Consumo Atual</th><th class="num">Consumo Anterior</th><th class="num">Variação</th><th>Situação</th></tr></thead><tbody>';
+  linhas.forEach(l=>{
+    const ti = l.tier>=0 ? tierInfo(l.tier) : {tag:'',row:'',emoji:'ℹ️'};
+    html+='<tr class="'+ti.row+'"><td class="code">'+fmtData(l.data)+'</td><td>'+l.fracao+'</td>'
+      +'<td class="num">'+fmtM3(l.anterior)+'</td><td class="num">'+fmtM3(l.atual)+'</td>'
+      +'<td class="num"><strong>'+fmtM3(l.consumoAtual)+'</strong></td>'
+      +'<td class="num">'+(l.consumoAnterior==null?'—':fmtM3(l.consumoAnterior))+'</td>'
+      +'<td class="num">'+(l.variacao==null?'—':fmtPct(l.variacao))+'</td>'
+      +'<td>'+(l.tier>=0?'<span class="tag '+ti.tag+'">'+ti.emoji+' '+l.situacao+'</span>':'<span class="tag tag-verde">ℹ️ '+l.situacao+'</span>')+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  document.getElementById('leituras-tabela').innerHTML=html;
+}
+
+// ===== ABA CRITÉRIOS =====
+function renderCriterios(){
+  const el = document.getElementById('t-criterios');
+  const c = D.criterios;
+  el.innerHTML = `
+    <h2 class="section-title"><span class="section-num">C1</span>Critérios de Classificação de Alerta</h2>
+    <p style="color:var(--texto-soft);margin-bottom:20px;max-width:820px">A situação de cada fração é calculada comparando o <strong>consumo do mês atual</strong> com o <strong>consumo do mês anterior</strong> registrado no mesmo hidrômetro. Quanto maior o aumento percentual, maior o nível de alerta — o que pode indicar vazamentos, uso irregular ou falha no equipamento.</p>
+    <div class="legend-criterios">
+      <div class="legend-item"><span class="legend-dot" style="background:#2E7D32"></span><strong>Normal</strong>&nbsp;— variação abaixo de ${fmtPct(c.nivel1)}</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#F9A825"></span><strong>Alerta Nível 1</strong>&nbsp;— de ${fmtPct(c.nivel1)} até 30%</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#EF6C00"></span><strong>Alerta Nível 2</strong>&nbsp;— de 31% até 50%</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#C62828"></span><strong>Alerta Crítico</strong>&nbsp;— acima de 50%</div>
+    </div>
+    <h2 class="section-title"><span class="section-num">C2</span>Unidades em Situação Crítica</h2>
+    <div id="criticos-lista"></div>
+  `;
+  const criticos = D.unidades.filter(u=>u.tier===3).sort((a,b)=>b.variacaoAtual-a.variacaoAtual);
+  if(criticos.length===0){
+    document.getElementById('criticos-lista').innerHTML = '<div class="kpi positivo"><div class="kpi-label">Situação</div><div class="kpi-value">Nenhuma unidade em alerta crítico</div></div>';
+  } else {
+    document.getElementById('criticos-lista').innerHTML = '<div class="kpi-grid-3">'+criticos.map(u=>
+      `<div class="kpi n3"><div class="kpi-label">${u.fracao}</div><div class="kpi-value alerta">${fmtPct(u.variacaoAtual)}</div><div class="kpi-detail">${fmtM3(u.consumoAnterior)} → ${fmtM3(u.consumoAtual)}</div></div>`
+    ).join('')+'</div>';
+  }
+}
+
+window.addEventListener('load',carregar);
+</script>
+</body>
+</html>

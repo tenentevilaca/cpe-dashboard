@@ -1,0 +1,445 @@
+{
+  "atualizadoEm": "2026-07-15T15:09:42.686483",
+  "criterios": {
+    "nivel1": 0.1,
+    "nivel2": 0.31,
+    "nivel3": 0.5
+  },
+  "unidades": [
+    {
+      "fracao": "SEDE CPE",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 8000,
+          "atual": 8093,
+          "consumoAtual": 93,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 8093,
+          "atual": 10109,
+          "consumoAtual": 2016,
+          "consumoAnterior": 93,
+          "variacao": 20.6774,
+          "situacao": "ALERTA CRÍTICO (>50%)"
+        }
+      ],
+      "consumoTotal": 2109,
+      "consumoAtual": 2016,
+      "consumoAnterior": 93,
+      "variacaoAtual": 20.6774,
+      "tier": 3,
+      "situacaoAtual": "ALERTA CRÍTICO (>50%)"
+    },
+    {
+      "fracao": "1 CIA 1 PEL - VESPASIANO",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 9370,
+          "atual": 9490,
+          "consumoAtual": 120,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 9490,
+          "atual": 9615,
+          "consumoAtual": 125,
+          "consumoAnterior": 120,
+          "variacao": 0.0417,
+          "situacao": "NORMAL"
+        }
+      ],
+      "consumoTotal": 245,
+      "consumoAtual": 125,
+      "consumoAnterior": 120,
+      "variacaoAtual": 0.0417,
+      "tier": 0,
+      "situacaoAtual": "NORMAL"
+    },
+    {
+      "fracao": "1 CIA 2 PEL - NOVA LIMA",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 10740,
+          "atual": 10835,
+          "consumoAtual": 95,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 10835,
+          "atual": 10947,
+          "consumoAtual": 112,
+          "consumoAnterior": 95,
+          "variacao": 0.1789,
+          "situacao": "ALERTA (10% a 30%)"
+        }
+      ],
+      "consumoTotal": 207,
+      "consumoAtual": 112,
+      "consumoAnterior": 95,
+      "variacaoAtual": 0.1789,
+      "tier": 1,
+      "situacaoAtual": "ALERTA (10% a 30%)"
+    },
+    {
+      "fracao": "1 CIA 4 PEL - MATEUS LEME",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 12110,
+          "atual": 12260,
+          "consumoAtual": 150,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 12260,
+          "atual": 12406,
+          "consumoAtual": 146,
+          "consumoAnterior": 150,
+          "variacao": -0.0267,
+          "situacao": "NORMAL"
+        }
+      ],
+      "consumoTotal": 296,
+      "consumoAtual": 146,
+      "consumoAnterior": 150,
+      "variacaoAtual": -0.0267,
+      "tier": 0,
+      "situacaoAtual": "NORMAL"
+    },
+    {
+      "fracao": "SEDE BPM MAMB",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 13480,
+          "atual": 13660,
+          "consumoAtual": 180,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 13660,
+          "atual": 13962,
+          "consumoAtual": 302,
+          "consumoAnterior": 180,
+          "variacao": 0.6778,
+          "situacao": "ALERTA CRÍTICO (>50%)"
+        }
+      ],
+      "consumoTotal": 482,
+      "consumoAtual": 302,
+      "consumoAnterior": 180,
+      "variacaoAtual": 0.6778,
+      "tier": 3,
+      "situacaoAtual": "ALERTA CRÍTICO (>50%)"
+    },
+    {
+      "fracao": "6 CIA 4 PEL - FRUTAL",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 14850,
+          "atual": 14960,
+          "consumoAtual": 110,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 14960,
+          "atual": 15116,
+          "consumoAtual": 156,
+          "consumoAnterior": 110,
+          "variacao": 0.4182,
+          "situacao": "ALERTA (31% a 50%)"
+        }
+      ],
+      "consumoTotal": 266,
+      "consumoAtual": 156,
+      "consumoAnterior": 110,
+      "variacaoAtual": 0.4182,
+      "tier": 2,
+      "situacaoAtual": "ALERTA (31% a 50%)"
+    },
+    {
+      "fracao": "5º CIA - LAVRAS",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 16220,
+          "atual": 16420,
+          "consumoAtual": 200,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 16420,
+          "atual": 16634,
+          "consumoAtual": 214,
+          "consumoAnterior": 200,
+          "variacao": 0.07,
+          "situacao": "NORMAL"
+        }
+      ],
+      "consumoTotal": 414,
+      "consumoAtual": 214,
+      "consumoAnterior": 200,
+      "variacaoAtual": 0.07,
+      "tier": 0,
+      "situacaoAtual": "NORMAL"
+    },
+    {
+      "fracao": "1 CIA  6 PEL - DIVINOPOLIS",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 17590,
+          "atual": 17720,
+          "consumoAtual": 130,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 17720,
+          "atual": 17881,
+          "consumoAtual": 161,
+          "consumoAnterior": 130,
+          "variacao": 0.2385,
+          "situacao": "ALERTA (10% a 30%)"
+        }
+      ],
+      "consumoTotal": 291,
+      "consumoAtual": 161,
+      "consumoAnterior": 130,
+      "variacaoAtual": 0.2385,
+      "tier": 1,
+      "situacaoAtual": "ALERTA (10% a 30%)"
+    },
+    {
+      "fracao": "2 CIA 2 PEL - JANUARIA",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 18960,
+          "atual": 19045,
+          "consumoAtual": 85,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 19045,
+          "atual": 19132,
+          "consumoAtual": 87,
+          "consumoAnterior": 85,
+          "variacao": 0.0235,
+          "situacao": "NORMAL"
+        }
+      ],
+      "consumoTotal": 172,
+      "consumoAtual": 87,
+      "consumoAnterior": 85,
+      "variacaoAtual": 0.0235,
+      "tier": 0,
+      "situacaoAtual": "NORMAL"
+    },
+    {
+      "fracao": "4 CIA 3 PEL - S. J. DEL REI",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 20330,
+          "atual": 20470,
+          "consumoAtual": 140,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 20470,
+          "atual": 20659,
+          "consumoAtual": 189,
+          "consumoAnterior": 140,
+          "variacao": 0.35,
+          "situacao": "ALERTA (31% a 50%)"
+        }
+      ],
+      "consumoTotal": 329,
+      "consumoAtual": 189,
+      "consumoAnterior": 140,
+      "variacaoAtual": 0.35,
+      "tier": 2,
+      "situacaoAtual": "ALERTA (31% a 50%)"
+    },
+    {
+      "fracao": "2 CIA 3 PEL - CURVELO",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 21700,
+          "atual": 21860,
+          "consumoAtual": 160,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 21860,
+          "atual": 22012,
+          "consumoAtual": 152,
+          "consumoAnterior": 160,
+          "variacao": -0.05,
+          "situacao": "NORMAL"
+        }
+      ],
+      "consumoTotal": 312,
+      "consumoAtual": 152,
+      "consumoAnterior": 160,
+      "variacaoAtual": -0.05,
+      "tier": 0,
+      "situacaoAtual": "NORMAL"
+    },
+    {
+      "fracao": "3 CIA 5 PEL - TEOFILO OTONI",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 23070,
+          "atual": 23170,
+          "consumoAtual": 100,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 23170,
+          "atual": 23282,
+          "consumoAtual": 112,
+          "consumoAnterior": 100,
+          "variacao": 0.12,
+          "situacao": "ALERTA (10% a 30%)"
+        }
+      ],
+      "consumoTotal": 212,
+      "consumoAtual": 112,
+      "consumoAnterior": 100,
+      "variacaoAtual": 0.12,
+      "tier": 1,
+      "situacaoAtual": "ALERTA (10% a 30%)"
+    },
+    {
+      "fracao": "3 CIA 5 PEL - JEQUITINHONHA",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 24440,
+          "atual": 24515,
+          "consumoAtual": 75,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 24515,
+          "atual": 24652,
+          "consumoAtual": 137,
+          "consumoAnterior": 75,
+          "variacao": 0.8267,
+          "situacao": "ALERTA CRÍTICO (>50%)"
+        }
+      ],
+      "consumoTotal": 212,
+      "consumoAtual": 137,
+      "consumoAnterior": 75,
+      "variacaoAtual": 0.8267,
+      "tier": 3,
+      "situacaoAtual": "ALERTA CRÍTICO (>50%)"
+    },
+    {
+      "fracao": "5 CIA 2 PEL - ITAJUBA",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 25810,
+          "atual": 25925,
+          "consumoAtual": 115,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 25925,
+          "atual": 26050,
+          "consumoAtual": 125,
+          "consumoAnterior": 115,
+          "variacao": 0.087,
+          "situacao": "NORMAL"
+        }
+      ],
+      "consumoTotal": 240,
+      "consumoAtual": 125,
+      "consumoAnterior": 115,
+      "variacaoAtual": 0.087,
+      "tier": 0,
+      "situacaoAtual": "NORMAL"
+    },
+    {
+      "fracao": "5 CIA 2 PEL - POUSO ALEGRE",
+      "leituras": [
+        {
+          "data": "2026-05-28",
+          "anterior": 27180,
+          "atual": 27325,
+          "consumoAtual": 145,
+          "consumoAnterior": null,
+          "variacao": null,
+          "situacao": "LEITURA NORMAL"
+        },
+        {
+          "data": "2026-06-28",
+          "anterior": 27325,
+          "atual": 27538,
+          "consumoAtual": 213,
+          "consumoAnterior": 145,
+          "variacao": 0.469,
+          "situacao": "ALERTA (31% a 50%)"
+        }
+      ],
+      "consumoTotal": 358,
+      "consumoAtual": 213,
+      "consumoAnterior": 145,
+      "variacaoAtual": 0.469,
+      "tier": 2,
+      "situacaoAtual": "ALERTA (31% a 50%)"
+    }
+  ]
+}
