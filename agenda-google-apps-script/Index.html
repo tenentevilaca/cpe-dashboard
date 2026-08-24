@@ -81,7 +81,7 @@ tbody tr.concluida{opacity:.55}
         <div class="fg"><label>Tarefa</label><input type="text" id="f-tarefa" required maxlength="200" placeholder="Descrição da tarefa"></div>
         <div class="fg"><label>Responsável</label><input type="text" id="f-responsavel" required maxlength="120" placeholder="Nome do responsável"></div>
         <div class="fg"><label>Data de Início</label><input type="date" id="f-inicio" required></div>
-        <div class="fg"><label>Prazo</label><input type="date" id="f-prazo" required></div>
+        <div class="fg"><label>Prazo (dias)</label><input type="number" id="f-prazo-dias" required min="1" step="1" placeholder="Ex: 30"></div>
         <button type="submit" class="add-btn">+ Lançar</button>
       </div>
       <div class="form-error" id="form-error"></div>
@@ -137,17 +137,20 @@ function salvarTarefa(ev) {
   const erroEl = document.getElementById('form-error');
   erroEl.textContent = '';
 
+  const dataInicio = document.getElementById('f-inicio').value;
+  const prazoDias = parseInt(document.getElementById('f-prazo-dias').value, 10);
+
+  if (!prazoDias || prazoDias < 1) {
+    erroEl.textContent = 'Informe um número de dias de prazo válido (maior que zero).';
+    return false;
+  }
+
   const dados = {
     tarefa: document.getElementById('f-tarefa').value.trim(),
     responsavel: document.getElementById('f-responsavel').value.trim(),
-    dataInicio: document.getElementById('f-inicio').value,
-    prazo: document.getElementById('f-prazo').value
+    dataInicio: dataInicio,
+    prazo: addDias(dataInicio, prazoDias)
   };
-
-  if (dados.prazo < dados.dataInicio) {
-    erroEl.textContent = 'O prazo não pode ser anterior à data de início.';
-    return false;
-  }
 
   const btn = ev.target.querySelector('.add-btn');
   btn.disabled = true;
@@ -207,6 +210,15 @@ function parseData(s) {
   return new Date(+p[0], +p[1] - 1, +p[2]);
 }
 
+function addDias(dataStr, dias) {
+  const d = parseData(dataStr);
+  d.setDate(d.getDate() + Number(dias));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + dia;
+}
+
 function calcularFarol(inicio, prazo, concluida, dataConclusao) {
   const MS_DIA = 86400000;
   const dIni = parseData(inicio);
@@ -238,7 +250,7 @@ function calcularFarol(inicio, prazo, concluida, dataConclusao) {
     diasAtraso = Math.max(0, Math.round((dRef - dPrazo) / MS_DIA));
   }
 
-  return { pct: Math.round(pct), nivel: nivel, diasAtraso: diasAtraso };
+  return { pct: Math.round(pct), nivel: nivel, diasAtraso: diasAtraso, totalDias: totalDias };
 }
 
 function farolLabel(f, concluida) {
@@ -288,7 +300,7 @@ function render() {
       '<td><strong>' + escapeHtml(t.tarefa) + '</strong></td>' +
       '<td>' + escapeHtml(t.responsavel) + '</td>' +
       '<td class="code">' + fmtData(t.dataInicio) + '</td>' +
-      '<td class="code">' + fmtData(t.prazo) + '</td>' +
+      '<td class="code">' + fmtData(t.prazo) + '<br><span style="color:var(--texto-mute);font-size:10px">' + f.totalDias + ' dia(s) de prazo</span></td>' +
       '<td><span class="farol farol-' + (t.concluida ? 'concluida' : f.nivel) + '">' + farolLabel(f, t.concluida) + '</span>' +
       (t.concluida ? '' : '<div class="bar-mini"><div class="bar-fill ' + corBarra + '" style="width:' + largura + '%"></div></div>') +
       '</td>' +

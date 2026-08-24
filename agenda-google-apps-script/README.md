@@ -33,7 +33,7 @@ Agenda com farol de prazo, rodando 100% no Google (Google Sheets + Google Apps S
 
 ## 🎯 Como usar
 
-- **Lançar tarefa:** preencha Tarefa, Responsável, Data de Início e Prazo, clique em "+ Lançar"
+- **Lançar tarefa:** preencha Tarefa, Responsável, Data de Início e o número de dias de Prazo (ex: 30) — a data final é calculada automaticamente somando os dias à data de início — clique em "+ Lançar"
 - **Concluir:** clique em "✓ Concluir" na linha da tarefa — ela para de contar prazo (o farol congela na data de conclusão)
 - **Reabrir:** clique em "↺ Reabrir" para voltar a contar o prazo
 - **Excluir:** clique em "🗑 Excluir" (pede confirmação)
