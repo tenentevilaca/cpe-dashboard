@@ -260,6 +260,7 @@ function enviarWhatsApp_(tarefa, responsavel, statusLabel) {
   const resposta = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   const codigo = resposta.getResponseCode();
   const corpo = resposta.getContentText();
+  Logger.log('CallMeBot respondeu (HTTP ' + codigo + '): ' + corpo);
 
   if (codigo >= 300 || /error/i.test(corpo)) {
     throw new Error('Erro ao enviar WhatsApp via CallMeBot (HTTP ' + codigo + '): ' + corpo);
