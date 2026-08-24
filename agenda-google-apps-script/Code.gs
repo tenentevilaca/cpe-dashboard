@@ -262,7 +262,7 @@ function enviarWhatsApp_(tarefa, responsavel, statusLabel) {
   const corpo = resposta.getContentText();
   Logger.log('CallMeBot respondeu (HTTP ' + codigo + '): ' + corpo);
 
-  if (codigo >= 300 || /error/i.test(corpo)) {
+  if (codigo >= 300 || /error|invalid|not (an? )?(registered|allowed)/i.test(corpo)) {
     throw new Error('Erro ao enviar WhatsApp via CallMeBot (HTTP ' + codigo + '): ' + corpo);
   }
 }
