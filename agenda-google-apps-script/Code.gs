@@ -5,7 +5,7 @@
  */
 
 const SHEET_NAME = 'Agenda';
-const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel'];
+const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel', 'Notificar'];
 
 // Nomes das Script Properties (configuradas em Configurações do projeto → Script Properties,
 // NUNCA no código-fonte — assim a chave não vai pro GitHub).
@@ -63,7 +63,8 @@ function listarTarefas() {
       dataInicio: formatDate_(r[3]),
       prazo: formatDate_(r[4]),
       concluida: r[5] === true || r[5] === 'TRUE' || r[5] === 'VERDADEIRO',
-      dataConclusao: formatDate_(r[6])
+      dataConclusao: formatDate_(r[6]),
+      notificar: !(r[8] === false || r[8] === 'FALSE' || r[8] === 'FALSO')
     }));
 }
 
@@ -83,7 +84,21 @@ function adicionarTarefa(dados) {
   const sheet = getSheet_();
   const id = Utilities.getUuid();
   const nivelInicial = calcularFarol_(dados.dataInicio, dados.prazo).nivel;
-  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', nivelInicial]);
+  const notificar = dados.notificar !== false;
+  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', nivelInicial, notificar]);
+  return listarTarefas();
+}
+
+/** Liga/desliga o aviso de WhatsApp para uma tarefa específica. */
+function alternarNotificacao(id, notificar) {
+  const sheet = getSheet_();
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, 9).setValue(!!notificar);
+      break;
+    }
+  }
   return listarTarefas();
 }
 
@@ -95,8 +110,13 @@ function concluirTarefa(id, concluida) {
     if (values[i][0] === id) {
       sheet.getRange(i + 1, 6).setValue(!!concluida);
       sheet.getRange(i + 1, 7).setValue(concluida ? new Date() : '');
-      if (concluida) {
-        enviarWhatsApp_(values[i][1], values[i][2], '✅ Concluída');
+      const notificar = !(values[i][8] === false || values[i][8] === 'FALSE' || values[i][8] === 'FALSO');
+      if (concluida && notificar) {
+        try {
+          enviarWhatsApp_(values[i][1], values[i][2], '✅ Concluída');
+        } catch (e) {
+          Logger.log('Falha ao enviar WhatsApp para tarefa "' + values[i][1] + '": ' + e);
+        }
       }
       break;
     }
@@ -177,9 +197,10 @@ function verificarAlteracoesDeStatus() {
     const dataInicio = formatDate_(row[3]);
     const prazo = formatDate_(row[4]);
     const nivelAnterior = row[7];
+    const notificar = !(row[8] === false || row[8] === 'FALSE' || row[8] === 'FALSO');
     const farolAtual = calcularFarol_(dataInicio, prazo);
 
-    if (nivelAnterior && nivelAnterior !== farolAtual.nivel) {
+    if (notificar && nivelAnterior && nivelAnterior !== farolAtual.nivel) {
       let statusMsg = NIVEL_LABEL[farolAtual.nivel] || farolAtual.nivel;
       if (farolAtual.nivel === 'preto' && farolAtual.diasAtraso > 0) {
         statusMsg += ' — ' + farolAtual.diasAtraso + ' dia(s) em atraso';
