@@ -1,19 +1,16 @@
 /**
  * Agenda de Tarefas — CPE 2026
  * Armazena as tarefas numa aba da própria planilha, serve o painel web (farol de prazo)
- * e envia avisos por WhatsApp (Meta Cloud API) quando o farol de uma tarefa muda.
+ * e envia avisos por WhatsApp (CallMeBot) quando o farol de uma tarefa muda.
  */
 
 const SHEET_NAME = 'Agenda';
 const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel'];
 
 // Nomes das Script Properties (configuradas em Configurações do projeto → Script Properties,
-// NUNCA no código-fonte — assim o token não vai pro GitHub).
-const PROP_TOKEN = 'WHATSAPP_TOKEN';
-const PROP_PHONE_NUMBER_ID = 'WHATSAPP_PHONE_NUMBER_ID';
-const PROP_DESTINATARIO = 'WHATSAPP_DESTINATARIO';
-const PROP_TEMPLATE = 'WHATSAPP_TEMPLATE_NAME';
-const PROP_TEMPLATE_LANG = 'WHATSAPP_TEMPLATE_LANG';
+// NUNCA no código-fonte — assim a chave não vai pro GitHub).
+const PROP_PHONE = 'CALLMEBOT_PHONE';
+const PROP_APIKEY = 'CALLMEBOT_API_KEY';
 
 function doGet() {
   return HtmlService.createTemplateFromFile('Index')
@@ -218,52 +215,33 @@ function removerGatilhos() {
   });
 }
 
-// ===== Envio de WhatsApp (Meta Cloud API) =====
+// ===== Envio de WhatsApp (CallMeBot) =====
 
-/** Monta e envia a mensagem de template. Lança erro se a configuração estiver incompleta ou a API falhar. */
+/** Monta e envia a mensagem via CallMeBot. Lança erro se a configuração estiver incompleta ou a API falhar. */
 function enviarWhatsApp_(tarefa, responsavel, statusLabel) {
   const props = PropertiesService.getScriptProperties();
-  const token = props.getProperty(PROP_TOKEN);
-  const phoneNumberId = props.getProperty(PROP_PHONE_NUMBER_ID);
-  const destinatario = props.getProperty(PROP_DESTINATARIO);
-  const template = props.getProperty(PROP_TEMPLATE) || 'alerta_prazo_agenda';
-  const lang = props.getProperty(PROP_TEMPLATE_LANG) || 'pt_BR';
+  const phone = props.getProperty(PROP_PHONE);
+  const apiKey = props.getProperty(PROP_APIKEY);
 
-  if (!token || !phoneNumberId || !destinatario) {
-    throw new Error('WhatsApp não configurado: defina WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_DESTINATARIO em Configurações do projeto → Script Properties.');
+  if (!phone || !apiKey) {
+    throw new Error('WhatsApp não configurado: defina CALLMEBOT_PHONE e CALLMEBOT_API_KEY em Configurações do projeto → Script Properties.');
   }
 
-  const payload = {
-    messaging_product: 'whatsapp',
-    to: destinatario,
-    type: 'template',
-    template: {
-      name: template,
-      language: { code: lang },
-      components: [
-        {
-          type: 'body',
-          parameters: [
-            { type: 'text', text: String(tarefa) },
-            { type: 'text', text: String(responsavel) },
-            { type: 'text', text: String(statusLabel) }
-          ]
-        }
-      ]
-    }
-  };
+  const mensagem = '⚠️ Alerta de prazo — Agenda CPE\n\nTarefa: ' + tarefa +
+    '\nResponsável: ' + responsavel +
+    '\nNovo status: ' + statusLabel;
 
-  const resposta = UrlFetchApp.fetch('https://graph.facebook.com/v21.0/' + phoneNumberId + '/messages', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + token },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });
+  const url = 'https://api.callmebot.com/whatsapp.php'
+    + '?phone=' + encodeURIComponent(phone)
+    + '&text=' + encodeURIComponent(mensagem)
+    + '&apikey=' + encodeURIComponent(apiKey);
 
+  const resposta = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   const codigo = resposta.getResponseCode();
-  if (codigo >= 300) {
-    throw new Error('Erro ' + codigo + ' ao enviar WhatsApp: ' + resposta.getContentText());
+  const corpo = resposta.getContentText();
+
+  if (codigo >= 300 || /error/i.test(corpo)) {
+    throw new Error('Erro ao enviar WhatsApp via CallMeBot (HTTP ' + codigo + '): ' + corpo);
   }
 }
 

@@ -62,65 +62,32 @@ Todos os lançamentos ficam na aba **`Agenda`** da planilha do Google Sheets cri
 
 ---
 
-## 📲 Avisos de WhatsApp quando o farol muda (Meta Cloud API)
+## 📲 Avisos de WhatsApp quando o farol muda (CallMeBot)
 
-Sempre que o farol de uma tarefa mudar de cor (ex: verde → laranja) ou uma tarefa for concluída, o sistema pode mandar um aviso por WhatsApp. Isso usa a **Meta WhatsApp Cloud API** (gratuita até 1000 conversas/mês), que exige uma configuração única do seu lado.
+Sempre que o farol de uma tarefa mudar de cor (ex: verde → laranja) ou uma tarefa for concluída, o sistema manda um aviso por WhatsApp pro seu número, usando o **CallMeBot** (serviço gratuito de terceiros — se você já tem uma API key ativada, é só reaproveitar).
 
-### A. Criar o app e o número de teste na Meta
+### A. Ativar a API key (pule se já tiver uma)
 
-1. Acesse https://developers.facebook.com e crie/entre com uma conta de desenvolvedor
-2. Clique em **Meus Apps → Criar App**, escolha o tipo **"Outro" → "Negócios"**
-3. Dentro do app criado, adicione o produto **WhatsApp**
-4. Na página **WhatsApp → Introdução**, a Meta te dá um **número de teste grátis**. Nessa mesma página:
-   - Copie o **Phone Number ID** (Id do número de telefone)
-   - Em "Para", clique em **Gerenciar lista de números** e adicione **o seu número de WhatsApp** (formato internacional, ex: +55 31 99999-9999) — em modo de teste, só números cadastrados aqui recebem mensagem
-   - Você vai receber um código no WhatsApp pra confirmar o número
+1. Salve o contato **+34 621 71 85 21** no seu WhatsApp
+2. Mande a mensagem: `I allow callmebot to send me messages`
+3. Em alguns minutos você recebe de volta sua **API key** (um número)
 
-### B. Gerar um token permanente
-
-O token que aparece na tela de "Introdução" expira em 24h — só serve pra teste manual. Para o aviso automático funcionar todo dia, você precisa de um token permanente:
-
-1. Vá em https://business.facebook.com → **Configurações do Negócio → Usuários → Usuários do sistema**
-2. Crie um usuário do sistema (papel: Admin)
-3. Clique em **Adicionar ativos** → selecione seu app do WhatsApp → dê permissão total
-4. Clique em **Gerar novo token** para esse usuário do sistema, marque a permissão **`whatsapp_business_messaging`**, e copie o token gerado (só aparece uma vez — guarde num lugar seguro)
-
-### C. Criar o modelo de mensagem (template)
-
-Mensagens iniciadas pelo sistema (não é resposta a uma mensagem sua) exigem um **template aprovado pela Meta**:
-
-1. Vá em https://business.facebook.com/wa/manage/message-templates
-2. Clique em **Criar modelo**
-3. Preencha:
-   - **Nome:** `alerta_prazo_agenda`
-   - **Categoria:** Utilidade (Utility)
-   - **Idioma:** Português (BR)
-   - **Corpo do texto:**
-     ```
-     ⚠️ Alerta de prazo — Agenda CPE
-
-     Tarefa: {{1}}
-     Responsável: {{2}}
-     Novo status: {{3}}
-     ```
-4. Envie para aprovação — normalmente leva minutos, pode levar até 24h
-
-### D. Configurar o Apps Script
+### B. Configurar o Apps Script
 
 1. No editor do Apps Script, clique no ícone de **engrenagem ⚙️ (Configurações do projeto)**
 2. Role até **Script Properties** → **Add script property** e adicione, uma por uma:
 
    | Propriedade | Valor |
    |---|---|
-   | `WHATSAPP_TOKEN` | o token permanente do Passo B |
-   | `WHATSAPP_PHONE_NUMBER_ID` | o Phone Number ID do Passo A |
-   | `WHATSAPP_DESTINATARIO` | seu número no formato internacional sem símbolos, ex: `5531999999999` |
-   | `WHATSAPP_TEMPLATE_NAME` | `alerta_prazo_agenda` (opcional — já é o padrão) |
-   | `WHATSAPP_TEMPLATE_LANG` | `pt_BR` (opcional — já é o padrão) |
+   | `CALLMEBOT_PHONE` | seu número no formato internacional sem símbolos, ex: `5531999999999` |
+   | `CALLMEBOT_API_KEY` | a API key do Passo A |
 
 3. Copie o `Code.gs` atualizado deste repositório para o editor (substitui o antigo) e salve
 4. No menu de funções (topo do editor, ao lado do ▶ Executar), selecione **`testarWhatsApp`** e clique em **Executar** — autorize se pedir, e confira se a mensagem chegou no seu WhatsApp
 5. Se deu certo, selecione **`instalarGatilhoDiario`** no mesmo menu e clique em **Executar** uma única vez — isso liga o monitoramento automático (roda todo dia por volta das 8h e avisa quando o farol de alguma tarefa mudar)
 6. Crie uma **nova versão** da implantação (Implantar → Gerenciar implantações → ✏️ → Nova versão → Implantar) pra tudo entrar em vigor
 
-**Importante:** enquanto o app estiver em "modo de Desenvolvimento" na Meta, só o número cadastrado no Passo A recebe mensagens. Para uso mais amplo (vários responsáveis, por exemplo), a Meta exige verificação do negócio.
+**Observações:**
+- O CallMeBot é um serviço não-oficial mantido por terceiros (não é da Meta/WhatsApp) — de vez em quando pode ficar instável, mas pra avisos pessoais funciona bem e é o mais simples que existe
+- Ele manda mensagem só pro número que ativou a API key (o seu) — não dá pra usar pra avisar vários responsáveis diferentes com essa mesma chave
+- Nunca cole a API key diretamente no código — sempre em Script Properties, senão ela vai pro histórico do GitHub
