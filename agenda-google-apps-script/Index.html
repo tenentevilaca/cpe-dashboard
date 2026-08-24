@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda de Tarefas — CPE 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--preto:#373435;--dourado:#A08F63;--dourado-claro:#C4B287;--bg:#FAF8F3;--bg-card:#FFFFFF;--bg-soft:#F2EFE6;--texto:#373435;--texto-soft:#5A5A5A;--texto-mute:#8A8A8A;--linha:#E0DCD0;--sombra:0 1px 3px rgba(55,52,53,.04),0 4px 16px rgba(55,52,53,.04);
+--verde:#2E7D32;--laranja:#EF6C00;--vermelho:#C62828;--preto-farol:#1C1C1C}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--texto);line-height:1.5;min-height:100vh}
+.header{background:var(--preto);color:#FFF;padding:20px 40px;border-bottom:3px solid var(--dourado)}
+.header-top{display:flex;justify-content:space-between;align-items:center;max-width:1400px;margin:0 auto;gap:24px;flex-wrap:wrap}
+.header-info h1{font-family:'Source Serif Pro',serif;font-size:24px;color:#FFF}
+.header-info .subtitle{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.5px;color:var(--dourado-claro)}
+.refresh-btn{background:var(--dourado);color:var(--preto);border:none;padding:10px 18px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.refresh-btn:hover{background:var(--dourado-claro)}
+.status-line{background:rgba(255,255,255,.08);padding:8px 40px;text-align:center;font-size:11px;color:#FFF;font-family:'JetBrains Mono',monospace}
+.status-line.error{background:var(--vermelho)}.status-line.success{background:rgba(160,143,99,.4)}
+.main{max-width:1400px;margin:0 auto;padding:28px 40px}
+.section-title{font-family:'Source Serif Pro',serif;font-size:20px;font-weight:700;margin:32px 0 16px;padding-bottom:8px;border-bottom:2px solid var(--dourado);display:flex;align-items:baseline;gap:12px;color:var(--texto)}
+.section-title:first-child{margin-top:0}
+.form-card{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:20px 24px;box-shadow:var(--sombra);margin-bottom:8px}
+.form-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr auto;gap:16px;align-items:end}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-mute)}
+.fg input{background:var(--bg);border:1px solid var(--linha);padding:9px 12px;border-radius:4px;font-size:13px;color:var(--texto);font-family:inherit}
+.fg input:focus{outline:2px solid var(--dourado-claro)}
+.add-btn{background:var(--preto);color:#FFF;border:none;padding:10px 20px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;height:38px}
+.add-btn:hover{background:#4a4647}
+.form-error{color:var(--vermelho);font-size:12px;margin-top:10px}
+.filtro-bar{display:flex;gap:8px;margin:20px 0;flex-wrap:wrap}
+.filtro-btn{background:var(--bg-card);border:1px solid var(--linha);padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--texto-soft)}
+.filtro-btn.active{background:var(--preto);color:#FFF;border-color:var(--preto)}
+.table-card{background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;overflow:hidden;box-shadow:var(--sombra);margin-top:8px}
+.table-header{padding:18px 24px;border-bottom:1px solid var(--linha);display:flex;justify-content:space-between;align-items:center}
+.table-header h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-soft)}
+.table-meta{font-size:11px;color:var(--texto-mute);font-family:'JetBrains Mono',monospace}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--bg-soft)}
+th{padding:12px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--texto-soft);border-bottom:1px solid var(--linha);white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--linha);color:var(--texto);vertical-align:middle}
+td.code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--texto-soft)}
+tbody tr:hover{background:var(--bg-soft)}
+tbody tr.concluida{opacity:.55}
+.farol{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;color:#FFF;white-space:nowrap}
+.farol-verde{background:var(--verde)}
+.farol-laranja{background:var(--laranja)}
+.farol-vermelho{background:var(--vermelho)}
+.farol-preto{background:var(--preto-farol)}
+.farol-concluida{background:var(--dourado)}
+.bar-mini{width:90px;height:6px;background:var(--bg-soft);border-radius:3px;overflow:hidden;margin-top:5px}
+.bar-fill{height:100%}
+.bar-fill.verde{background:var(--verde)}.bar-fill.laranja{background:var(--laranja)}.bar-fill.vermelho{background:var(--vermelho)}.bar-fill.preto{background:var(--preto-farol)}
+.acoes{display:flex;gap:8px}
+.acao-btn{background:transparent;border:1px solid var(--linha);border-radius:4px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:inherit;color:var(--texto-soft)}
+.acao-btn:hover{background:var(--bg-soft)}
+.acao-btn.excluir:hover{background:#FFEBEE;color:var(--vermelho);border-color:var(--vermelho)}
+.legend-criterios{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 8px}
+.legend-item{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--linha);border-radius:6px;padding:10px 16px;font-size:12px;box-shadow:var(--sombra)}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.empty{text-align:center;padding:40px;color:var(--texto-mute);font-size:13px}
+.footer{max-width:1400px;margin:40px auto 0;padding:24px 40px 32px;border-top:1px solid var(--linha);font-size:11px;color:var(--texto-mute);text-align:center}
+@media(max-width:900px){.form-grid{grid-template-columns:1fr 1fr}.header,.main,.status-line{padding-left:20px;padding-right:20px}}
+</style>
+</head>
+<body>
+<header class="header"><div class="header-top">
+  <div class="header-info"><div class="subtitle">Estado-Maior do CPE | Controle de Prazos 2026</div><h1>🗓️ Agenda de Tarefas</h1></div>
+  <button class="refresh-btn" onclick="carregar()">🔄 Atualizar</button>
+</div></header>
+<div class="status-line" id="status">Carregando...</div>
+
+<main class="main">
+  <h2 class="section-title"><span>Nova Tarefa</span></h2>
+  <div class="form-card">
+    <form id="form-tarefa" onsubmit="return salvarTarefa(event)">
+      <div class="form-grid">
+        <div class="fg"><label>Tarefa</label><input type="text" id="f-tarefa" required maxlength="200" placeholder="Descrição da tarefa"></div>
+        <div class="fg"><label>Responsável</label><input type="text" id="f-responsavel" required maxlength="120" placeholder="Nome do responsável"></div>
+        <div class="fg"><label>Data de Início</label><input type="date" id="f-inicio" required></div>
+        <div class="fg"><label>Prazo</label><input type="date" id="f-prazo" required></div>
+        <button type="submit" class="add-btn">+ Lançar</button>
+      </div>
+      <div class="form-error" id="form-error"></div>
+    </form>
+  </div>
+
+  <h2 class="section-title"><span>Critérios do Farol de Prazo</span></h2>
+  <div class="legend-criterios">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--verde)"></span><strong>Verde</strong>&nbsp;— até 70% do prazo decorrido</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--laranja)"></span><strong>Laranja</strong>&nbsp;— de 70% a 90%</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--vermelho)"></span><strong>Vermelho</strong>&nbsp;— de 91% a 99%</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--preto-farol)"></span><strong>Preto</strong>&nbsp;— 100% ou mais (mostra os dias em atraso)</div>
+  </div>
+
+  <h2 class="section-title"><span>Tarefas Lançadas</span></h2>
+  <div class="filtro-bar">
+    <button class="filtro-btn active" data-f="TODAS" onclick="filtrar('TODAS')">Todas</button>
+    <button class="filtro-btn" data-f="PENDENTES" onclick="filtrar('PENDENTES')">Pendentes</button>
+    <button class="filtro-btn" data-f="ATRASADAS" onclick="filtrar('ATRASADAS')">Atrasadas (🔴⚫)</button>
+    <button class="filtro-btn" data-f="CONCLUIDAS" onclick="filtrar('CONCLUIDAS')">Concluídas</button>
+  </div>
+  <div id="tabela-container"></div>
+
+  <footer class="footer">Agenda de Tarefas — CPE 2026 · Google Apps Script</footer>
+</main>
+
+<script>
+let TAREFAS = [];
+let FILTRO = 'TODAS';
+
+function setStatus(m, t) {
+  const e = document.getElementById('status');
+  e.textContent = m;
+  e.className = 'status-line ' + (t || '');
+}
+
+function carregar() {
+  setStatus('Buscando tarefas...', '');
+  google.script.run
+    .withSuccessHandler(function (dados) {
+      TAREFAS = dados;
+      setStatus('✓ ' + dados.length + ' tarefa(s) carregada(s)', 'success');
+      render();
+    })
+    .withFailureHandler(function (erro) {
+      setStatus('⚠ Erro ao carregar: ' + (erro.message || erro), 'error');
+    })
+    .listarTarefas();
+}
+
+function salvarTarefa(ev) {
+  ev.preventDefault();
+  const erroEl = document.getElementById('form-error');
+  erroEl.textContent = '';
+
+  const dados = {
+    tarefa: document.getElementById('f-tarefa').value.trim(),
+    responsavel: document.getElementById('f-responsavel').value.trim(),
+    dataInicio: document.getElementById('f-inicio').value,
+    prazo: document.getElementById('f-prazo').value
+  };
+
+  if (dados.prazo < dados.dataInicio) {
+    erroEl.textContent = 'O prazo não pode ser anterior à data de início.';
+    return false;
+  }
+
+  const btn = ev.target.querySelector('.add-btn');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+
+  google.script.run
+    .withSuccessHandler(function (dadosAtualizados) {
+      TAREFAS = dadosAtualizados;
+      document.getElementById('form-tarefa').reset();
+      btn.disabled = false;
+      btn.textContent = '+ Lançar';
+      setStatus('✓ Tarefa lançada com sucesso', 'success');
+      render();
+    })
+    .withFailureHandler(function (erro) {
+      btn.disabled = false;
+      btn.textContent = '+ Lançar';
+      erroEl.textContent = erro.message || String(erro);
+    })
+    .adicionarTarefa(dados);
+
+  return false;
+}
+
+function concluir(id, concluida) {
+  google.script.run
+    .withSuccessHandler(function (dados) {
+      TAREFAS = dados;
+      render();
+    })
+    .withFailureHandler(function (erro) { setStatus('⚠ ' + (erro.message || erro), 'error'); })
+    .concluirTarefa(id, concluida);
+}
+
+function excluir(id, nome) {
+  if (!confirm('Excluir a tarefa "' + nome + '"?')) return;
+  google.script.run
+    .withSuccessHandler(function (dados) {
+      TAREFAS = dados;
+      render();
+    })
+    .withFailureHandler(function (erro) { setStatus('⚠ ' + (erro.message || erro), 'error'); })
+    .excluirTarefa(id);
+}
+
+function filtrar(f) {
+  FILTRO = f;
+  document.querySelectorAll('.filtro-btn').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.f === f);
+  });
+  render();
+}
+
+// ===== Cálculo do farol =====
+function parseData(s) {
+  const p = s.split('-');
+  return new Date(+p[0], +p[1] - 1, +p[2]);
+}
+
+function calcularFarol(inicio, prazo, concluida, dataConclusao) {
+  const MS_DIA = 86400000;
+  const dIni = parseData(inicio);
+  const dPrazo = parseData(prazo);
+  const hojeReal = new Date();
+  const dRef = concluida && dataConclusao
+    ? parseData(dataConclusao)
+    : new Date(hojeReal.getFullYear(), hojeReal.getMonth(), hojeReal.getDate());
+
+  const totalDias = Math.round((dPrazo - dIni) / MS_DIA);
+  const decorridos = Math.round((dRef - dIni) / MS_DIA);
+
+  let pct;
+  if (totalDias <= 0) {
+    pct = decorridos >= 0 ? 100 : 0;
+  } else {
+    pct = (decorridos / totalDias) * 100;
+  }
+  pct = Math.max(0, pct);
+
+  let nivel;
+  if (pct >= 100) nivel = 'preto';
+  else if (pct > 90) nivel = 'vermelho';
+  else if (pct >= 70) nivel = 'laranja';
+  else nivel = 'verde';
+
+  let diasAtraso = 0;
+  if (nivel === 'preto') {
+    diasAtraso = Math.max(0, Math.round((dRef - dPrazo) / MS_DIA));
+  }
+
+  return { pct: Math.round(pct), nivel: nivel, diasAtraso: diasAtraso };
+}
+
+function farolLabel(f, concluida) {
+  if (concluida) return '✓ Concluída';
+  if (f.nivel === 'preto') return f.diasAtraso > 0 ? '⚫ +' + f.diasAtraso + ' dia(s) em atraso' : '⚫ Vence hoje (100%)';
+  if (f.nivel === 'vermelho') return '🔴 ' + f.pct + '%';
+  if (f.nivel === 'laranja') return '🟠 ' + f.pct + '%';
+  return '🟢 ' + f.pct + '%';
+}
+
+function fmtData(s) {
+  if (!s) return '—';
+  const p = s.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+function render() {
+  let lista = TAREFAS.map(function (t) {
+    return Object.assign({}, t, { farol: calcularFarol(t.dataInicio, t.prazo, t.concluida, t.dataConclusao) });
+  });
+
+  if (FILTRO === 'PENDENTES') lista = lista.filter(function (t) { return !t.concluida; });
+  else if (FILTRO === 'CONCLUIDAS') lista = lista.filter(function (t) { return t.concluida; });
+  else if (FILTRO === 'ATRASADAS') lista = lista.filter(function (t) { return !t.concluida && (t.farol.nivel === 'vermelho' || t.farol.nivel === 'preto'); });
+
+  lista.sort(function (a, b) {
+    if (a.concluida !== b.concluida) return a.concluida ? 1 : -1;
+    return b.farol.pct - a.farol.pct;
+  });
+
+  const container = document.getElementById('tabela-container');
+  if (lista.length === 0) {
+    container.innerHTML = '<div class="table-card"><div class="empty">Nenhuma tarefa encontrada para este filtro.</div></div>';
+    return;
+  }
+
+  let html = '<div class="table-card"><div class="table-header"><h3>Lançamentos</h3><span class="table-meta">' + lista.length + ' tarefa(s)</span></div>' +
+    '<div style="overflow-x:auto"><table><thead><tr>' +
+    '<th>Tarefa</th><th>Responsável</th><th>Início</th><th>Prazo</th><th>Farol</th><th>Ações</th>' +
+    '</tr></thead><tbody>';
+
+  lista.forEach(function (t) {
+    const f = t.farol;
+    const corBarra = t.concluida ? '' : f.nivel;
+    const largura = Math.min(100, f.pct);
+    html += '<tr class="' + (t.concluida ? 'concluida' : '') + '">' +
+      '<td><strong>' + escapeHtml(t.tarefa) + '</strong></td>' +
+      '<td>' + escapeHtml(t.responsavel) + '</td>' +
+      '<td class="code">' + fmtData(t.dataInicio) + '</td>' +
+      '<td class="code">' + fmtData(t.prazo) + '</td>' +
+      '<td><span class="farol farol-' + (t.concluida ? 'concluida' : f.nivel) + '">' + farolLabel(f, t.concluida) + '</span>' +
+      (t.concluida ? '' : '<div class="bar-mini"><div class="bar-fill ' + corBarra + '" style="width:' + largura + '%"></div></div>') +
+      '</td>' +
+      '<td class="acoes">' +
+      '<button class="acao-btn" onclick="concluir(\'' + t.id + '\',' + (!t.concluida) + ')">' + (t.concluida ? '↺ Reabrir' : '✓ Concluir') + '</button>' +
+      '<button class="acao-btn excluir" onclick="excluir(\'' + t.id + '\',\'' + escapeHtml(t.tarefa).replace(/'/g, "\\'") + '\')">🗑 Excluir</button>' +
+      '</td></tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+  container.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+window.addEventListener('load', carregar);
+</script>
+</body>
+</html>

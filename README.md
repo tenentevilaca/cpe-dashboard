@@ -51,3 +51,9 @@ Dashboard orçamentário do CPE rodando no Render (URL pública permanente).
 - Planilha CPE: https://docs.google.com/spreadsheets/d/14_loVs5PklVuyxLVWkxKP2uJhn8inxTovCv9DcYb9Xg
 - Planilha Repasses: https://docs.google.com/spreadsheets/d/1nU9jcXC6zhtA_lnYrUDVDvF0U-4YONPU
 
+---
+
+## 🗓️ Agenda de Tarefas (Google Apps Script)
+
+Agenda com farol de prazo (verde/laranja/vermelho/preto), rodando 100% no Google — sem depender do Render. Veja o setup em [`agenda-google-apps-script/README.md`](./agenda-google-apps-script/README.md).
+
