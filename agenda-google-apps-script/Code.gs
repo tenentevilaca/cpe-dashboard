@@ -49,12 +49,17 @@ function formatDate_(v) {
   return v;
 }
 
-/** Retorna todas as tarefas cadastradas. */
+/**
+ * Retorna todas as tarefas cadastradas, junto com a data de "hoje" segundo o fuso horário
+ * do script (America/Sao_Paulo). O painel usa essa data em vez do relógio do navegador do
+ * usuário para calcular o farol — assim o farol exibido sempre bate com o que dispara os
+ * avisos de WhatsApp, independente do fuso/relógio do computador de quem está olhando.
+ */
 function listarTarefas() {
   const sheet = getSheet_();
   const values = sheet.getDataRange().getValues();
   const rows = values.slice(1);
-  return rows
+  const tarefas = rows
     .filter(r => r[0] !== '' && r[0] != null)
     .map(r => ({
       id: r[0],
@@ -66,6 +71,10 @@ function listarTarefas() {
       dataConclusao: formatDate_(r[6]),
       notificar: !(r[8] === false || r[8] === 'FALSE' || r[8] === 'FALSO')
     }));
+  return {
+    tarefas: tarefas,
+    hoje: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')
+  };
 }
 
 /** Adiciona uma nova tarefa. dados = {tarefa, responsavel, dataInicio, prazo} (datas em 'yyyy-MM-dd'). */

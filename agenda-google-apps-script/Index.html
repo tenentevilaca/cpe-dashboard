@@ -115,6 +115,7 @@ tbody tr.concluida{opacity:.55}
 
 <script>
 let TAREFAS = [];
+let HOJE = null;
 let FILTRO = 'TODAS';
 
 function setStatus(m, t) {
@@ -123,12 +124,17 @@ function setStatus(m, t) {
   e.className = 'status-line ' + (t || '');
 }
 
+function aplicarResultado(resultado) {
+  TAREFAS = resultado.tarefas;
+  HOJE = resultado.hoje;
+}
+
 function carregar() {
   setStatus('Buscando tarefas...', '');
   google.script.run
-    .withSuccessHandler(function (dados) {
-      TAREFAS = dados;
-      setStatus('✓ ' + dados.length + ' tarefa(s) carregada(s)', 'success');
+    .withSuccessHandler(function (resultado) {
+      aplicarResultado(resultado);
+      setStatus('✓ ' + TAREFAS.length + ' tarefa(s) carregada(s)', 'success');
       render();
     })
     .withFailureHandler(function (erro) {
@@ -163,8 +169,8 @@ function salvarTarefa(ev) {
   btn.textContent = 'Salvando...';
 
   google.script.run
-    .withSuccessHandler(function (dadosAtualizados) {
-      TAREFAS = dadosAtualizados;
+    .withSuccessHandler(function (resultado) {
+      aplicarResultado(resultado);
       document.getElementById('form-tarefa').reset();
       btn.disabled = false;
       btn.textContent = '+ Lançar';
@@ -183,8 +189,8 @@ function salvarTarefa(ev) {
 
 function concluir(id, concluida) {
   google.script.run
-    .withSuccessHandler(function (dados) {
-      TAREFAS = dados;
+    .withSuccessHandler(function (resultado) {
+      aplicarResultado(resultado);
       render();
     })
     .withFailureHandler(function (erro) { setStatus('⚠ ' + (erro.message || erro), 'error'); })
@@ -193,8 +199,8 @@ function concluir(id, concluida) {
 
 function alternarNotificacao(id, notificar) {
   google.script.run
-    .withSuccessHandler(function (dados) {
-      TAREFAS = dados;
+    .withSuccessHandler(function (resultado) {
+      aplicarResultado(resultado);
       render();
     })
     .withFailureHandler(function (erro) { setStatus('⚠ ' + (erro.message || erro), 'error'); })
@@ -204,8 +210,8 @@ function alternarNotificacao(id, notificar) {
 function excluir(id, nome) {
   if (!confirm('Excluir a tarefa "' + nome + '"?')) return;
   google.script.run
-    .withSuccessHandler(function (dados) {
-      TAREFAS = dados;
+    .withSuccessHandler(function (resultado) {
+      aplicarResultado(resultado);
       render();
     })
     .withFailureHandler(function (erro) { setStatus('⚠ ' + (erro.message || erro), 'error'); })
@@ -239,10 +245,9 @@ function calcularFarol(inicio, prazo, concluida, dataConclusao) {
   const MS_DIA = 86400000;
   const dIni = parseData(inicio);
   const dPrazo = parseData(prazo);
-  const hojeReal = new Date();
   const dRef = concluida && dataConclusao
     ? parseData(dataConclusao)
-    : new Date(hojeReal.getFullYear(), hojeReal.getMonth(), hojeReal.getDate());
+    : parseData(HOJE);
 
   const totalDias = Math.round((dPrazo - dIni) / MS_DIA);
   const decorridos = Math.round((dRef - dIni) / MS_DIA);
