@@ -292,6 +292,25 @@ function linkWhatsApp(t, f) {
   return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(mensagemStatusWhatsApp(t, f));
 }
 
+let JANELA_WHATSAPP = null;
+
+function enviarWhatsApp(id) {
+  const t = TAREFAS.find(function (x) { return x.id === id; });
+  if (!t) return;
+  const f = calcularFarol(t.dataInicio, t.prazo, t.concluida, t.dataConclusao);
+  const url = linkWhatsApp(t, f);
+  // O WhatsApp Web reseta o nome da própria aba ao carregar (proteção contra
+  // rastreamento entre abas), então "target" nomeado no <a> não funciona depois
+  // do primeiro clique. Por isso guardamos a referência direta da janela e
+  // reaproveitamos ela, em vez de depender do nome.
+  if (JANELA_WHATSAPP && !JANELA_WHATSAPP.closed) {
+    JANELA_WHATSAPP.location.href = url;
+    JANELA_WHATSAPP.focus();
+  } else {
+    JANELA_WHATSAPP = window.open(url, 'agenda_whatsapp');
+  }
+}
+
 function definirTelefone(id, atual) {
   const tel = prompt('Telefone do WhatsApp do responsável (com DDI+DDD, só números).\nEx: 5531999999999', atual || '');
   if (tel === null) return;
@@ -487,7 +506,7 @@ function render() {
       '</td>' +
       '<td><button class="acao-btn ' + (t.notificar ? 'aviso-on' : 'aviso-off') + '" onclick="alternarNotificacao(\'' + t.id + '\',' + !t.notificar + ')" title="Clique para ' + (t.notificar ? 'silenciar' : 'ativar') + ' os avisos desta tarefa">' + (t.notificar ? '🔔 Ativo' : '🔕 Mudo') + '</button></td>' +
       '<td>' + (t.telefoneResponsavel
-        ? '<a class="zap-btn" href="' + linkWhatsApp(t, f) + '" target="agenda_whatsapp" rel="noopener">📲 Enviar</a> <button class="acao-btn" onclick="definirTelefone(\'' + t.id + '\',\'' + t.telefoneResponsavel + '\')" title="Editar número">✏️</button>'
+        ? '<button class="zap-btn" onclick="enviarWhatsApp(\'' + t.id + '\')">📲 Enviar</button> <button class="acao-btn" onclick="definirTelefone(\'' + t.id + '\',\'' + t.telefoneResponsavel + '\')" title="Editar número">✏️</button>'
         : '<button class="acao-btn" onclick="definirTelefone(\'' + t.id + '\')">☎️ Definir nº</button>') + '</td>' +
       '<td><button class="badge-obs' + (t.totalObservacoes > 0 ? ' tem-obs' : '') + '" onclick="abrirObservacoes(\'' + t.id + '\',\'' + escapeHtml(t.tarefa).replace(/'/g, "\\'") + '\')">📝 ' + t.totalObservacoes + '</button></td>' +
       '<td class="acoes">' +
