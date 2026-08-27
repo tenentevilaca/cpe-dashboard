@@ -292,23 +292,18 @@ function linkWhatsApp(t, f) {
   return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(mensagemStatusWhatsApp(t, f));
 }
 
-let JANELA_WHATSAPP = null;
-
 function enviarWhatsApp(id) {
   const t = TAREFAS.find(function (x) { return x.id === id; });
   if (!t) return;
   const f = calcularFarol(t.dataInicio, t.prazo, t.concluida, t.dataConclusao);
   const url = linkWhatsApp(t, f);
-  // O WhatsApp Web reseta o nome da própria aba ao carregar (proteção contra
-  // rastreamento entre abas), então "target" nomeado no <a> não funciona depois
-  // do primeiro clique. Por isso guardamos a referência direta da janela e
-  // reaproveitamos ela, em vez de depender do nome.
-  if (JANELA_WHATSAPP && !JANELA_WHATSAPP.closed) {
-    JANELA_WHATSAPP.location.href = url;
-    JANELA_WHATSAPP.focus();
-  } else {
-    JANELA_WHATSAPP = window.open(url, 'agenda_whatsapp');
-  }
+  // O próprio WhatsApp costuma fechar a janela que abrimos e abrir outra por
+  // conta dele (parte do redirecionamento wa.me -> WhatsApp Web/app), então não
+  // dá para garantir o reaproveitamento da aba de forma confiável. Como
+  // consolação, abrimos como uma janela pequena (não uma aba cheia), pra não
+  // acumular bagunça na barra de abas — fica fácil fechar com Ctrl+W depois
+  // de enviar.
+  window.open(url, 'agenda_whatsapp', 'width=480,height=680,noopener');
 }
 
 function definirTelefone(id, atual) {
