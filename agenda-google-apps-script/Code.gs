@@ -5,7 +5,7 @@
  */
 
 const SHEET_NAME = 'Agenda';
-const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel', 'Notificar'];
+const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel', 'Notificar', 'TelefoneResponsavel'];
 
 const OBS_SHEET_NAME = 'Observacoes';
 const OBS_HEADERS = ['ID', 'TarefaID', 'Data', 'Texto', 'PrazoAnterior', 'PrazoNovo'];
@@ -109,7 +109,8 @@ function listarTarefas() {
       concluida: r[5] === true || r[5] === 'TRUE' || r[5] === 'VERDADEIRO',
       dataConclusao: formatDate_(r[6]),
       notificar: !(r[8] === false || r[8] === 'FALSE' || r[8] === 'FALSO'),
-      totalObservacoes: contagemObs[r[0]] || 0
+      totalObservacoes: contagemObs[r[0]] || 0,
+      telefoneResponsavel: r[9] || ''
     }));
   return {
     tarefas: tarefas,
@@ -208,7 +209,20 @@ function adicionarTarefa(dados) {
   const id = Utilities.getUuid();
   const chaveInicial = statusKey_(calcularFarol_(dados.dataInicio, dados.prazo));
   const notificar = dados.notificar !== false;
-  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', chaveInicial, notificar]);
+  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', chaveInicial, notificar, dados.telefoneResponsavel || '']);
+  return listarTarefas();
+}
+
+/** Atualiza o telefone de WhatsApp do responsável por uma tarefa (usado pelo botão "Definir nº"). */
+function atualizarTelefoneResponsavel(id, telefone) {
+  const sheet = getSheet_();
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, 10).setValue(telefone || '');
+      break;
+    }
+  }
   return listarTarefas();
 }
 
