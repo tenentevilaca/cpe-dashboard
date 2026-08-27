@@ -92,9 +92,9 @@ function adicionarTarefa(dados) {
   }
   const sheet = getSheet_();
   const id = Utilities.getUuid();
-  const nivelInicial = calcularFarol_(dados.dataInicio, dados.prazo).nivel;
+  const chaveInicial = statusKey_(calcularFarol_(dados.dataInicio, dados.prazo));
   const notificar = dados.notificar !== false;
-  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', nivelInicial, notificar]);
+  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', chaveInicial, notificar]);
   return listarTarefas();
 }
 
@@ -180,6 +180,15 @@ function calcularFarol_(dataInicioStr, prazoStr) {
   return { pct: Math.round(pct), nivel: nivel, diasAtraso: diasAtraso };
 }
 
+/**
+ * Chave de comparação de status: quando preta, inclui o número de dias em atraso, para que
+ * cada dia a mais de atraso conte como uma mudança de status (e dispare um novo aviso),
+ * mesmo a cor continuando preta.
+ */
+function statusKey_(farol) {
+  return farol.nivel === 'preto' ? 'preto:' + farol.diasAtraso : farol.nivel;
+}
+
 const NIVEL_LABEL = {
   verde: '🟢 Verde (dentro do prazo)',
   laranja: '🟠 Laranja (atenção — 70% a 90% do prazo)',
@@ -205,11 +214,12 @@ function verificarAlteracoesDeStatus() {
 
     const dataInicio = formatDate_(row[3]);
     const prazo = formatDate_(row[4]);
-    const nivelAnterior = row[7];
+    const chaveAnterior = row[7];
     const notificar = !(row[8] === false || row[8] === 'FALSE' || row[8] === 'FALSO');
     const farolAtual = calcularFarol_(dataInicio, prazo);
+    const chaveAtual = statusKey_(farolAtual);
 
-    if (notificar && nivelAnterior && nivelAnterior !== farolAtual.nivel) {
+    if (notificar && chaveAnterior && chaveAnterior !== chaveAtual) {
       let statusMsg = NIVEL_LABEL[farolAtual.nivel] || farolAtual.nivel;
       if (farolAtual.nivel === 'preto' && farolAtual.diasAtraso > 0) {
         statusMsg += ' — ' + farolAtual.diasAtraso + ' dia(s) em atraso';
@@ -221,7 +231,7 @@ function verificarAlteracoesDeStatus() {
       }
     }
 
-    sheet.getRange(i + 1, 8).setValue(farolAtual.nivel);
+    sheet.getRange(i + 1, 8).setValue(chaveAtual);
   }
 }
 
