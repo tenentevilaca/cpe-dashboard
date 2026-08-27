@@ -487,7 +487,7 @@ function render() {
       '</td>' +
       '<td><button class="acao-btn ' + (t.notificar ? 'aviso-on' : 'aviso-off') + '" onclick="alternarNotificacao(\'' + t.id + '\',' + !t.notificar + ')" title="Clique para ' + (t.notificar ? 'silenciar' : 'ativar') + ' os avisos desta tarefa">' + (t.notificar ? '🔔 Ativo' : '🔕 Mudo') + '</button></td>' +
       '<td>' + (t.telefoneResponsavel
-        ? '<a class="zap-btn" href="' + linkWhatsApp(t, f) + '" target="_blank" rel="noopener">📲 Enviar</a> <button class="acao-btn" onclick="definirTelefone(\'' + t.id + '\',\'' + t.telefoneResponsavel + '\')" title="Editar número">✏️</button>'
+        ? '<a class="zap-btn" href="' + linkWhatsApp(t, f) + '" target="agenda_whatsapp" rel="noopener">📲 Enviar</a> <button class="acao-btn" onclick="definirTelefone(\'' + t.id + '\',\'' + t.telefoneResponsavel + '\')" title="Editar número">✏️</button>'
         : '<button class="acao-btn" onclick="definirTelefone(\'' + t.id + '\')">☎️ Definir nº</button>') + '</td>' +
       '<td><button class="badge-obs' + (t.totalObservacoes > 0 ? ' tem-obs' : '') + '" onclick="abrirObservacoes(\'' + t.id + '\',\'' + escapeHtml(t.tarefa).replace(/'/g, "\\'") + '\')">📝 ' + t.totalObservacoes + '</button></td>' +
       '<td class="acoes">' +
