@@ -7,6 +7,9 @@
 const SHEET_NAME = 'Agenda';
 const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel', 'Notificar'];
 
+const OBS_SHEET_NAME = 'Observacoes';
+const OBS_HEADERS = ['ID', 'TarefaID', 'Data', 'Texto', 'PrazoAnterior', 'PrazoNovo'];
+
 // Nomes das Script Properties (configuradas em Configurações do projeto → Script Properties,
 // NUNCA no código-fonte — assim a chave não vai pro GitHub).
 const PROP_PHONE = 'CALLMEBOT_PHONE';
@@ -41,12 +44,47 @@ function getSheet_() {
   return sheet;
 }
 
+function getObsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(OBS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(OBS_SHEET_NAME);
+    sheet.appendRow(OBS_HEADERS);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
 function formatDate_(v) {
   if (!v) return '';
   if (Object.prototype.toString.call(v) === '[object Date]') {
     return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
   return v;
+}
+
+function fmtDataBr_(s) {
+  if (!s) return '';
+  const p = s.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+function addDias_(dataStr, dias) {
+  const d = new Date(dataStr + 'T00:00:00');
+  d.setDate(d.getDate() + Number(dias));
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+function contarObservacoesPorTarefa_() {
+  const sheet = getObsSheet_();
+  const values = sheet.getDataRange().getValues();
+  const mapa = {};
+  for (let i = 1; i < values.length; i++) {
+    const tid = values[i][1];
+    if (!tid) continue;
+    mapa[tid] = (mapa[tid] || 0) + 1;
+  }
+  return mapa;
 }
 
 /**
@@ -59,6 +97,7 @@ function listarTarefas() {
   const sheet = getSheet_();
   const values = sheet.getDataRange().getValues();
   const rows = values.slice(1);
+  const contagemObs = contarObservacoesPorTarefa_();
   const tarefas = rows
     .filter(r => r[0] !== '' && r[0] != null)
     .map(r => ({
@@ -69,11 +108,86 @@ function listarTarefas() {
       prazo: formatDate_(r[4]),
       concluida: r[5] === true || r[5] === 'TRUE' || r[5] === 'VERDADEIRO',
       dataConclusao: formatDate_(r[6]),
-      notificar: !(r[8] === false || r[8] === 'FALSE' || r[8] === 'FALSO')
+      notificar: !(r[8] === false || r[8] === 'FALSE' || r[8] === 'FALSO'),
+      totalObservacoes: contagemObs[r[0]] || 0
     }));
   return {
     tarefas: tarefas,
     hoje: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')
+  };
+}
+
+/** Retorna as observações/justificativas de uma tarefa, em ordem cronológica. */
+function listarObservacoes(tarefaId) {
+  const sheet = getObsSheet_();
+  const values = sheet.getDataRange().getValues();
+  const rows = values.slice(1);
+  return rows
+    .filter(r => r[1] === tarefaId)
+    .map(r => ({
+      id: r[0],
+      tarefaId: r[1],
+      data: r[2],
+      texto: r[3],
+      prazoAnterior: r[4],
+      prazoNovo: r[5]
+    }));
+}
+
+/**
+ * Registra uma observação/justificativa numa tarefa e, opcionalmente, prorroga o prazo.
+ * dados = {tarefaId, texto, diasExtra} — diasExtra é opcional (número de dias a somar ao
+ * prazo atual da tarefa).
+ */
+function adicionarObservacao(dados) {
+  if (!dados || !dados.tarefaId || !dados.texto) {
+    throw new Error('Informe a observação/justificativa.');
+  }
+  const sheet = getSheet_();
+  const values = sheet.getDataRange().getValues();
+  let linha = -1;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0] === dados.tarefaId) { linha = i; break; }
+  }
+  if (linha === -1) {
+    throw new Error('Tarefa não encontrada.');
+  }
+
+  const tarefaNome = values[linha][1];
+  const responsavel = values[linha][2];
+  const prazoAtual = formatDate_(values[linha][4]);
+  const notificar = !(values[linha][8] === false || values[linha][8] === 'FALSE' || values[linha][8] === 'FALSO');
+
+  let prazoAnterior = '';
+  let prazoNovo = '';
+  const diasExtra = Number(dados.diasExtra);
+  if (diasExtra && diasExtra > 0) {
+    prazoAnterior = prazoAtual;
+    prazoNovo = addDias_(prazoAtual, diasExtra);
+    sheet.getRange(linha + 1, 5).setValue(new Date(prazoNovo + 'T00:00:00'));
+  }
+
+  const obsSheet = getObsSheet_();
+  obsSheet.appendRow([
+    Utilities.getUuid(),
+    dados.tarefaId,
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'),
+    dados.texto,
+    prazoAnterior,
+    prazoNovo
+  ]);
+
+  if (prazoNovo && notificar) {
+    try {
+      enviarWhatsApp_(tarefaNome, responsavel, '🗓️ Prazo prorrogado para ' + fmtDataBr_(prazoNovo) + ' — Motivo: ' + dados.texto);
+    } catch (e) {
+      Logger.log('Falha ao enviar WhatsApp de prorrogação para "' + tarefaNome + '": ' + e);
+    }
+  }
+
+  return {
+    observacoes: listarObservacoes(dados.tarefaId),
+    resultado: listarTarefas()
   };
 }
 
