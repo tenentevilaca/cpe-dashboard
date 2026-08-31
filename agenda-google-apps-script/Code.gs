@@ -154,10 +154,7 @@ function adicionarObservacao(dados) {
     throw new Error('Tarefa não encontrada.');
   }
 
-  const tarefaNome = values[linha][1];
-  const responsavel = values[linha][2];
   const prazoAtual = formatDate_(values[linha][4]);
-  const notificar = !(values[linha][8] === false || values[linha][8] === 'FALSE' || values[linha][8] === 'FALSO');
 
   let prazoAnterior = '';
   let prazoNovo = '';
@@ -178,13 +175,10 @@ function adicionarObservacao(dados) {
     prazoNovo
   ]);
 
-  if (prazoNovo && notificar) {
-    try {
-      enviarWhatsApp_(tarefaNome, responsavel, '🗓️ Prazo prorrogado para ' + fmtDataBr_(prazoNovo) + ' — Motivo: ' + dados.texto);
-    } catch (e) {
-      Logger.log('Falha ao enviar WhatsApp de prorrogação para "' + tarefaNome + '": ' + e);
-    }
-  }
+  // Nenhuma chamada de rede (WhatsApp) acontece aqui de propósito: o CallMeBot pode
+  // demorar ou travar pra responder, e isso prendia a tela em "Salvando..." — o aviso
+  // de mudança de farol pro dono continua acontecendo pelas outras vias (conclusão de
+  // tarefa e verificação periódica).
 
   return {
     observacoes: listarObservacoes(dados.tarefaId),
