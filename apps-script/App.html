@@ -44,15 +44,32 @@ function debounce(fn, ms) {
   return function () { var a = arguments; clearTimeout(t); t = setTimeout(function () { fn.apply(null, a); }, ms); };
 }
 
-function setCrumbs(parts) {
-  var html = parts.map(function (p, i) {
-    if (i === parts.length - 1) return '<span>' + esc(p.label) + '</span>';
-    return '<a href="' + p.href + '">' + esc(p.label) + '</a> / ';
-  }).join('');
-  document.getElementById('crumbs').innerHTML = html;
-}
-
 var charts = {}; // guarda instâncias Chart.js para destruir ao re-renderizar
+
+// ---------- barra de abas (topo) ----------
+
+function renderTabBar() {
+  var hash = location.hash || '#/';
+  var html = '<button class="tab-btn' + (hash === '#/' || hash === '' ? ' active' : '') +
+    '" onclick="location.hash=\'#/\'">📊 Visão Geral</button>';
+
+  INITIAL_CONFIG.categories.forEach(function (cat) {
+    var sheets = INITIAL_CONFIG.sheets.filter(function (s) { return s.category === cat; });
+    if (!sheets.length) return;
+    html += '<span class="tab-group-label">' + esc(cat) + '</span>';
+    sheets.forEach(function (s) {
+      var target = '#/aba/' + encodeURIComponent(s.id);
+      html += '<button class="tab-btn' + (hash === target ? ' active' : '') + '" onclick="location.hash=\'' +
+        target + '\'">' + esc(s.title) + '</button>';
+    });
+  });
+
+  html += '<span class="tab-group-label">Outros</span>';
+  html += '<button class="tab-btn' + (hash === '#/encarregados' ? ' active' : '') +
+    '" onclick="location.hash=\'#/encarregados\'">Encarregados</button>';
+
+  document.getElementById('tabbar').innerHTML = html;
+}
 
 function destroyCharts() { Object.keys(charts).forEach(function (k) { charts[k].destroy(); }); charts = {}; }
 
@@ -62,6 +79,7 @@ function router() {
   var hash = location.hash || '#/';
   destroyCharts();
   fecharModal();
+  renderTabBar();
   if (hash === '#/' || hash === '') {
     renderHome();
   } else if (hash === '#/encarregados') {
@@ -91,7 +109,6 @@ function atualizarTudo() {
 // ---------- HOME ----------
 
 function renderHome() {
-  setCrumbs([{ label: 'Início', href: '#/' }]);
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando resumo…</div>';
 
@@ -195,7 +212,6 @@ function errorBox(err) {
 
 function renderSheetView(id) {
   var cfg = CFG_BY_ID[id];
-  setCrumbs([{ label: 'Início', href: '#/' }, { label: cfg.title, href: '#' }]);
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando "' + esc(cfg.title) + '"…</div>';
 
@@ -365,7 +381,6 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fech
 // ---------- ENCARREGADOS ----------
 
 function renderEncarregadosView() {
-  setCrumbs([{ label: 'Início', href: '#/' }, { label: 'Encarregados', href: '#' }]);
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando…</div>';
 
@@ -401,7 +416,7 @@ function renderEncarregadosView() {
 
 function tickClock() {
   var d = new Date();
-  document.getElementById('clock').textContent = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
+  document.getElementById('clock').textContent = 'Sincronizado: ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
 }
 setInterval(tickClock, 1000);
 tickClock();
