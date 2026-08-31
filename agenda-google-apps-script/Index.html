@@ -306,6 +306,30 @@ function enviarWhatsApp(id) {
   window.open(url, 'agenda_whatsapp', 'width=480,height=680,noopener');
 }
 
+function mensagemObservacaoWhatsApp(t, obs) {
+  let msg = '📝 Nova observação — Agenda CPE\n\n' +
+    'Tarefa: ' + t.tarefa +
+    '\nResponsável: ' + t.responsavel +
+    '\nObservação: ' + obs.texto;
+  if (obs.prazoNovo) {
+    msg += '\n\n🗓️ Prazo prorrogado: ' + fmtData(obs.prazoAnterior) + ' → ' + fmtData(obs.prazoNovo);
+  }
+  return msg;
+}
+
+function linkWhatsAppObservacao(t, obs) {
+  const tel = soDigitos(t.telefoneResponsavel);
+  return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(mensagemObservacaoWhatsApp(t, obs));
+}
+
+function enviarWhatsAppObs(obsId) {
+  const obs = OBSERVACOES_ATUAIS.find(function (o) { return o.id === obsId; });
+  const t = TAREFAS.find(function (x) { return x.id === TAREFA_OBS_ATUAL; });
+  if (!obs || !t || !t.telefoneResponsavel) return;
+  const url = linkWhatsAppObservacao(t, obs);
+  window.open(url, 'agenda_whatsapp', 'width=480,height=680,noopener');
+}
+
 function definirTelefone(id, atual) {
   const tel = prompt('Telefone do WhatsApp do responsável (com DDI+DDD, só números).\nEx: 5531999999999', atual || '');
   if (tel === null) return;
@@ -344,6 +368,7 @@ function fecharModalObs() {
 
 function renderObservacoes() {
   const container = document.getElementById('obs-lista');
+  const t = TAREFAS.find(function (x) { return x.id === TAREFA_OBS_ATUAL; });
   if (OBSERVACOES_ATUAIS.length === 0) {
     container.innerHTML = '<div class="obs-empty">Nenhuma observação registrada ainda.</div>';
     return;
@@ -355,6 +380,7 @@ function renderObservacoes() {
       '<div class="obs-data">' + escapeHtml(o.data) + '</div>' +
       '<div class="obs-texto">' + escapeHtml(o.texto) + '</div>' +
       (temPrazo ? '<div class="obs-prazo-mudou">🗓️ Prazo prorrogado: ' + fmtData(o.prazoAnterior) + ' → ' + fmtData(o.prazoNovo) + '</div>' : '') +
+      (t && t.telefoneResponsavel ? '<div style="margin-top:8px"><button class="zap-btn" onclick="enviarWhatsAppObs(\'' + o.id + '\')">📲 Reenviar pro responsável</button></div>' : '') +
       '</div>';
   });
   container.innerHTML = html;
@@ -389,6 +415,13 @@ function salvarObservacao(ev) {
       btn.disabled = false;
       btn.textContent = '+ Registrar';
       render();
+
+      const t = TAREFAS.find(function (x) { return x.id === TAREFA_OBS_ATUAL; });
+      const novaObs = OBSERVACOES_ATUAIS[OBSERVACOES_ATUAIS.length - 1];
+      if (t && t.telefoneResponsavel && novaObs) {
+        const url = linkWhatsAppObservacao(t, novaObs);
+        window.open(url, 'agenda_whatsapp', 'width=480,height=680,noopener');
+      }
     })
     .withFailureHandler(function (erro) {
       btn.disabled = false;
