@@ -1,0 +1,409 @@
+<script>
+'use strict';
+
+var CFG_BY_ID = {};
+INITIAL_CONFIG.sheets.forEach(function (s) { CFG_BY_ID[s.id] = s; });
+
+var STATE = {
+  sheetData: {},      // cache: id -> resultado de getSheetView
+  encarregados: null,
+  filters: {}         // por id: {unidade, situacao, busca, pendentes, pagina}
+};
+
+// ---------- utilidades ----------
+
+function gsRun(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn].apply(null, args);
+  });
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function fmtDateBR(iso) {
+  if (!iso) return null;
+  var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  return String(iso);
+}
+
+function badgeClass(cor) { return 'badge ' + (cor || 'cinza'); }
+
+function kpiCard(n, label, cor) {
+  return '<div class="kpi ' + cor + '"><div class="n">' + n + '</div><div class="l">' + esc(label) + '</div></div>';
+}
+
+function debounce(fn, ms) {
+  var t;
+  return function () { var a = arguments; clearTimeout(t); t = setTimeout(function () { fn.apply(null, a); }, ms); };
+}
+
+function setCrumbs(parts) {
+  var html = parts.map(function (p, i) {
+    if (i === parts.length - 1) return '<span>' + esc(p.label) + '</span>';
+    return '<a href="' + p.href + '">' + esc(p.label) + '</a> / ';
+  }).join('');
+  document.getElementById('crumbs').innerHTML = html;
+}
+
+var charts = {}; // guarda instâncias Chart.js para destruir ao re-renderizar
+
+function destroyCharts() { Object.keys(charts).forEach(function (k) { charts[k].destroy(); }); charts = {}; }
+
+// ---------- roteador ----------
+
+function router() {
+  var hash = location.hash || '#/';
+  destroyCharts();
+  fecharModal();
+  if (hash === '#/' || hash === '') {
+    renderHome();
+  } else if (hash === '#/encarregados') {
+    renderEncarregadosView();
+  } else if (hash.indexOf('#/aba/') === 0) {
+    var id = decodeURIComponent(hash.replace('#/aba/', ''));
+    if (CFG_BY_ID[id]) renderSheetView(id);
+    else renderHome();
+  } else {
+    renderHome();
+  }
+}
+window.addEventListener('hashchange', router);
+
+function atualizarTudo() {
+  var hash = location.hash || '#/';
+  if (hash.indexOf('#/aba/') === 0) {
+    var id = decodeURIComponent(hash.replace('#/aba/', ''));
+    delete STATE.sheetData[id];
+  } else {
+    STATE.sheetData = {};
+    STATE.encarregados = null;
+  }
+  router();
+}
+
+// ---------- HOME ----------
+
+function renderHome() {
+  setCrumbs([{ label: 'Início', href: '#/' }]);
+  var app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando resumo…</div>';
+
+  gsRun('getHomeSummary').then(function (summary) {
+    INITIAL_SUMMARY = summary;
+    drawHome(summary);
+  }).catch(function (err) { app.innerHTML = errorBox(err); });
+
+  // pinta imediatamente com o snapshot inicial (rápido), depois atualiza com o fresco acima
+  drawHome(INITIAL_SUMMARY);
+}
+
+function drawHome(summary) {
+  destroyCharts();
+  var totals = { total: 0, FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, OUTROS: 0 };
+  var byCat = {};
+  summary.forEach(function (s) {
+    ['total', 'FINALIZADO', 'ATRASADO', 'EM ANDAMENTO', 'OUTROS'].forEach(function (k) { totals[k] += s.counts[k] || 0; });
+    byCat[s.category] = byCat[s.category] || { total: 0, FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, items: [] };
+    byCat[s.category].total += s.counts.total || 0;
+    byCat[s.category].FINALIZADO += s.counts.FINALIZADO || 0;
+    byCat[s.category].ATRASADO += s.counts.ATRASADO || 0;
+    byCat[s.category]['EM ANDAMENTO'] += s.counts['EM ANDAMENTO'] || 0;
+    byCat[s.category].items.push(s);
+  });
+
+  var html = '';
+  html += '<div class="kpi-row">';
+  html += kpiCard(totals.total, 'Registros no painel', 'azul');
+  html += kpiCard(totals.FINALIZADO, 'Finalizados', 'verde');
+  html += kpiCard(totals['EM ANDAMENTO'], 'Em andamento', 'azul');
+  html += kpiCard(totals.ATRASADO, 'Atrasados / atenção', 'vermelho');
+  html += '</div>';
+
+  html += '<div class="chart-grid">';
+  html += '<div class="chart-card"><h2>Situação por categoria</h2><div class="chart-wrap"><canvas id="chartCategorias"></canvas></div></div>';
+  html += '<div class="chart-card"><h2>Distribuição geral</h2><div class="chart-wrap"><canvas id="chartGeral"></canvas></div></div>';
+  html += '</div>';
+
+  INITIAL_CONFIG.categories.forEach(function (cat) {
+    var c = byCat[cat];
+    if (!c) return;
+    html += '<div class="categoria"><h2>' + esc(cat) + '</h2><div class="cards">';
+    c.items.forEach(function (s) {
+      html += '<a class="card" href="#/aba/' + encodeURIComponent(s.id) + '">' +
+        '<h3>' + esc(s.title) + '</h3>' +
+        '<p>' + esc(s.description || '') + '</p>' +
+        '<div class="badges">' +
+        '<span class="badge azul">' + s.counts.total + ' total</span>' +
+        (s.counts.FINALIZADO ? '<span class="badge verde">' + s.counts.FINALIZADO + ' finalizado</span>' : '') +
+        (s.counts['EM ANDAMENTO'] ? '<span class="badge azul">' + s.counts['EM ANDAMENTO'] + ' em andamento</span>' : '') +
+        (s.counts.ATRASADO ? '<span class="badge vermelho">' + s.counts.ATRASADO + ' atrasado</span>' : '') +
+        (s.counts.error ? '<span class="badge cinza">erro ao ler aba</span>' : '') +
+        '</div></a>';
+    });
+    html += '</div></div>';
+  });
+
+  html += '<div class="categoria"><h2>Outros</h2><div class="cards">' +
+    '<a class="card" href="#/encarregados"><h3>Encarregados</h3>' +
+    '<p>Escalas de Conselho de Justiça, indicados CPM e controle de processos entregues.</p>' +
+    '<div class="badges"><span class="badge azul">ver painel</span></div></a>' +
+    '</div></div>';
+
+  document.getElementById('app').innerHTML = html;
+
+  var catLabels = INITIAL_CONFIG.categories.filter(function (c) { return byCat[c]; });
+  charts.cat = new Chart(document.getElementById('chartCategorias'), {
+    type: 'bar',
+    data: {
+      labels: catLabels,
+      datasets: [
+        { label: 'Finalizado', data: catLabels.map(function (c) { return byCat[c].FINALIZADO; }), backgroundColor: '#1f9d55' },
+        { label: 'Em andamento', data: catLabels.map(function (c) { return byCat[c]['EM ANDAMENTO']; }), backgroundColor: '#2563a8' },
+        { label: 'Atrasado', data: catLabels.map(function (c) { return byCat[c].ATRASADO; }), backgroundColor: '#d64545' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
+  charts.geral = new Chart(document.getElementById('chartGeral'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Finalizado', 'Em andamento', 'Atrasado', 'Outros'],
+      datasets: [{ data: [totals.FINALIZADO, totals['EM ANDAMENTO'], totals.ATRASADO, totals.OUTROS],
+        backgroundColor: ['#1f9d55', '#2563a8', '#d64545', '#9aa3af'] }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function errorBox(err) {
+  return '<div class="error-box">Não foi possível carregar os dados.<br>' + esc(err && err.message ? err.message : err) + '</div>';
+}
+
+// ---------- VISÃO DE ABA ----------
+
+function renderSheetView(id) {
+  var cfg = CFG_BY_ID[id];
+  setCrumbs([{ label: 'Início', href: '#/' }, { label: cfg.title, href: '#' }]);
+  var app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando "' + esc(cfg.title) + '"…</div>';
+
+  STATE.filters[id] = STATE.filters[id] || { unidade: '', situacao: '', busca: '', pendentes: false, pagina: 1 };
+
+  var p = STATE.sheetData[id] ? Promise.resolve(STATE.sheetData[id]) : gsRun('getSheetView', id);
+  p.then(function (data) {
+    STATE.sheetData[id] = data;
+    drawSheetView(id, data);
+  }).catch(function (err) { app.innerHTML = errorBox(err); });
+}
+
+function distinctValues_(rows, key) {
+  var set = {};
+  rows.forEach(function (r) { var v = r[key]; if (v) set[String(v).trim()] = true; });
+  return Object.keys(set).sort();
+}
+
+function applyFilters_(id, data) {
+  var f = STATE.filters[id];
+  var roles = data.roles;
+  return data.rows.filter(function (r) {
+    if (f.unidade && roles.unit && String(r[roles.unit] || '').trim() !== f.unidade) return false;
+    if (f.situacao && r._situacao !== f.situacao) return false;
+    if (f.pendentes && r._situacao === 'FINALIZADO') return false;
+    if (f.busca) {
+      var alvo = data.columns.map(function (c) { return r[c.key]; }).concat([r._situacao]).join(' | ').toUpperCase();
+      if (alvo.indexOf(f.busca.toUpperCase()) === -1) return false;
+    }
+    return true;
+  });
+}
+
+function drawSheetView(id, data) {
+  destroyCharts();
+  var cfg = CFG_BY_ID[id];
+  var f = STATE.filters[id];
+  var roles = data.roles;
+  var listCols = data.columns.filter(function (c) { return c.list; });
+
+  var unidades = roles.unit ? distinctValues_(data.rows, roles.unit) : [];
+  var situacoes = distinctValues_(data.rows, '_situacao');
+
+  var filtered = applyFilters_(id, data);
+
+  var html = '';
+  html += '<div class="view-header"><div><h1>' + esc(data.title) + '</h1><p>' + esc(data.description || '') + '</p></div>' +
+    '<button class="btn small" onclick="atualizarTudo()">↻ Atualizar</button></div>';
+
+  html += '<div class="toolbar">';
+  if (unidades.length) {
+    html += '<div class="grp"><label>Unidade</label><select id="f-unidade"><option value="">Todas</option>' +
+      unidades.map(function (u) { return '<option ' + (u === f.unidade ? 'selected' : '') + '>' + esc(u) + '</option>'; }).join('') +
+      '</select></div>';
+  }
+  if (situacoes.length > 1) {
+    html += '<div class="grp"><label>Situação</label><select id="f-situacao"><option value="">Todas</option>' +
+      situacoes.map(function (s) { return '<option ' + (s === f.situacao ? 'selected' : '') + '>' + esc(s) + '</option>'; }).join('') +
+      '</select></div>';
+  }
+  html += '<div class="grp"><label>Buscar</label><input id="f-busca" type="text" placeholder="texto, SICOR, nome…" value="' + esc(f.busca) + '"></div>';
+  html += '<div class="grp chk"><label><input type="checkbox" id="f-pendentes" ' + (f.pendentes ? 'checked' : '') + '> Somente pendentes</label></div>';
+  html += '<div class="spacer"></div>';
+  html += '<div class="count">' + filtered.length + ' de ' + data.rows.length + ' registros</div>';
+  html += '</div>';
+
+  if (filtered.length === 0) {
+    html += '<div class="empty-state">Nenhum registro encontrado com os filtros atuais.</div>';
+    document.getElementById('app').innerHTML = html;
+    bindToolbar_(id, data);
+    return;
+  }
+
+  html += '<div class="chart-grid">' +
+    '<div class="chart-card"><h2>Situação (registros filtrados)</h2><div class="chart-wrap"><canvas id="chartSituacao"></canvas></div></div>' +
+    (roles.unit ? '<div class="chart-card"><h2>Top unidades</h2><div class="chart-wrap"><canvas id="chartUnidade"></canvas></div></div>' : '') +
+    '</div>';
+
+  var porPagina = 40;
+  var totalPaginas = Math.max(1, Math.ceil(filtered.length / porPagina));
+  if (f.pagina > totalPaginas) f.pagina = totalPaginas;
+  var inicio = (f.pagina - 1) * porPagina;
+  var pageRows = filtered.slice(inicio, inicio + porPagina);
+
+  html += '<div style="overflow-x:auto"><table><thead><tr><th>Situação</th>' +
+    listCols.map(function (c) { return '<th>' + esc(c.header) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  pageRows.forEach(function (r) {
+    html += '<tr onclick="abrirModal(\'' + id + '\',' + r._row + ')"><td><span class="' + badgeClass(r._situacaoCor) + '">' + esc(r._situacao) + '</span></td>';
+    listCols.forEach(function (c) {
+      var v = r[c.key];
+      var display = c.type === 'date' ? (fmtDateBR(v) || '—') : (v || '—');
+      html += '<td class="cell-trunc" title="' + esc(v || '') + '">' + esc(display) + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<div class="pager">' +
+    '<button class="btn small" ' + (f.pagina <= 1 ? 'disabled' : '') + ' onclick="mudarPagina(\'' + id + '\',-1)">‹ Anterior</button>' +
+    '<span>Página ' + f.pagina + ' de ' + totalPaginas + '</span>' +
+    '<button class="btn small" ' + (f.pagina >= totalPaginas ? 'disabled' : '') + ' onclick="mudarPagina(\'' + id + '\',1)">Próxima ›</button>' +
+    '</div>';
+
+  document.getElementById('app').innerHTML = html;
+  bindToolbar_(id, data);
+
+  var sitCounts = {};
+  filtered.forEach(function (r) { sitCounts[r._situacao] = (sitCounts[r._situacao] || 0) + 1; });
+  var sitLabels = Object.keys(sitCounts);
+  var corPorSituacao = { FINALIZADO: '#1f9d55', ATRASADO: '#d64545', 'EM ANDAMENTO': '#2563a8', 'SEM STATUS': '#9aa3af' };
+  charts.situacao = new Chart(document.getElementById('chartSituacao'), {
+    type: 'doughnut',
+    data: { labels: sitLabels, datasets: [{ data: sitLabels.map(function (s) { return sitCounts[s]; }),
+      backgroundColor: sitLabels.map(function (s) { return corPorSituacao[s] || '#c98a11'; }) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  if (roles.unit) {
+    var uCounts = {};
+    filtered.forEach(function (r) { var u = r[roles.unit] || 'Não informado'; uCounts[u] = (uCounts[u] || 0) + 1; });
+    var top = Object.keys(uCounts).map(function (k) { return [k, uCounts[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8);
+    charts.unidade = new Chart(document.getElementById('chartUnidade'), {
+      type: 'bar',
+      data: { labels: top.map(function (t) { return t[0]; }), datasets: [{ label: 'Registros', data: top.map(function (t) { return t[1]; }), backgroundColor: '#2563a8' }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+    });
+  }
+}
+
+function bindToolbar_(id, data) {
+  var f = STATE.filters[id];
+  var elU = document.getElementById('f-unidade');
+  var elS = document.getElementById('f-situacao');
+  var elB = document.getElementById('f-busca');
+  var elP = document.getElementById('f-pendentes');
+  if (elU) elU.addEventListener('change', function () { f.unidade = this.value; f.pagina = 1; drawSheetView(id, data); });
+  if (elS) elS.addEventListener('change', function () { f.situacao = this.value; f.pagina = 1; drawSheetView(id, data); });
+  if (elP) elP.addEventListener('change', function () { f.pendentes = this.checked; f.pagina = 1; drawSheetView(id, data); });
+  if (elB) elB.addEventListener('input', debounce(function () { f.busca = this.value; f.pagina = 1; drawSheetView(id, data); }, 250));
+}
+
+function mudarPagina(id, delta) {
+  STATE.filters[id].pagina += delta;
+  drawSheetView(id, STATE.sheetData[id]);
+}
+
+// ---------- MODAL ----------
+
+function abrirModal(id, rowIndex) {
+  var data = STATE.sheetData[id];
+  var cfg = CFG_BY_ID[id];
+  var row = data.rows.filter(function (r) { return r._row === rowIndex; })[0];
+  if (!row) return;
+  document.getElementById('modal-title').innerHTML = esc(cfg.title) + ' — <span class="' + badgeClass(row._situacaoCor) + '">' + esc(row._situacao) + '</span>';
+  var body = data.columns.map(function (c) {
+    var v = row[c.key];
+    var display = v ? (c.type === 'date' ? fmtDateBR(v) : v) : '—';
+    return '<div class="field"><div class="k">' + esc(c.header) + '</div><div class="v">' + esc(display) + '</div></div>';
+  }).join('');
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+
+function fecharModal() { document.getElementById('modal-backdrop').classList.remove('open'); }
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fecharModal(); });
+
+// ---------- ENCARREGADOS ----------
+
+function renderEncarregadosView() {
+  setCrumbs([{ label: 'Início', href: '#/' }, { label: 'Encarregados', href: '#' }]);
+  var app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando…</div>';
+
+  var p = STATE.encarregados ? Promise.resolve(STATE.encarregados) : gsRun('getEncarregadosView');
+  p.then(function (data) {
+    STATE.encarregados = data;
+    var html = '<div class="view-header"><div><h1>' + esc(data.title) + '</h1>' +
+      '<p>Escalas do Conselho de Justiça, indicados para CPM e controle de processos entregues aos encarregados.</p></div>' +
+      '<button class="btn small" onclick="atualizarTudo()">↻ Atualizar</button></div>';
+    data.blocks.forEach(function (b) {
+      html += '<div class="encarregados-block"><h3>' + esc(b.heading) + '</h3>' +
+        (b.subLabel ? '<div class="sub">' + esc(b.subLabel) + '</div>' : '');
+      if (!b.rows.length) {
+        html += '<div class="sub">Sem registros nesta escala.</div></div>';
+        return;
+      }
+      html += '<div style="overflow-x:auto"><table><thead><tr>' +
+        b.header.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>';
+      b.rows.forEach(function (r) {
+        html += '<tr>' + b.header.map(function (h) {
+          var v = r[h];
+          var display = (v && String(v).match(/^\d{4}-\d{2}-\d{2}T/)) ? fmtDateBR(v) : (v || '—');
+          return '<td>' + esc(display) + '</td>';
+        }).join('') + '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+    });
+    app.innerHTML = html;
+  }).catch(function (err) { app.innerHTML = errorBox(err); });
+}
+
+// ---------- boot ----------
+
+function tickClock() {
+  var d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
+}
+setInterval(tickClock, 1000);
+tickClock();
+router();
+</script>

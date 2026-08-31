@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('Style'); ?>
+</head>
+<body>
+  <div id="topbar">
+    <div class="brand" onclick="location.hash='#/'">
+      <b>Gestão à Vista — Subcorregedoria CPE</b>
+      <span>Rotina diária · painel consolidado</span>
+    </div>
+    <div class="actions">
+      <span class="clock" id="clock"></span>
+      <button class="btn ghost" onclick="atualizarTudo()">↻ Atualizar dados</button>
+    </div>
+  </div>
+  <div id="crumbs"></div>
+  <div id="app">
+    <div class="loading">Carregando…</div>
+  </div>
+
+  <div id="modal-backdrop" onclick="if(event.target===this) fecharModal()">
+    <div id="modal">
+      <div class="modal-head">
+        <h3 id="modal-title"></h3>
+        <button class="modal-close" onclick="fecharModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <?!= include('ChartLib'); ?>
+  <script>
+    var INITIAL_CONFIG = <?!= JSON.stringify(getAppConfig()) ?>;
+    var INITIAL_SUMMARY = <?!= JSON.stringify(getHomeSummary()) ?>;
+  </script>
+  <?!= include('App'); ?>
+</body>
+</html>
