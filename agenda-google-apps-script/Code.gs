@@ -5,7 +5,7 @@
  */
 
 const SHEET_NAME = 'Agenda';
-const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel', 'Notificar', 'TelefoneResponsavel', 'NotificarRespAuto'];
+const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluida', 'DataConclusao', 'UltimoNivel', 'Notificar', 'TelefoneResponsavel'];
 
 const OBS_SHEET_NAME = 'Observacoes';
 const OBS_HEADERS = ['ID', 'TarefaID', 'Data', 'Texto', 'PrazoAnterior', 'PrazoNovo'];
@@ -14,10 +14,6 @@ const OBS_HEADERS = ['ID', 'TarefaID', 'Data', 'Texto', 'PrazoAnterior', 'PrazoN
 // NUNCA no código-fonte — assim a chave não vai pro GitHub).
 const PROP_PHONE = 'CALLMEBOT_PHONE';
 const PROP_APIKEY = 'CALLMEBOT_API_KEY';
-const PROP_META_PHONE_ID = 'META_PHONE_NUMBER_ID';
-const PROP_META_TOKEN = 'META_ACCESS_TOKEN';
-const PROP_META_TEMPLATE = 'META_TEMPLATE_NAME';
-const PROP_META_LANG = 'META_TEMPLATE_LANG';
 
 function doGet() {
   return HtmlService.createTemplateFromFile('Index')
@@ -114,8 +110,7 @@ function listarTarefas() {
       dataConclusao: formatDate_(r[6]),
       notificar: !(r[8] === false || r[8] === 'FALSE' || r[8] === 'FALSO'),
       totalObservacoes: contagemObs[r[0]] || 0,
-      telefoneResponsavel: r[9] || '',
-      notificarResponsavelAuto: !(r[10] === false || r[10] === 'FALSE' || r[10] === 'FALSO')
+      telefoneResponsavel: r[9] || ''
     }));
   return {
     tarefas: tarefas,
@@ -163,8 +158,6 @@ function adicionarObservacao(dados) {
   const responsavel = values[linha][2];
   const prazoAtual = formatDate_(values[linha][4]);
   const notificar = !(values[linha][8] === false || values[linha][8] === 'FALSE' || values[linha][8] === 'FALSO');
-  const telefoneResp = values[linha][9];
-  const notificarRespAuto = !(values[linha][10] === false || values[linha][10] === 'FALSE' || values[linha][10] === 'FALSO');
 
   let prazoAnterior = '';
   let prazoNovo = '';
@@ -185,21 +178,11 @@ function adicionarObservacao(dados) {
     prazoNovo
   ]);
 
-  if (prazoNovo) {
-    const msgProrrogacao = '🗓️ Prazo prorrogado para ' + fmtDataBr_(prazoNovo) + ' — Motivo: ' + dados.texto;
-    if (notificar) {
-      try {
-        enviarWhatsApp_(tarefaNome, responsavel, msgProrrogacao);
-      } catch (e) {
-        Logger.log('Falha ao enviar WhatsApp de prorrogação para "' + tarefaNome + '": ' + e);
-      }
-    }
-    if (telefoneResp && notificarRespAuto && metaConfigurado_()) {
-      try {
-        enviarWhatsAppMeta_(telefoneResp, tarefaNome, responsavel, msgProrrogacao);
-      } catch (e) {
-        Logger.log('Falha ao enviar WhatsApp (Meta) de prorrogação para responsável de "' + tarefaNome + '": ' + e);
-      }
+  if (prazoNovo && notificar) {
+    try {
+      enviarWhatsApp_(tarefaNome, responsavel, '🗓️ Prazo prorrogado para ' + fmtDataBr_(prazoNovo) + ' — Motivo: ' + dados.texto);
+    } catch (e) {
+      Logger.log('Falha ao enviar WhatsApp de prorrogação para "' + tarefaNome + '": ' + e);
     }
   }
 
@@ -226,8 +209,7 @@ function adicionarTarefa(dados) {
   const id = Utilities.getUuid();
   const chaveInicial = statusKey_(calcularFarol_(dados.dataInicio, dados.prazo));
   const notificar = dados.notificar !== false;
-  const notificarRespAuto = dados.notificarResponsavelAuto !== false;
-  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', chaveInicial, notificar, dados.telefoneResponsavel || '', notificarRespAuto]);
+  sheet.appendRow([id, dados.tarefa, dados.responsavel, inicio, prazo, false, '', chaveInicial, notificar, dados.telefoneResponsavel || '']);
   return listarTarefas();
 }
 
@@ -244,26 +226,13 @@ function atualizarTelefoneResponsavel(id, telefone) {
   return listarTarefas();
 }
 
-/** Liga/desliga o aviso de WhatsApp (CallMeBot, pro seu número) para uma tarefa específica. */
+/** Liga/desliga o aviso de WhatsApp para uma tarefa específica. */
 function alternarNotificacao(id, notificar) {
   const sheet = getSheet_();
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       sheet.getRange(i + 1, 9).setValue(!!notificar);
-      break;
-    }
-  }
-  return listarTarefas();
-}
-
-/** Liga/desliga o aviso automático via WhatsApp Cloud API (Meta) pro número do responsável. */
-function alternarNotificacaoResponsavel(id, notificar) {
-  const sheet = getSheet_();
-  const values = sheet.getDataRange().getValues();
-  for (let i = 1; i < values.length; i++) {
-    if (values[i][0] === id) {
-      sheet.getRange(i + 1, 11).setValue(!!notificar);
       break;
     }
   }
@@ -279,22 +248,11 @@ function concluirTarefa(id, concluida) {
       sheet.getRange(i + 1, 6).setValue(!!concluida);
       sheet.getRange(i + 1, 7).setValue(concluida ? new Date() : '');
       const notificar = !(values[i][8] === false || values[i][8] === 'FALSE' || values[i][8] === 'FALSO');
-      const telefoneResp = values[i][9];
-      const notificarRespAuto = !(values[i][10] === false || values[i][10] === 'FALSE' || values[i][10] === 'FALSO');
-      if (concluida) {
-        if (notificar) {
-          try {
-            enviarWhatsApp_(values[i][1], values[i][2], '✅ Concluída');
-          } catch (e) {
-            Logger.log('Falha ao enviar WhatsApp para tarefa "' + values[i][1] + '": ' + e);
-          }
-        }
-        if (telefoneResp && notificarRespAuto && metaConfigurado_()) {
-          try {
-            enviarWhatsAppMeta_(telefoneResp, values[i][1], values[i][2], '✅ Concluída');
-          } catch (e) {
-            Logger.log('Falha ao enviar WhatsApp (Meta) para responsável da tarefa "' + values[i][1] + '": ' + e);
-          }
+      if (concluida && notificar) {
+        try {
+          enviarWhatsApp_(values[i][1], values[i][2], '✅ Concluída');
+        } catch (e) {
+          Logger.log('Falha ao enviar WhatsApp para tarefa "' + values[i][1] + '": ' + e);
         }
       }
       break;
@@ -386,29 +344,18 @@ function verificarAlteracoesDeStatus() {
     const prazo = formatDate_(row[4]);
     const chaveAnterior = row[7];
     const notificar = !(row[8] === false || row[8] === 'FALSE' || row[8] === 'FALSO');
-    const telefoneResp = row[9];
-    const notificarRespAuto = !(row[10] === false || row[10] === 'FALSE' || row[10] === 'FALSO');
     const farolAtual = calcularFarol_(dataInicio, prazo);
     const chaveAtual = statusKey_(farolAtual);
 
-    if (chaveAnterior && chaveAnterior !== chaveAtual) {
+    if (notificar && chaveAnterior && chaveAnterior !== chaveAtual) {
       let statusMsg = NIVEL_LABEL[farolAtual.nivel] || farolAtual.nivel;
       if (farolAtual.nivel === 'preto' && farolAtual.diasAtraso > 0) {
         statusMsg += ' — ' + farolAtual.diasAtraso + ' dia(s) em atraso';
       }
-      if (notificar) {
-        try {
-          enviarWhatsApp_(row[1], row[2], statusMsg);
-        } catch (e) {
-          Logger.log('Falha ao enviar WhatsApp para tarefa "' + row[1] + '": ' + e);
-        }
-      }
-      if (telefoneResp && notificarRespAuto && metaConfigurado_()) {
-        try {
-          enviarWhatsAppMeta_(telefoneResp, row[1], row[2], statusMsg);
-        } catch (e) {
-          Logger.log('Falha ao enviar WhatsApp (Meta) para responsável da tarefa "' + row[1] + '": ' + e);
-        }
+      try {
+        enviarWhatsApp_(row[1], row[2], statusMsg);
+      } catch (e) {
+        Logger.log('Falha ao enviar WhatsApp para tarefa "' + row[1] + '": ' + e);
       }
     }
 
@@ -471,79 +418,4 @@ function enviarWhatsApp_(tarefa, responsavel, statusLabel) {
 function testarWhatsApp() {
   enviarWhatsApp_('Tarefa de teste', 'Você', '🟢 Verde (dentro do prazo)');
   Logger.log('Mensagem de teste enviada com sucesso — confira o WhatsApp.');
-}
-
-// ===== Envio de WhatsApp pro RESPONSÁVEL (WhatsApp Cloud API — Meta) =====
-// Diferente do CallMeBot (que só manda pro seu próprio número), a Cloud API oficial da Meta
-// manda pro número que você quiser, sem o responsável precisar instalar/ativar nada — ele só
-// recebe a mensagem no WhatsApp normal dele. Em compensação, enquanto o app da Meta estiver em
-// modo de Desenvolvimento (sem verificação de empresa), só é possível mandar mensagem pros
-// números de teste cadastrados manualmente no painel da Meta (limite de 5 números).
-
-function metaConfigurado_() {
-  const props = PropertiesService.getScriptProperties();
-  return !!(props.getProperty(PROP_META_PHONE_ID) && props.getProperty(PROP_META_TOKEN));
-}
-
-function soDigitos_(s) {
-  return String(s || '').replace(/\D/g, '');
-}
-
-/**
- * Envia uma mensagem via WhatsApp Cloud API (Meta) direto pro número do responsável, usando um
- * template aprovado com 3 variáveis no corpo: {{1}} tarefa, {{2}} responsável, {{3}} status.
- * Requer META_PHONE_NUMBER_ID e META_ACCESS_TOKEN em Script Properties (veja o README).
- */
-function enviarWhatsAppMeta_(telefone, tarefa, responsavel, statusLabel) {
-  const props = PropertiesService.getScriptProperties();
-  const phoneNumberId = props.getProperty(PROP_META_PHONE_ID);
-  const token = props.getProperty(PROP_META_TOKEN);
-  if (!phoneNumberId || !token) {
-    throw new Error('WhatsApp (Meta) não configurado: defina META_PHONE_NUMBER_ID e META_ACCESS_TOKEN em Script Properties.');
-  }
-  const templateName = props.getProperty(PROP_META_TEMPLATE) || 'agenda_cpe_status';
-  const lang = props.getProperty(PROP_META_LANG) || 'pt_BR';
-
-  const payload = {
-    messaging_product: 'whatsapp',
-    to: soDigitos_(telefone),
-    type: 'template',
-    template: {
-      name: templateName,
-      language: { code: lang },
-      components: [{
-        type: 'body',
-        parameters: [
-          { type: 'text', text: String(tarefa) },
-          { type: 'text', text: String(responsavel) },
-          { type: 'text', text: String(statusLabel) }
-        ]
-      }]
-    }
-  };
-
-  const resposta = UrlFetchApp.fetch('https://graph.facebook.com/v21.0/' + phoneNumberId + '/messages', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + token },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });
-  const codigo = resposta.getResponseCode();
-  const corpo = resposta.getContentText();
-  Logger.log('WhatsApp Cloud API (Meta) respondeu (HTTP ' + codigo + '): ' + corpo);
-
-  if (codigo >= 300) {
-    throw new Error('Erro ao enviar WhatsApp via Meta (HTTP ' + codigo + '): ' + corpo);
-  }
-}
-
-/**
- * Função de teste: edite o número de teste abaixo (precisa ser um dos números cadastrados no
- * painel da Meta, em modo Desenvolvimento) e rode manualmente pelo editor (▶ Executar).
- */
-function testarWhatsAppMeta() {
-  const telefoneDeTeste = '5531999999999'; // <- troque por um número cadastrado no painel da Meta
-  enviarWhatsAppMeta_(telefoneDeTeste, 'Tarefa de teste', 'Fulano de Tal', '🟢 Verde (dentro do prazo)');
-  Logger.log('Mensagem de teste enviada com sucesso — confira o WhatsApp do número informado.');
 }
