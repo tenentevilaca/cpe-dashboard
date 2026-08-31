@@ -69,6 +69,20 @@ function fmtDataBr_(s) {
   return p[2] + '/' + p[1] + '/' + p[0];
 }
 
+/**
+ * O Google Sheets às vezes reconhece um texto tipo "28/08/2026 14:10" e guarda como
+ * data de verdade em vez de texto puro. Se isso não for convertido de volta pra string
+ * antes de devolver pro navegador, o google.script.run trava silenciosamente ao tentar
+ * mandar um objeto Date embutido numa lista.
+ */
+function formatDataHora_(v) {
+  if (!v) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+  }
+  return v;
+}
+
 function addDias_(dataStr, dias) {
   const d = new Date(dataStr + 'T00:00:00');
   d.setDate(d.getDate() + Number(dias));
@@ -128,10 +142,10 @@ function listarObservacoes(tarefaId) {
     .map(r => ({
       id: r[0],
       tarefaId: r[1],
-      data: r[2],
+      data: formatDataHora_(r[2]),
       texto: r[3],
-      prazoAnterior: r[4],
-      prazoNovo: r[5]
+      prazoAnterior: formatDate_(r[4]),
+      prazoNovo: formatDate_(r[5])
     }));
 }
 
