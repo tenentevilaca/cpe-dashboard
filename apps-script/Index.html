@@ -9,14 +9,7 @@
   <div id="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-escudo">
-          <svg viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Brasão CPE">
-            <path d="M50 2 L96 18 V54 C96 82 76 102 50 114 C24 102 4 82 4 54 V18 Z" fill="#2b2827" stroke="#C4B287" stroke-width="3"/>
-            <path d="M50 10 L88 24 V54 C88 77 71 94 50 105 C29 94 12 77 12 54 V24 Z" fill="none" stroke="#A08F63" stroke-width="1.5"/>
-            <text x="50" y="66" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="30" fill="#C4B287">CPE</text>
-            <text x="50" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="10" letter-spacing="2" fill="#EDE6D6">PMMG</text>
-          </svg>
-        </div>
+        <?!= include('Escudo'); ?>
         <div>
           <div class="subtitle">PMMG · Estado-Maior do CPE</div>
           <h1>Gestão à Vista — Subcorregedoria CPE</h1>
@@ -47,11 +40,11 @@
     </div>
   </div>
 
-  <?!= include('ChartLib'); ?>
   <script>
     var INITIAL_CONFIG = <?!= JSON.stringify(getAppConfig()) ?>;
     var INITIAL_SUMMARY = <?!= JSON.stringify(getHomeSummary()) ?>;
   </script>
   <?!= include('App'); ?>
+  <?!= include('ChartLib'); ?>
 </body>
 </html>

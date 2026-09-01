@@ -73,6 +73,17 @@ function renderTabBar() {
 
 function destroyCharts() { Object.keys(charts).forEach(function (k) { charts[k].destroy(); }); charts = {}; }
 
+// Chart.js pode não estar disponível ainda (carrega depois do App.html de propósito,
+// pra nunca travar o resto do painel se o arquivo do Chart.js falhar). Nesses casos
+// os gráficos simplesmente não aparecem, mas tabelas/filtros/abas continuam normais.
+function chartDisponivel() { return typeof Chart !== 'undefined'; }
+function marcarGraficoIndisponivel(canvasId) {
+  var el = document.getElementById(canvasId);
+  if (el && el.parentNode) {
+    el.parentNode.innerHTML = '<div class="loading" style="height:100%;display:flex;align-items:center;justify-content:center;margin:0;padding:0;">Gráfico indisponível nesta sessão</div>';
+  }
+}
+
 // ---------- roteador ----------
 
 function router() {
@@ -174,6 +185,12 @@ function drawHome(summary) {
     '</div></div>';
 
   document.getElementById('app').innerHTML = html;
+
+  if (!chartDisponivel()) {
+    marcarGraficoIndisponivel('chartCategorias');
+    marcarGraficoIndisponivel('chartGeral');
+    return;
+  }
 
   var catLabels = INITIAL_CONFIG.categories.filter(function (c) { return byCat[c]; });
   charts.cat = new Chart(document.getElementById('chartCategorias'), {
@@ -317,6 +334,12 @@ function drawSheetView(id, data) {
 
   document.getElementById('app').innerHTML = html;
   bindToolbar_(id, data);
+
+  if (!chartDisponivel()) {
+    marcarGraficoIndisponivel('chartSituacao');
+    if (roles.unit) marcarGraficoIndisponivel('chartUnidade');
+    return;
+  }
 
   var sitCounts = {};
   filtered.forEach(function (r) { sitCounts[r._situacao] = (sitCounts[r._situacao] || 0) + 1; });
