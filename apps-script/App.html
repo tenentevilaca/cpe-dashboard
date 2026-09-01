@@ -67,7 +67,6 @@ function renderTabBar() {
   INITIAL_CONFIG.categories.forEach(function (cat) {
     var itens = itensDaCategoria_(cat);
     if (!itens.length && cat !== 'Disciplinar') return;
-    html += '<span class="tab-group-label">' + esc(cat) + '</span>';
     itens.forEach(function (it) {
       var target = (it.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(it.id);
       html += '<button class="tab-btn' + (hash === target ? ' active' : '') + '" onclick="location.hash=\'' +
