@@ -4,10 +4,14 @@
 var CFG_BY_ID = {};
 INITIAL_CONFIG.sheets.forEach(function (s) { CFG_BY_ID[s.id] = s; });
 
+var GRUPO_BY_ID = {};
+INITIAL_CONFIG.grupos.forEach(function (g) { GRUPO_BY_ID[g.id] = g; });
+
 var STATE = {
-  sheetData: {},      // cache: id -> resultado de getSheetView
+  sheetData: {},       // cache: id -> resultado de getSheetView
+  groupData: {},        // cache: id -> resultado de getGroupView
   encarregados: null,
-  filters: {}         // por id: {unidade, situacao, busca, pendentes, pagina}
+  filters: {}           // por id: {tipo, unidade, situacao, busca, pendentes, pagina}
 };
 
 // ---------- utilidades ----------
@@ -48,25 +52,32 @@ var charts = {}; // guarda instâncias Chart.js para destruir ao re-renderizar
 
 // ---------- barra de abas (topo) ----------
 
+function itensDaCategoria_(cat) {
+  var itens = [];
+  INITIAL_CONFIG.sheets.forEach(function (s) { if (s.category === cat) itens.push({ isGroup: false, id: s.id, title: s.title }); });
+  INITIAL_CONFIG.grupos.forEach(function (g) { if (g.category === cat) itens.push({ isGroup: true, id: g.id, title: g.title }); });
+  return itens;
+}
+
 function renderTabBar() {
   var hash = location.hash || '#/';
   var html = '<button class="tab-btn' + (hash === '#/' || hash === '' ? ' active' : '') +
     '" onclick="location.hash=\'#/\'">📊 Visão Geral</button>';
 
   INITIAL_CONFIG.categories.forEach(function (cat) {
-    var sheets = INITIAL_CONFIG.sheets.filter(function (s) { return s.category === cat; });
-    if (!sheets.length) return;
+    var itens = itensDaCategoria_(cat);
+    if (!itens.length && cat !== 'Disciplinar') return;
     html += '<span class="tab-group-label">' + esc(cat) + '</span>';
-    sheets.forEach(function (s) {
-      var target = '#/aba/' + encodeURIComponent(s.id);
+    itens.forEach(function (it) {
+      var target = (it.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(it.id);
       html += '<button class="tab-btn' + (hash === target ? ' active' : '') + '" onclick="location.hash=\'' +
-        target + '\'">' + esc(s.title) + '</button>';
+        target + '\'">' + esc(it.title) + '</button>';
     });
+    if (cat === 'Disciplinar') {
+      html += '<button class="tab-btn' + (hash === '#/encarregados' ? ' active' : '') +
+        '" onclick="location.hash=\'#/encarregados\'">Encarregados</button>';
+    }
   });
-
-  html += '<span class="tab-group-label">Outros</span>';
-  html += '<button class="tab-btn' + (hash === '#/encarregados' ? ' active' : '') +
-    '" onclick="location.hash=\'#/encarregados\'">Encarregados</button>';
 
   document.getElementById('tabbar').innerHTML = html;
 }
@@ -95,6 +106,10 @@ function router() {
     renderHome();
   } else if (hash === '#/encarregados') {
     renderEncarregadosView();
+  } else if (hash.indexOf('#/grupo/') === 0) {
+    var gid = decodeURIComponent(hash.replace('#/grupo/', ''));
+    if (GRUPO_BY_ID[gid]) renderGroupView(gid);
+    else renderHome();
   } else if (hash.indexOf('#/aba/') === 0) {
     var id = decodeURIComponent(hash.replace('#/aba/', ''));
     if (CFG_BY_ID[id]) renderSheetView(id);
@@ -110,8 +125,14 @@ function atualizarTudo() {
   if (hash.indexOf('#/aba/') === 0) {
     var id = decodeURIComponent(hash.replace('#/aba/', ''));
     delete STATE.sheetData[id];
+  } else if (hash.indexOf('#/grupo/') === 0) {
+    var gid = decodeURIComponent(hash.replace('#/grupo/', ''));
+    delete STATE.groupData[gid];
+  } else if (hash === '#/encarregados') {
+    STATE.encarregados = null;
   } else {
     STATE.sheetData = {};
+    STATE.groupData = {};
     STATE.encarregados = null;
   }
   router();
@@ -131,6 +152,14 @@ function renderHome() {
   // se já tem um resumo em cache (navegação de volta pra Home), pinta na hora;
   // senão fica com "Carregando resumo…" até a chamada acima responder
   if (INITIAL_SUMMARY) drawHome(INITIAL_SUMMARY);
+}
+
+function itemBadges_(s) {
+  return '<span class="badge azul">' + s.counts.total + ' total</span>' +
+    (s.counts.FINALIZADO ? '<span class="badge verde">' + s.counts.FINALIZADO + ' finalizado</span>' : '') +
+    (s.counts['EM ANDAMENTO'] ? '<span class="badge azul">' + s.counts['EM ANDAMENTO'] + ' em andamento</span>' : '') +
+    (s.counts.ATRASADO ? '<span class="badge vermelho">' + s.counts.ATRASADO + ' atrasado</span>' : '') +
+    (s.counts.error ? '<span class="badge cinza">erro ao ler aba</span>' : '');
 }
 
 function drawHome(summary) {
@@ -162,28 +191,24 @@ function drawHome(summary) {
 
   INITIAL_CONFIG.categories.forEach(function (cat) {
     var c = byCat[cat];
-    if (!c) return;
+    if (!c && cat !== 'Disciplinar') return;
     html += '<div class="categoria"><h2>' + esc(cat) + '</h2><div class="cards">';
-    c.items.forEach(function (s) {
-      html += '<a class="card" href="#/aba/' + encodeURIComponent(s.id) + '">' +
-        '<h3>' + esc(s.title) + '</h3>' +
-        '<p>' + esc(s.description || '') + '</p>' +
-        '<div class="badges">' +
-        '<span class="badge azul">' + s.counts.total + ' total</span>' +
-        (s.counts.FINALIZADO ? '<span class="badge verde">' + s.counts.FINALIZADO + ' finalizado</span>' : '') +
-        (s.counts['EM ANDAMENTO'] ? '<span class="badge azul">' + s.counts['EM ANDAMENTO'] + ' em andamento</span>' : '') +
-        (s.counts.ATRASADO ? '<span class="badge vermelho">' + s.counts.ATRASADO + ' atrasado</span>' : '') +
-        (s.counts.error ? '<span class="badge cinza">erro ao ler aba</span>' : '') +
-        '</div></a>';
-    });
+    if (c) {
+      c.items.forEach(function (s) {
+        var target = (s.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(s.id);
+        html += '<a class="card" href="' + target + '">' +
+          '<h3>' + esc(s.title) + '</h3>' +
+          '<p>' + esc(s.description || '') + '</p>' +
+          '<div class="badges">' + itemBadges_(s) + '</div></a>';
+      });
+    }
+    if (cat === 'Disciplinar') {
+      html += '<a class="card" href="#/encarregados"><h3>Encarregados</h3>' +
+        '<p>Escalas de Conselho de Justiça, indicados CPM e controle de processos entregues.</p>' +
+        '<div class="badges"><span class="badge azul">ver painel</span></div></a>';
+    }
     html += '</div></div>';
   });
-
-  html += '<div class="categoria"><h2>Outros</h2><div class="cards">' +
-    '<a class="card" href="#/encarregados"><h3>Encarregados</h3>' +
-    '<p>Escalas de Conselho de Justiça, indicados CPM e controle de processos entregues.</p>' +
-    '<div class="badges"><span class="badge azul">ver painel</span></div></a>' +
-    '</div></div>';
 
   document.getElementById('app').innerHTML = html;
 
@@ -226,7 +251,7 @@ function errorBox(err) {
   return '<div class="error-box">Não foi possível carregar os dados.<br>' + esc(err && err.message ? err.message : err) + '</div>';
 }
 
-// ---------- VISÃO DE ABA ----------
+// ---------- VISÃO DE ABA (avulsa) ----------
 
 function renderSheetView(id) {
   var cfg = CFG_BY_ID[id];
@@ -265,7 +290,6 @@ function applyFilters_(id, data) {
 
 function drawSheetView(id, data) {
   destroyCharts();
-  var cfg = CFG_BY_ID[id];
   var f = STATE.filters[id];
   var roles = data.roles;
   var listCols = data.columns.filter(function (c) { return c.list; });
@@ -382,6 +406,165 @@ function mudarPagina(id, delta) {
   drawSheetView(id, STATE.sheetData[id]);
 }
 
+// ---------- VISÃO DE GRUPO (várias abas unidas + filtro de Tipo) ----------
+
+function renderGroupView(id) {
+  var grupo = GRUPO_BY_ID[id];
+  var app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando "' + esc(grupo.title) + '"…</div>';
+
+  STATE.filters[id] = STATE.filters[id] || { tipo: '', unidade: '', situacao: '', busca: '', pendentes: false, pagina: 1 };
+
+  var p = STATE.groupData[id] ? Promise.resolve(STATE.groupData[id]) : gsRun('getGroupView', id);
+  p.then(function (data) {
+    STATE.groupData[id] = data;
+    drawGroupView(id, data);
+  }).catch(function (err) { app.innerHTML = errorBox(err); });
+}
+
+function membroPorTipo_(data, tipo) {
+  var arr = data.membros.filter(function (m) { return m.tipo === tipo; });
+  return arr[0] || null;
+}
+
+function applyFiltersGrupo_(id, data) {
+  var f = STATE.filters[id];
+  return data.rows.filter(function (r) {
+    if (f.tipo && r._tipo !== f.tipo) return false;
+    if (f.unidade && String(r._unidadeValor || '').trim() !== f.unidade) return false;
+    if (f.situacao && r._situacao !== f.situacao) return false;
+    if (f.pendentes && r._situacao === 'FINALIZADO') return false;
+    if (f.busca) {
+      var membro = membroPorTipo_(data, r._tipo);
+      var campos = membro ? membro.columns.map(function (c) { return r[c.key]; }) : [];
+      var alvo = campos.concat([r._situacao, r._tipo]).join(' | ').toUpperCase();
+      if (alvo.indexOf(f.busca.toUpperCase()) === -1) return false;
+    }
+    return true;
+  });
+}
+
+function drawGroupView(id, data) {
+  destroyCharts();
+  var f = STATE.filters[id];
+
+  var tipos = data.membros.map(function (m) { return m.tipo; });
+  var unidades = distinctValues_(data.rows, '_unidadeValor');
+  var situacoes = distinctValues_(data.rows, '_situacao');
+
+  var filtered = applyFiltersGrupo_(id, data);
+
+  var html = '';
+  html += '<div class="view-header"><div><h1>' + esc(data.title) + '</h1><p>' + esc(data.description || '') + '</p></div>' +
+    '<button class="btn small" onclick="atualizarTudo()">↻ Atualizar</button></div>';
+
+  html += '<div class="toolbar">';
+  html += '<div class="grp"><label>Tipo</label><select id="f-tipo"><option value="">Todos</option>' +
+    tipos.map(function (t) { return '<option ' + (t === f.tipo ? 'selected' : '') + '>' + esc(t) + '</option>'; }).join('') +
+    '</select></div>';
+  if (unidades.length) {
+    html += '<div class="grp"><label>Unidade</label><select id="f-unidade"><option value="">Todas</option>' +
+      unidades.map(function (u) { return '<option ' + (u === f.unidade ? 'selected' : '') + '>' + esc(u) + '</option>'; }).join('') +
+      '</select></div>';
+  }
+  if (situacoes.length > 1) {
+    html += '<div class="grp"><label>Situação</label><select id="f-situacao"><option value="">Todas</option>' +
+      situacoes.map(function (s) { return '<option ' + (s === f.situacao ? 'selected' : '') + '>' + esc(s) + '</option>'; }).join('') +
+      '</select></div>';
+  }
+  html += '<div class="grp"><label>Buscar</label><input id="f-busca" type="text" placeholder="texto, SICOR, nome…" value="' + esc(f.busca) + '"></div>';
+  html += '<div class="grp chk"><label><input type="checkbox" id="f-pendentes" ' + (f.pendentes ? 'checked' : '') + '> Somente pendentes</label></div>';
+  html += '<div class="spacer"></div>';
+  html += '<div class="count">' + filtered.length + ' de ' + data.rows.length + ' registros</div>';
+  html += '</div>';
+
+  if (filtered.length === 0) {
+    html += '<div class="empty-state">Nenhum registro encontrado com os filtros atuais.</div>';
+    document.getElementById('app').innerHTML = html;
+    bindToolbarGrupo_(id, data);
+    return;
+  }
+
+  html += '<div class="chart-grid">' +
+    '<div class="chart-card"><h2>Situação (registros filtrados)</h2><div class="chart-wrap"><canvas id="chartSituacao"></canvas></div></div>' +
+    '<div class="chart-card"><h2>Por tipo</h2><div class="chart-wrap"><canvas id="chartTipo"></canvas></div></div>' +
+    '</div>';
+
+  var porPagina = 40;
+  var totalPaginas = Math.max(1, Math.ceil(filtered.length / porPagina));
+  if (f.pagina > totalPaginas) f.pagina = totalPaginas;
+  var inicio = (f.pagina - 1) * porPagina;
+  var pageRows = filtered.slice(inicio, inicio + porPagina);
+
+  html += '<div style="overflow-x:auto"><table><thead><tr><th>Situação</th><th>Tipo</th><th>Data</th><th>Unidade</th><th>Assunto</th></tr></thead><tbody>';
+  pageRows.forEach(function (r) {
+    html += '<tr onclick="abrirModalGrupo(\'' + id + '\',\'' + r._uid + '\')">' +
+      '<td><span class="' + badgeClass(r._situacaoCor) + '">' + esc(r._situacao) + '</span></td>' +
+      '<td><span class="badge cinza">' + esc(r._tipo) + '</span></td>' +
+      '<td>' + esc(fmtDateBR(r._dataValor) || '—') + '</td>' +
+      '<td>' + esc(r._unidadeValor || '—') + '</td>' +
+      '<td class="cell-trunc" title="' + esc(r._assuntoValor || '') + '">' + esc(r._assuntoValor || '—') + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<div class="pager">' +
+    '<button class="btn small" ' + (f.pagina <= 1 ? 'disabled' : '') + ' onclick="mudarPagina(\'' + id + '\',-1)">‹ Anterior</button>' +
+    '<span>Página ' + f.pagina + ' de ' + totalPaginas + '</span>' +
+    '<button class="btn small" ' + (f.pagina >= totalPaginas ? 'disabled' : '') + ' onclick="mudarPagina(\'' + id + '\',1)">Próxima ›</button>' +
+    '</div>';
+
+  document.getElementById('app').innerHTML = html;
+  bindToolbarGrupo_(id, data);
+
+  if (!chartDisponivel()) {
+    marcarGraficoIndisponivel('chartSituacao');
+    marcarGraficoIndisponivel('chartTipo');
+    return;
+  }
+
+  var sitCounts = {};
+  filtered.forEach(function (r) { sitCounts[r._situacao] = (sitCounts[r._situacao] || 0) + 1; });
+  var sitLabels = Object.keys(sitCounts);
+  var corPorSituacao = { FINALIZADO: '#1f9d55', ATRASADO: '#d64545', 'EM ANDAMENTO': '#2563a8', 'SEM STATUS': '#9aa3af' };
+  charts.situacao = new Chart(document.getElementById('chartSituacao'), {
+    type: 'doughnut',
+    data: { labels: sitLabels, datasets: [{ data: sitLabels.map(function (s) { return sitCounts[s]; }),
+      backgroundColor: sitLabels.map(function (s) { return corPorSituacao[s] || '#c98a11'; }) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  var tipoCounts = {};
+  filtered.forEach(function (r) { tipoCounts[r._tipo] = (tipoCounts[r._tipo] || 0) + 1; });
+  var tipoLabels = Object.keys(tipoCounts);
+  charts.tipo = new Chart(document.getElementById('chartTipo'), {
+    type: 'bar',
+    data: { labels: tipoLabels, datasets: [{ label: 'Registros', data: tipoLabels.map(function (t) { return tipoCounts[t]; }), backgroundColor: '#A08F63' }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+  });
+}
+
+function bindToolbarGrupo_(id, data) {
+  var f = STATE.filters[id];
+  var elT = document.getElementById('f-tipo');
+  var elU = document.getElementById('f-unidade');
+  var elS = document.getElementById('f-situacao');
+  var elB = document.getElementById('f-busca');
+  var elP = document.getElementById('f-pendentes');
+  if (elT) elT.addEventListener('change', function () { f.tipo = this.value; f.pagina = 1; drawGroupView(id, data); });
+  if (elU) elU.addEventListener('change', function () { f.unidade = this.value; f.pagina = 1; drawGroupView(id, data); });
+  if (elS) elS.addEventListener('change', function () { f.situacao = this.value; f.pagina = 1; drawGroupView(id, data); });
+  if (elP) elP.addEventListener('change', function () { f.pendentes = this.checked; f.pagina = 1; drawGroupView(id, data); });
+  if (elB) elB.addEventListener('input', debounce(function () { f.busca = this.value; f.pagina = 1; drawGroupView(id, data); }, 250));
+}
+
+// mudarPagina() acima já serve tanto pra aba avulsa quanto pra grupo — decide olhando o cache
+function mudarPagina(id, delta) {
+  STATE.filters[id].pagina += delta;
+  if (GRUPO_BY_ID[id]) drawGroupView(id, STATE.groupData[id]);
+  else drawSheetView(id, STATE.sheetData[id]);
+}
+
 // ---------- MODAL ----------
 
 function abrirModal(id, rowIndex) {
@@ -391,6 +574,23 @@ function abrirModal(id, rowIndex) {
   if (!row) return;
   document.getElementById('modal-title').innerHTML = esc(cfg.title) + ' — <span class="' + badgeClass(row._situacaoCor) + '">' + esc(row._situacao) + '</span>';
   var body = data.columns.map(function (c) {
+    var v = row[c.key];
+    var display = v ? (c.type === 'date' ? fmtDateBR(v) : v) : '—';
+    return '<div class="field"><div class="k">' + esc(c.header) + '</div><div class="v">' + esc(display) + '</div></div>';
+  }).join('');
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+
+function abrirModalGrupo(id, uid) {
+  var data = STATE.groupData[id];
+  var row = data.rows.filter(function (r) { return r._uid === uid; })[0];
+  if (!row) return;
+  var membro = membroPorTipo_(data, row._tipo);
+  document.getElementById('modal-title').innerHTML = esc(data.title) + ' · ' + esc(row._tipo) +
+    ' — <span class="' + badgeClass(row._situacaoCor) + '">' + esc(row._situacao) + '</span>';
+  var cols = membro ? membro.columns : [];
+  var body = cols.map(function (c) {
     var v = row[c.key];
     var display = v ? (c.type === 'date' ? fmtDateBR(v) : v) : '—';
     return '<div class="field"><div class="k">' + esc(c.header) + '</div><div class="v">' + esc(display) + '</div></div>';

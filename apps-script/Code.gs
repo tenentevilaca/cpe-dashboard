@@ -2,9 +2,15 @@
  * Gestão à Vista — Subcorregedoria CPE
  * Backend Apps Script (bound ao arquivo "ROTINA DIÁRIA SUBCORREGEDORIA CPE").
  *
- * Fonte única de verdade: CONFIG abaixo. Cada aba da planilha tem uma entrada
- * com suas colunas e "papéis" (entrada/prazo/encerramento/unidade/situação).
- * A classificação de situação (FINALIZADO / ATRASADO / EM ANDAMENTO / PENDENTE)
+ * Duas fontes de verdade:
+ *  - CONFIG: abas que continuam sozinhas, cada uma com suas colunas e "papéis"
+ *    (entrada/prazo/encerramento/unidade/status).
+ *  - GRUPOS: painéis que juntam várias abas parecidas num só (ex.: as 4 OGE),
+ *    com um filtro de "Tipo" pra escolher a origem (ou "Todas"). Cada membro
+ *    de um grupo tem seus próprios papéis + um campo "assunto" (qual coluna
+ *    mostrar como resumo na tabela consolidada).
+ *
+ * A classificação de situação (FINALIZADO / ATRASADO / EM ANDAMENTO / SEM STATUS)
  * é sempre calculada aqui no servidor, nunca no cliente, para ter uma regra só.
  */
 
@@ -32,137 +38,6 @@ var CONFIG = {
     roles: { entry: 'dataEntrada', deadline: 'prazoFinal', close: null, unit: 'origem', status: 'status' }
   },
 
-  OGECPE: {
-    sheetName: 'OGECPE',
-    title: 'OGE — CPE',
-    category: 'Ouvidoria (OGE)',
-    description: 'Manifestações da Ouvidoria-Geral direcionadas ao EM CPE.',
-    columns: ogeColumns_(),
-    roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
-  },
-  OGEBPGD: {
-    sheetName: 'OGEBPGD',
-    title: 'OGE — BPGD',
-    category: 'Ouvidoria (OGE)',
-    description: 'Manifestações da Ouvidoria-Geral direcionadas ao BPGD.',
-    columns: ogeColumns_(),
-    roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
-  },
-  OGEMAMB: {
-    sheetName: 'OGEMAMB',
-    title: 'OGE — BPM AMB',
-    category: 'Ouvidoria (OGE)',
-    description: 'Manifestações da Ouvidoria-Geral direcionadas ao BPM AMB.',
-    columns: ogeColumns_(),
-    roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
-  },
-  OGERV: {
-    sheetName: 'OGERV',
-    title: 'OGE — BPM RV',
-    category: 'Ouvidoria (OGE)',
-    description: 'Manifestações da Ouvidoria-Geral direcionadas ao BPM RV.',
-    columns: ogeColumns_(),
-    roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
-  },
-
-  RECOMPENSAS: {
-    sheetName: 'RECOMPENSAS',
-    title: 'Recompensas',
-    category: 'Reconhecimento',
-    description: 'Processos de recompensa em tramitação.',
-    columns: [
-      { key: 'data', header: 'DATA', type: 'date', list: true },
-      { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
-      { key: 'sicor', header: 'SICOR/PORTARIA', type: 'text', list: true },
-      { key: 'tipoDocumento', header: 'TIPO DOCUMENTO/NOME PM', type: 'text', list: true },
-      { key: 'finalidade', header: 'FINALIDADE', type: 'longtext', list: false },
-      { key: 'statusDetalhe', header: 'STATUS', type: 'text', list: false },
-      { key: 'status', header: 'STATUS II', type: 'status', list: true },
-      { key: 'dataEncerramento', header: 'DATA ENCERRAMENTO', type: 'date', list: true }
-    ],
-    roles: { entry: 'data', deadline: null, close: 'dataEncerramento', unit: 'origem', status: 'status' }
-  },
-
-  CEDMU: {
-    sheetName: 'CEDMU MEDALHA',
-    title: 'CEDMU — Medalhas',
-    category: 'Reconhecimento',
-    description: 'Processos de condecoração (medalhas) via CEDMU.',
-    columns: [
-      { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
-      { key: 'medalha', header: 'MEDALHA', type: 'text', list: true },
-      { key: 'militar', header: 'Nº PM, POSTO/GRADUAÇÃO, NOME', type: 'longtext', list: true },
-      { key: 'dataEntrada', header: 'DATA ENTRADA', type: 'date', list: true },
-      { key: 'protocoloEntrada', header: 'PROTOCOLO ENTRADA', type: 'text', list: false },
-      { key: 'dataEnvioCedmu', header: 'DATA ENVIO CEDMU', type: 'date', list: false },
-      { key: 'dataDestinatario', header: 'DATA / DESTINATÁRIO', type: 'text', list: false },
-      { key: 'protocoloDestinatario', header: 'PROTOCOLO / DESTINATÁRIO', type: 'text', list: false },
-      { key: 'status', header: 'STATUS', type: 'status', list: true }
-    ],
-    roles: { entry: 'dataEntrada', deadline: null, close: null, unit: 'origem', status: 'status' }
-  },
-
-  MPMG: {
-    sheetName: 'MPMG',
-    title: 'MPMG',
-    category: 'Disciplinar',
-    description: 'Expedientes oriundos do Ministério Público de Minas Gerais.',
-    columns: [
-      { key: 'data', header: 'DATA', type: 'date', list: true },
-      { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
-      { key: 'qtDias', header: 'QT. DIA', type: 'text', list: false },
-      { key: 'prazoInicial', header: 'PRAZO INICIAL', type: 'date', list: false },
-      { key: 'prazoFinal', header: 'PRAZO FINAL', type: 'date', list: true },
-      { key: 'sicor', header: 'N. SICOR', type: 'text', list: true },
-      { key: 'observacoes', header: 'OBSERVAÇÕES', type: 'longtext', list: true },
-      { key: 'status', header: 'STATUS', type: 'text', list: true }
-    ],
-    roles: { entry: 'data', deadline: 'prazoFinal', close: null, unit: 'unidade', status: 'status' }
-  },
-
-  CPM: {
-    sheetName: 'CPM',
-    title: 'CPM',
-    category: 'Disciplinar',
-    description: 'Solicitações do Conselho de Promoção de Militares.',
-    columns: [
-      { key: 'dataSolicitacao', header: 'DATA QUE A SOLICITAÇÃO DA CPM APORTOU NA SCPM-CPE', type: 'date', list: true },
-      { key: 'prazoConcedido', header: 'PRAZO CONCEDIDO PELA CPM', type: 'text', list: false },
-      { key: 'prazoInicial', header: 'PRAZO INICIAL', type: 'date', list: false },
-      { key: 'prazoUeop', header: 'PRAZO UEOP', type: 'date', list: false },
-      { key: 'prazoFinal', header: 'PRAZO FINAL', type: 'date', list: true },
-      { key: 'unidade', header: 'UEOP', type: 'text', list: true },
-      { key: 'sicor', header: 'Nº SICOR', type: 'text', list: true },
-      { key: 'observacoes', header: 'OBSERVAÇÕES', type: 'longtext', list: false },
-      { key: 'statusDetalhe', header: 'STATUS', type: 'text', list: false },
-      { key: 'status', header: 'STATUS II', type: 'status', list: true },
-      { key: 'dataEncerramento', header: 'DATA ENCERRAMENTO', type: 'date', list: true }
-    ],
-    roles: { entry: 'dataSolicitacao', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
-  },
-
-  DDU: {
-    sheetName: 'DDU',
-    title: 'DDU',
-    category: 'Disciplinar',
-    description: 'Demandas de Diligência/Denúncia via Unidade (DDU).',
-    columns: [
-      { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
-      { key: 'dataEntrada', header: 'DATA ENTRADA SUBCORREGEDORIA', type: 'date', list: true },
-      { key: 'prazoUeop', header: 'PRAZO UEOP', type: 'date', list: false },
-      { key: 'prazoFinal', header: 'PRAZO FINAL', type: 'date', list: true },
-      { key: 'ueop', header: 'UEOp', type: 'text', list: false },
-      { key: 'sicor', header: 'SICOR', type: 'text', list: true },
-      { key: 'protocoloDdu', header: 'PROTOCOLO DDU', type: 'text', list: false },
-      { key: 'enviadoAtendimento', header: 'ENVIADO PARA ATENDIMENTO', type: 'text', list: false },
-      { key: 'instaurado', header: 'INSTAURADO PROCEDIMENTO', type: 'text', list: true },
-      { key: 'resposta', header: 'RESPOSTA', type: 'longtext', list: false },
-      { key: 'status', header: 'STATUS', type: 'status', list: true },
-      { key: 'dataEncerramento', header: 'DATA ENCERRAMENTO', type: 'date', list: true }
-    ],
-    roles: { entry: 'dataEntrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
-  },
-
   REQUISICOES: {
     sheetName: 'REQUISIÇÕES ',
     title: 'Requisições / Audiências',
@@ -184,23 +59,6 @@ var CONFIG = {
     roles: { entry: 'dataEntrada', deadline: null, close: null, unit: 'origem', status: null }
   },
 
-  RECURDISC: {
-    sheetName: 'RECURDISC',
-    title: 'Recursos Disciplinares',
-    category: 'Disciplinar',
-    description: 'Recursos disciplinares em 1ª e 2ª instância.',
-    columns: [
-      { key: 'data', header: 'DATA', type: 'date', list: true },
-      { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
-      { key: 'sicor', header: 'SICOR/PORTARIA', type: 'text', list: true },
-      { key: 'tipoDocumento', header: 'TIPO DOCUMENTO/1ª OU 2ª INST', type: 'text', list: true },
-      { key: 'finalidade', header: 'FINALIDADE', type: 'longtext', list: false },
-      { key: 'destino', header: 'DESTINO', type: 'text', list: true },
-      { key: 'status', header: 'STATUS', type: 'text', list: true }
-    ],
-    roles: { entry: 'data', deadline: null, close: null, unit: 'origem', status: 'status' }
-  },
-
   CPEPRESO: {
     sheetName: 'MILITAR CPEPRESO',
     title: 'Militares Presos',
@@ -218,68 +76,6 @@ var CONFIG = {
     ],
     roles: { entry: 'dataPrisao', deadline: null, close: null, unit: 'unidade', status: 'status' },
     emptyStatusMeaning: 'PRESO — SEM ATUALIZAÇÃO REGISTRADA'
-  },
-
-  PADCPE: {
-    sheetName: 'PADCPE',
-    title: 'PAD — CPE',
-    category: 'Disciplinar',
-    description: 'Processos Administrativos Disciplinares. Atenção ao prazo de prescrição.',
-    columns: [
-      { key: 'sirh', header: 'sirh', type: 'text', list: true },
-      { key: 'nome', header: 'NOME', type: 'text', list: true },
-      { key: 'portaria', header: 'PORTARIA PAD', type: 'text', list: true },
-      { key: 'dataFato', header: 'DATA DO FATO', type: 'date', list: true },
-      { key: 'prescricao', header: 'PRESCRIÇÃO', type: 'date', list: true },
-      { key: 'fato', header: 'FATO', type: 'longtext', list: false },
-      { key: 'militarPreso', header: 'MILITAR PRESO', type: 'text', list: false },
-      { key: 'observacao', header: 'OBSERVAÇÃO', type: 'longtext', list: false },
-      { key: 'status', header: 'SITUAÇÃO', type: 'text', list: true }
-    ],
-    roles: { entry: 'dataFato', deadline: 'prescricao', close: null, unit: null, status: 'status' },
-    deadlineLabel: 'Prescrição'
-  },
-
-  DESERCAO: {
-    sheetName: 'DESERÇÂO',
-    title: 'Deserção',
-    category: 'Efetivo',
-    description: 'Processos de deserção em andamento.',
-    columns: [
-      { key: 'militar', header: 'DADOS DO MILITAR', type: 'longtext', list: true },
-      { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
-      { key: 'dataEntrada', header: 'ENTRADA SUBCORREGEDORIA', type: 'date', list: true },
-      { key: 'sicor', header: 'SICOR', type: 'text', list: false },
-      { key: 'portaria', header: 'PORTARIA SICOR', type: 'text', list: false },
-      { key: 'dataInstauracao', header: 'DATA INSTAURAÇÃO', type: 'date', list: false },
-      { key: 'prazoFinal', header: 'DATA FINAL/PREVISTA', type: 'date', list: true },
-      { key: 'protocoloTj', header: 'PROTOCOLO PA TJ DISTRIBUIÇÃO', type: 'text', list: false },
-      { key: 'dataEncTjm', header: 'DATA DO ENC. AO TJM MG', type: 'date', list: false },
-      { key: 'solucao', header: 'SOLUÇÃO', type: 'longtext', list: true },
-      { key: 'dataEncerramento', header: 'FINALIZADO', type: 'date', list: true },
-      { key: 'observacao', header: 'OBSERVAÇÃO', type: 'longtext', list: false }
-    ],
-    roles: { entry: 'dataEntrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: null }
-  },
-
-  TAD: {
-    sheetName: 'TAD',
-    title: 'TAD',
-    category: 'Disciplinar',
-    description: 'Termos de Ajustamento de Disciplina (Art. 15 CEDM).',
-    columns: [
-      { key: 'numero', header: 'NÚMERO', type: 'text', list: true },
-      { key: 'posto', header: 'POSTO/GRAD', type: 'text', list: true },
-      { key: 'nome', header: 'NOME COMPLETO', type: 'text', list: true },
-      { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
-      { key: 'cidade', header: 'CIDADE', type: 'text', list: false },
-      { key: 'art15', header: 'ART. 15 CEDM (S/CONCURSO)', type: 'text', list: false },
-      { key: 'acordo', header: 'ACORDO FIRMADO', type: 'text', list: true },
-      { key: 'prazoCumprimento', header: 'PRAZO CUMPRIMENTO ACORDO', type: 'date', list: true },
-      { key: 'ressarcimento', header: 'RESSARCIMENTO AO ERÁRIO,SE HOUVER', type: 'text', list: false },
-      { key: 'dataAssinatura', header: 'DATA ASSINATURA TADIS', type: 'date', list: true }
-    ],
-    roles: { entry: 'dataAssinatura', deadline: 'prazoCumprimento', close: null, unit: 'unidade', status: null }
   },
 
   SNGB: {
@@ -321,7 +117,198 @@ function ogeColumns_() {
   ];
 }
 
-var CATEGORY_ORDER = ['Demandas', 'Ouvidoria (OGE)', 'Disciplinar', 'Efetivo', 'Reconhecimento'];
+var GRUPOS = {
+
+  OUVIDORIA: {
+    title: 'Ouvidoria (OGE)',
+    category: 'Ouvidoria',
+    description: 'Manifestações da Ouvidoria-Geral do Estado, por unidade destinatária.',
+    membros: [
+      {
+        tipo: 'EM CPE', sheetName: 'OGECPE', columns: ogeColumns_(), assunto: 'objeto',
+        roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
+      },
+      {
+        tipo: 'BPGD', sheetName: 'OGEBPGD', columns: ogeColumns_(), assunto: 'objeto',
+        roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
+      },
+      {
+        tipo: 'BPM AMB', sheetName: 'OGEMAMB', columns: ogeColumns_(), assunto: 'objeto',
+        roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
+      },
+      {
+        tipo: 'BPM RV', sheetName: 'OGERV', columns: ogeColumns_(), assunto: 'objeto',
+        roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
+      }
+    ]
+  },
+
+  RECOMPENSAS: {
+    title: 'Recompensas e Medalhas',
+    category: 'Reconhecimento',
+    description: 'Processos de recompensa e condecoração (CEDMU) em tramitação.',
+    membros: [
+      {
+        tipo: 'Recompensa', sheetName: 'RECOMPENSAS', assunto: 'finalidade',
+        columns: [
+          { key: 'data', header: 'DATA', type: 'date', list: true },
+          { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
+          { key: 'sicor', header: 'SICOR/PORTARIA', type: 'text', list: true },
+          { key: 'tipoDocumento', header: 'TIPO DOCUMENTO/NOME PM', type: 'text', list: true },
+          { key: 'finalidade', header: 'FINALIDADE', type: 'longtext', list: false },
+          { key: 'statusDetalhe', header: 'STATUS', type: 'text', list: false },
+          { key: 'status', header: 'STATUS II', type: 'status', list: true },
+          { key: 'dataEncerramento', header: 'DATA ENCERRAMENTO', type: 'date', list: true }
+        ],
+        roles: { entry: 'data', deadline: null, close: 'dataEncerramento', unit: 'origem', status: 'status' }
+      },
+      {
+        tipo: 'Medalha (CEDMU)', sheetName: 'CEDMU MEDALHA', assunto: 'militar',
+        columns: [
+          { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
+          { key: 'medalha', header: 'MEDALHA', type: 'text', list: true },
+          { key: 'militar', header: 'Nº PM, POSTO/GRADUAÇÃO, NOME', type: 'longtext', list: true },
+          { key: 'dataEntrada', header: 'DATA ENTRADA', type: 'date', list: true },
+          { key: 'protocoloEntrada', header: 'PROTOCOLO ENTRADA', type: 'text', list: false },
+          { key: 'dataEnvioCedmu', header: 'DATA ENVIO CEDMU', type: 'date', list: false },
+          { key: 'dataDestinatario', header: 'DATA / DESTINATÁRIO', type: 'text', list: false },
+          { key: 'protocoloDestinatario', header: 'PROTOCOLO / DESTINATÁRIO', type: 'text', list: false },
+          { key: 'status', header: 'STATUS', type: 'status', list: true }
+        ],
+        roles: { entry: 'dataEntrada', deadline: null, close: null, unit: 'origem', status: 'status' }
+      }
+    ]
+  },
+
+  DENUNCIAS: {
+    title: 'Denúncias',
+    category: 'Disciplinar',
+    description: 'Denúncias e expedientes externos: Ministério Público (MPMG), CPM e DDU.',
+    membros: [
+      {
+        tipo: 'MPMG', sheetName: 'MPMG', assunto: 'observacoes',
+        columns: [
+          { key: 'data', header: 'DATA', type: 'date', list: true },
+          { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
+          { key: 'qtDias', header: 'QT. DIA', type: 'text', list: false },
+          { key: 'prazoInicial', header: 'PRAZO INICIAL', type: 'date', list: false },
+          { key: 'prazoFinal', header: 'PRAZO FINAL', type: 'date', list: true },
+          { key: 'sicor', header: 'N. SICOR', type: 'text', list: true },
+          { key: 'observacoes', header: 'OBSERVAÇÕES', type: 'longtext', list: true },
+          { key: 'status', header: 'STATUS', type: 'text', list: true }
+        ],
+        roles: { entry: 'data', deadline: 'prazoFinal', close: null, unit: 'unidade', status: 'status' }
+      },
+      {
+        tipo: 'CPM', sheetName: 'CPM', assunto: 'observacoes',
+        columns: [
+          { key: 'dataSolicitacao', header: 'DATA QUE A SOLICITAÇÃO DA CPM APORTOU NA SCPM-CPE', type: 'date', list: true },
+          { key: 'prazoConcedido', header: 'PRAZO CONCEDIDO PELA CPM', type: 'text', list: false },
+          { key: 'prazoInicial', header: 'PRAZO INICIAL', type: 'date', list: false },
+          { key: 'prazoUeop', header: 'PRAZO UEOP', type: 'date', list: false },
+          { key: 'prazoFinal', header: 'PRAZO FINAL', type: 'date', list: true },
+          { key: 'unidade', header: 'UEOP', type: 'text', list: true },
+          { key: 'sicor', header: 'Nº SICOR', type: 'text', list: true },
+          { key: 'observacoes', header: 'OBSERVAÇÕES', type: 'longtext', list: false },
+          { key: 'statusDetalhe', header: 'STATUS', type: 'text', list: false },
+          { key: 'status', header: 'STATUS II', type: 'status', list: true },
+          { key: 'dataEncerramento', header: 'DATA ENCERRAMENTO', type: 'date', list: true }
+        ],
+        roles: { entry: 'dataSolicitacao', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
+      },
+      {
+        tipo: 'DDU', sheetName: 'DDU', assunto: 'instaurado',
+        columns: [
+          { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
+          { key: 'dataEntrada', header: 'DATA ENTRADA SUBCORREGEDORIA', type: 'date', list: true },
+          { key: 'prazoUeop', header: 'PRAZO UEOP', type: 'date', list: false },
+          { key: 'prazoFinal', header: 'PRAZO FINAL', type: 'date', list: true },
+          { key: 'ueop', header: 'UEOp', type: 'text', list: false },
+          { key: 'sicor', header: 'SICOR', type: 'text', list: true },
+          { key: 'protocoloDdu', header: 'PROTOCOLO DDU', type: 'text', list: false },
+          { key: 'enviadoAtendimento', header: 'ENVIADO PARA ATENDIMENTO', type: 'text', list: false },
+          { key: 'instaurado', header: 'INSTAURADO PROCEDIMENTO', type: 'text', list: true },
+          { key: 'resposta', header: 'RESPOSTA', type: 'longtext', list: false },
+          { key: 'status', header: 'STATUS', type: 'status', list: true },
+          { key: 'dataEncerramento', header: 'DATA ENCERRAMENTO', type: 'date', list: true }
+        ],
+        roles: { entry: 'dataEntrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
+      }
+    ]
+  },
+
+  DISCIPLINA: {
+    title: 'Disciplina',
+    category: 'Disciplinar',
+    description: 'PAD, deserção, TAD e recursos disciplinares. Veja também a aba Encarregados, ao lado.',
+    membros: [
+      {
+        tipo: 'PAD', sheetName: 'PADCPE', assunto: 'fato', deadlineLabel: 'Prescrição',
+        columns: [
+          { key: 'sirh', header: 'sirh', type: 'text', list: true },
+          { key: 'nome', header: 'NOME', type: 'text', list: true },
+          { key: 'portaria', header: 'PORTARIA PAD', type: 'text', list: true },
+          { key: 'dataFato', header: 'DATA DO FATO', type: 'date', list: true },
+          { key: 'prescricao', header: 'PRESCRIÇÃO', type: 'date', list: true },
+          { key: 'fato', header: 'FATO', type: 'longtext', list: false },
+          { key: 'militarPreso', header: 'MILITAR PRESO', type: 'text', list: false },
+          { key: 'observacao', header: 'OBSERVAÇÃO', type: 'longtext', list: false },
+          { key: 'status', header: 'SITUAÇÃO', type: 'text', list: true }
+        ],
+        roles: { entry: 'dataFato', deadline: 'prescricao', close: null, unit: null, status: 'status' }
+      },
+      {
+        tipo: 'Deserção', sheetName: 'DESERÇÂO', assunto: 'solucao',
+        columns: [
+          { key: 'militar', header: 'DADOS DO MILITAR', type: 'longtext', list: true },
+          { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
+          { key: 'dataEntrada', header: 'ENTRADA SUBCORREGEDORIA', type: 'date', list: true },
+          { key: 'sicor', header: 'SICOR', type: 'text', list: false },
+          { key: 'portaria', header: 'PORTARIA SICOR', type: 'text', list: false },
+          { key: 'dataInstauracao', header: 'DATA INSTAURAÇÃO', type: 'date', list: false },
+          { key: 'prazoFinal', header: 'DATA FINAL/PREVISTA', type: 'date', list: true },
+          { key: 'protocoloTj', header: 'PROTOCOLO PA TJ DISTRIBUIÇÃO', type: 'text', list: false },
+          { key: 'dataEncTjm', header: 'DATA DO ENC. AO TJM MG', type: 'date', list: false },
+          { key: 'solucao', header: 'SOLUÇÃO', type: 'longtext', list: true },
+          { key: 'dataEncerramento', header: 'FINALIZADO', type: 'date', list: true },
+          { key: 'observacao', header: 'OBSERVAÇÃO', type: 'longtext', list: false }
+        ],
+        roles: { entry: 'dataEntrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: null }
+      },
+      {
+        tipo: 'TAD', sheetName: 'TAD', assunto: 'nome',
+        columns: [
+          { key: 'numero', header: 'NÚMERO', type: 'text', list: true },
+          { key: 'posto', header: 'POSTO/GRAD', type: 'text', list: true },
+          { key: 'nome', header: 'NOME COMPLETO', type: 'text', list: true },
+          { key: 'unidade', header: 'UNIDADE', type: 'text', list: true },
+          { key: 'cidade', header: 'CIDADE', type: 'text', list: false },
+          { key: 'art15', header: 'ART. 15 CEDM (S/CONCURSO)', type: 'text', list: false },
+          { key: 'acordo', header: 'ACORDO FIRMADO', type: 'text', list: true },
+          { key: 'prazoCumprimento', header: 'PRAZO CUMPRIMENTO ACORDO', type: 'date', list: true },
+          { key: 'ressarcimento', header: 'RESSARCIMENTO AO ERÁRIO,SE HOUVER', type: 'text', list: false },
+          { key: 'dataAssinatura', header: 'DATA ASSINATURA TADIS', type: 'date', list: true }
+        ],
+        roles: { entry: 'dataAssinatura', deadline: 'prazoCumprimento', close: null, unit: 'unidade', status: null }
+      },
+      {
+        tipo: 'Recursos', sheetName: 'RECURDISC', assunto: 'finalidade',
+        columns: [
+          { key: 'data', header: 'DATA', type: 'date', list: true },
+          { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
+          { key: 'sicor', header: 'SICOR/PORTARIA', type: 'text', list: true },
+          { key: 'tipoDocumento', header: 'TIPO DOCUMENTO/1ª OU 2ª INST', type: 'text', list: true },
+          { key: 'finalidade', header: 'FINALIDADE', type: 'longtext', list: false },
+          { key: 'destino', header: 'DESTINO', type: 'text', list: true },
+          { key: 'status', header: 'STATUS', type: 'text', list: true }
+        ],
+        roles: { entry: 'data', deadline: null, close: null, unit: 'origem', status: 'status' }
+      }
+    ]
+  }
+};
+
+var CATEGORY_ORDER = ['Demandas', 'Ouvidoria', 'Disciplinar', 'Efetivo', 'Reconhecimento'];
 
 // Palavras que indicam conclusão quando o campo de status é texto livre.
 var PALAVRAS_CONCLUIDO = [
@@ -379,7 +366,8 @@ function cellToJson_(value, type) {
   return typeof value === 'number' ? value : String(value).trim();
 }
 
-/** Lê uma aba inteira segundo o CONFIG e devolve linhas já no formato {key: valor} + _situacao. */
+/** Lê uma aba inteira segundo o cfg (de CONFIG ou de um membro de GRUPOS) e devolve
+ *  linhas já no formato {key: valor} + _situacao. */
 function readConfiguredSheet_(cfg) {
   var sheet = getSheet_(cfg.sheetName);
   var lastRow = sheet.getLastRow();
@@ -416,6 +404,34 @@ function readConfiguredSheet_(cfg) {
   return rows;
 }
 
+/** Lê todos os membros de um grupo e devolve uma lista única de linhas, cada uma
+ *  marcada com _tipo (qual membro/origem) e com atalhos _dataValor/_unidadeValor/
+ *  _assuntoValor pra a tabela consolidada não precisar saber a coluna exata de
+ *  cada membro. As colunas originais continuam no objeto pra o popup de detalhes. */
+function readGrupo_(grupo) {
+  var todasLinhas = [];
+  grupo.membros.forEach(function (m) {
+    var linhas = readConfiguredSheet_(m);
+    linhas.forEach(function (r) {
+      r._tipo = m.tipo;
+      r._uid = m.tipo + '#' + r._row;
+      r._dataValor = m.roles.entry ? r[m.roles.entry] : null;
+      r._unidadeValor = m.roles.unit ? r[m.roles.unit] : null;
+      r._assuntoValor = m.assunto ? r[m.assunto] : null;
+    });
+    todasLinhas = todasLinhas.concat(linhas);
+  });
+  todasLinhas.sort(function (a, b) {
+    var da = parseAnyDate_(a._dataValor);
+    var db = parseAnyDate_(b._dataValor);
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return db - da;
+  });
+  return todasLinhas;
+}
+
 function parseAnyDate_(v) {
   if (!v) return null;
   if (v instanceof Date) return v;
@@ -439,7 +455,7 @@ function textIndicaConcluido_(text) {
 
 /**
  * Regra única de classificação de situação, usada tanto na visão consolidada
- * (cards da Home) quanto na tabela de cada aba.
+ * (cards da Home) quanto na tabela de cada aba/grupo.
  */
 function classify_(obj, cfg) {
   var roles = cfg.roles;
@@ -479,45 +495,67 @@ function classify_(obj, cfg) {
 // ---------- API chamada pelo cliente ----------
 
 function getAppConfig() {
-  var list = [];
+  var sheets = [];
   Object.keys(CONFIG).forEach(function (id) {
     var c = CONFIG[id];
-    list.push({
-      id: id,
-      sheetName: c.sheetName,
-      title: c.title,
-      category: c.category,
-      description: c.description,
-      columns: c.columns,
-      roles: c.roles,
-      deadlineLabel: c.deadlineLabel || 'Prazo final'
+    sheets.push({
+      id: id, isGroup: false, sheetName: c.sheetName,
+      title: c.title, category: c.category, description: c.description,
+      columns: c.columns, roles: c.roles, deadlineLabel: c.deadlineLabel || 'Prazo final'
     });
   });
-  return { categories: CATEGORY_ORDER, sheets: list };
+
+  var grupos = [];
+  Object.keys(GRUPOS).forEach(function (id) {
+    var g = GRUPOS[id];
+    grupos.push({
+      id: id, isGroup: true, title: g.title, category: g.category, description: g.description,
+      membros: g.membros.map(function (m) {
+        return { tipo: m.tipo, columns: m.columns, roles: m.roles, deadlineLabel: m.deadlineLabel || 'Prazo final' };
+      })
+    });
+  });
+
+  return { categories: CATEGORY_ORDER, sheets: sheets, grupos: grupos };
 }
 
 function getHomeSummary() {
   var result = [];
+
+  function contar(rows) {
+    var counts = { FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, OUTROS: 0, total: 0 };
+    rows.forEach(function (r) {
+      counts.total++;
+      if (r._situacao === 'FINALIZADO') counts.FINALIZADO++;
+      else if (r._situacao === 'ATRASADO') counts.ATRASADO++;
+      else if (r._situacao === 'EM ANDAMENTO') counts['EM ANDAMENTO']++;
+      else counts.OUTROS++;
+    });
+    return counts;
+  }
+
   Object.keys(CONFIG).forEach(function (id) {
     var cfg = CONFIG[id];
     var counts = { FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, OUTROS: 0, total: 0 };
     try {
-      var rows = readConfiguredSheet_(cfg);
-      rows.forEach(function (r) {
-        counts.total++;
-        if (r._situacao === 'FINALIZADO') counts.FINALIZADO++;
-        else if (r._situacao === 'ATRASADO') counts.ATRASADO++;
-        else if (r._situacao === 'EM ANDAMENTO') counts['EM ANDAMENTO']++;
-        else counts.OUTROS++;
-      });
+      counts = contar(readConfiguredSheet_(cfg));
     } catch (err) {
       counts.error = String(err);
     }
-    result.push({
-      id: id, title: cfg.title, category: cfg.category,
-      description: cfg.description, counts: counts
-    });
+    result.push({ id: id, isGroup: false, title: cfg.title, category: cfg.category, description: cfg.description, counts: counts });
   });
+
+  Object.keys(GRUPOS).forEach(function (id) {
+    var grupo = GRUPOS[id];
+    var counts = { FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, OUTROS: 0, total: 0 };
+    try {
+      counts = contar(readGrupo_(grupo));
+    } catch (err) {
+      counts.error = String(err);
+    }
+    result.push({ id: id, isGroup: true, title: grupo.title, category: grupo.category, description: grupo.description, counts: counts });
+  });
+
   return result;
 }
 
@@ -529,6 +567,19 @@ function getSheetView(id) {
     id: id, title: cfg.title, description: cfg.description,
     columns: cfg.columns, roles: cfg.roles,
     deadlineLabel: cfg.deadlineLabel || 'Prazo final',
+    rows: rows
+  };
+}
+
+function getGroupView(id) {
+  var grupo = GRUPOS[id];
+  if (!grupo) throw new Error('Grupo desconhecido: ' + id);
+  var rows = readGrupo_(grupo);
+  return {
+    id: id, title: grupo.title, description: grupo.description,
+    membros: grupo.membros.map(function (m) {
+      return { tipo: m.tipo, columns: m.columns, roles: m.roles, deadlineLabel: m.deadlineLabel || 'Prazo final' };
+    }),
     rows: rows
   };
 }
