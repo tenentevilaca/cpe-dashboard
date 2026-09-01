@@ -42,7 +42,7 @@
 
   <script>
     var INITIAL_CONFIG = <?!= JSON.stringify(getAppConfig()) ?>;
-    var INITIAL_SUMMARY = <?!= JSON.stringify(getHomeSummary()) ?>;
+    var INITIAL_SUMMARY = null; // carregado de forma assíncrona pelo App.html, pra página abrir na hora
   </script>
   <?!= include('App'); ?>
   <?!= include('ChartLib'); ?>

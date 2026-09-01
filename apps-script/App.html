@@ -128,8 +128,9 @@ function renderHome() {
     drawHome(summary);
   }).catch(function (err) { app.innerHTML = errorBox(err); });
 
-  // pinta imediatamente com o snapshot inicial (rápido), depois atualiza com o fresco acima
-  drawHome(INITIAL_SUMMARY);
+  // se já tem um resumo em cache (navegação de volta pra Home), pinta na hora;
+  // senão fica com "Carregando resumo…" até a chamada acima responder
+  if (INITIAL_SUMMARY) drawHome(INITIAL_SUMMARY);
 }
 
 function drawHome(summary) {
