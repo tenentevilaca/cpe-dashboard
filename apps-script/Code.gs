@@ -60,7 +60,7 @@ var CONFIG = {
   },
 
   CPEPRESO: {
-    sheetName: 'MILITAR CPEPRESO',
+    sheetName: 'MILITAR CPE/PRESO',
     title: 'Militares Presos',
     category: 'Efetivo',
     description: 'Controle de militares presos sob acompanhamento do CPE.',
@@ -125,19 +125,19 @@ var GRUPOS = {
     description: 'Manifestações da Ouvidoria-Geral do Estado, por unidade destinatária.',
     membros: [
       {
-        tipo: 'EM CPE', sheetName: 'OGECPE', columns: ogeColumns_(), assunto: 'objeto',
+        tipo: 'EM CPE', sheetName: 'OGE/CPE', columns: ogeColumns_(), assunto: 'objeto',
         roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
       },
       {
-        tipo: 'BPGD', sheetName: 'OGEBPGD', columns: ogeColumns_(), assunto: 'objeto',
+        tipo: 'BPGD', sheetName: 'OGE/BPGD', columns: ogeColumns_(), assunto: 'objeto',
         roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
       },
       {
-        tipo: 'BPM AMB', sheetName: 'OGEMAMB', columns: ogeColumns_(), assunto: 'objeto',
+        tipo: 'BPM AMB', sheetName: 'OGE/MAMB', columns: ogeColumns_(), assunto: 'objeto',
         roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
       },
       {
-        tipo: 'BPM RV', sheetName: 'OGERV', columns: ogeColumns_(), assunto: 'objeto',
+        tipo: 'BPM RV', sheetName: 'OGE/RV', columns: ogeColumns_(), assunto: 'objeto',
         roles: { entry: 'entrada', deadline: 'prazoFinal', close: 'dataEncerramento', unit: 'unidade', status: 'status' }
       }
     ]
@@ -243,7 +243,7 @@ var GRUPOS = {
     description: 'PAD, deserção, TAD e recursos disciplinares. Veja também a aba Encarregados, ao lado.',
     membros: [
       {
-        tipo: 'PAD', sheetName: 'PADCPE', assunto: 'fato', deadlineLabel: 'Prescrição',
+        tipo: 'PAD', sheetName: 'PAD/CPE', assunto: 'fato', deadlineLabel: 'Prescrição',
         columns: [
           { key: 'sirh', header: 'sirh', type: 'text', list: true },
           { key: 'nome', header: 'NOME', type: 'text', list: true },
@@ -292,7 +292,7 @@ var GRUPOS = {
         roles: { entry: 'dataAssinatura', deadline: 'prazoCumprimento', close: null, unit: 'unidade', status: null }
       },
       {
-        tipo: 'Recursos', sheetName: 'RECURDISC', assunto: 'finalidade',
+        tipo: 'Recursos', sheetName: 'RECUR/DISC', assunto: 'finalidade',
         columns: [
           { key: 'data', header: 'DATA', type: 'date', list: true },
           { key: 'origem', header: 'ORIGEM', type: 'text', list: true },
