@@ -10,14 +10,44 @@ const HEADERS = ['ID', 'Tarefa', 'Responsavel', 'DataInicio', 'Prazo', 'Concluid
 const OBS_SHEET_NAME = 'Observacoes';
 const OBS_HEADERS = ['ID', 'TarefaID', 'Data', 'Texto', 'PrazoAnterior', 'PrazoNovo'];
 
+const ACESSO_SHEET_NAME = 'Acesso';
+const ACESSO_HEADERS = ['ID', 'Email', 'Nome', 'Motivo', 'Status', 'DataSolicitacao', 'DataAprovacao'];
+
 // Nomes das Script Properties (configuradas em Configurações do projeto → Script Properties,
 // NUNCA no código-fonte — assim a chave não vai pro GitHub).
 const PROP_PHONE = 'CALLMEBOT_PHONE';
 const PROP_APIKEY = 'CALLMEBOT_API_KEY';
+const PROP_OWNER_EMAIL = 'OWNER_EMAIL';
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
+/**
+ * Tela inicial (escudo + card "Agenda") sempre aparece primeiro. O acesso à Agenda em si é
+ * controlado pela conta Google de quem abriu o link — não existe usuário/senha digitados,
+ * já que o Apps Script não tem como guardar senha com segurança. Quem não é o dono nem já
+ * foi aprovado vê um formulário de solicitação de acesso; o dono aprova por um link que
+ * chega por e-mail.
+ */
+function doGet(e) {
+  const email = Session.getActiveUser().getEmail() || '';
+  let mensagemAprovacao = '';
+
+  if (e && e.parameter && e.parameter.acao === 'aprovar' && e.parameter.id) {
+    if (isOwner_(email)) {
+      const ok = aprovarAcesso_(e.parameter.id);
+      mensagemAprovacao = ok
+        ? 'Acesso aprovado com sucesso.'
+        : 'Solicitação não encontrada (pode já ter sido aprovada antes).';
+    } else {
+      mensagemAprovacao = 'Só o responsável pela Agenda pode aprovar solicitações — abra o link de aprovação logado com a conta correta.';
+    }
+  }
+
+  const template = HtmlService.createTemplateFromFile('Index');
+  template.userEmail = email;
+  template.isOwner = isOwner_(email);
+  template.statusAcesso = getStatusAcesso_(email);
+  template.mensagemAprovacao = mensagemAprovacao;
+
+  return template.evaluate()
     .setTitle('Agenda de Tarefas — CPE 2026')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -25,6 +55,98 @@ function doGet() {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// ===== Controle de acesso (dono + aprovação por e-mail) =====
+
+function getAcessoSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ACESSO_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ACESSO_SHEET_NAME);
+    sheet.appendRow(ACESSO_HEADERS);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function isOwner_(email) {
+  if (!email) return false;
+  const dono = PropertiesService.getScriptProperties().getProperty(PROP_OWNER_EMAIL);
+  return !!dono && email.toLowerCase() === dono.toLowerCase();
+}
+
+/** Retorna 'owner', 'aprovado', 'pendente' ou 'nenhum' pro e-mail informado. */
+function getStatusAcesso_(email) {
+  if (!email) return 'semLogin';
+  if (isOwner_(email)) return 'owner';
+  const sheet = getAcessoSheet_();
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][1]).toLowerCase() === email.toLowerCase()) {
+      return values[i][4] === 'Aprovado' ? 'aprovado' : 'pendente';
+    }
+  }
+  return 'nenhum';
+}
+
+/**
+ * Registra um pedido de acesso à Agenda pra conta Google atualmente logada e manda um
+ * e-mail pro dono com um link de aprovação. Chamado pelo formulário "Solicitar acesso".
+ */
+function solicitarAcesso(nome, motivo) {
+  const email = Session.getActiveUser().getEmail();
+  if (!email) {
+    throw new Error('Não foi possível identificar sua conta Google. Faça login e tente de novo.');
+  }
+
+  const statusAtual = getStatusAcesso_(email);
+  if (statusAtual === 'owner' || statusAtual === 'aprovado' || statusAtual === 'pendente') {
+    return { status: statusAtual };
+  }
+
+  const sheet = getAcessoSheet_();
+  const id = Utilities.getUuid();
+  sheet.appendRow([
+    id,
+    email,
+    nome || '',
+    motivo || '',
+    'Pendente',
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'),
+    ''
+  ]);
+
+  const dono = PropertiesService.getScriptProperties().getProperty(PROP_OWNER_EMAIL);
+  if (dono) {
+    const linkAprovar = ScriptApp.getService().getUrl() + '?acao=aprovar&id=' + encodeURIComponent(id);
+    const corpo = 'Nova solicitação de acesso à Agenda CPE:\n\n' +
+      'Nome: ' + (nome || '(não informado)') + '\n' +
+      'E-mail (Google): ' + email + '\n' +
+      'Motivo: ' + (motivo || '(não informado)') + '\n\n' +
+      'Para aprovar, abra o link abaixo logado com a sua conta (só funciona pra você):\n' + linkAprovar;
+    try {
+      MailApp.sendEmail(dono, '🔐 Solicitação de acesso — Agenda CPE', corpo);
+    } catch (e) {
+      Logger.log('Falha ao enviar e-mail de solicitação de acesso: ' + e);
+    }
+  }
+
+  return { status: 'pendente' };
+}
+
+/** Aprova um pedido de acesso pelo ID (chamado só a partir de doGet, após confirmar que é o dono). */
+function aprovarAcesso_(id) {
+  const sheet = getAcessoSheet_();
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, 5).setValue('Aprovado');
+      sheet.getRange(i + 1, 7).setValue(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'));
+      return true;
+    }
+  }
+  return false;
 }
 
 function getSheet_() {

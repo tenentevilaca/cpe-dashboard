@@ -88,13 +88,56 @@ tbody tr.concluida{opacity:.55}
 .obs-empty{color:var(--texto-mute);font-size:13px;text-align:center;padding:20px 0}
 .obs-form textarea{width:100%;background:var(--bg);border:1px solid var(--linha);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--texto);font-family:inherit;resize:vertical;min-height:70px}
 .obs-form .fg{margin-bottom:14px}
-@media(max-width:900px){.form-grid{grid-template-columns:1fr 1fr}.header,.main,.status-line{padding-left:20px;padding-right:20px}}
+.landing{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:40px;text-align:center}
+.landing-titulo{font-family:'Source Serif Pro',serif;font-size:26px;font-weight:700;color:var(--preto);margin-top:12px}
+.landing-subtitulo{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--texto-mute);margin-bottom:28px}
+.landing-card{background:var(--bg-card);border:2px solid var(--dourado);border-radius:14px;padding:44px 64px;box-shadow:var(--sombra);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.landing-card:hover{transform:translateY(-3px);box-shadow:0 6px 24px rgba(55,52,53,.14)}
+.landing-card-icone{font-size:48px;margin-bottom:12px}
+.landing-card-texto{font-family:'Source Serif Pro',serif;font-size:18px;font-weight:700;color:var(--preto)}
+.landing-status{margin-top:20px;font-size:13px;color:var(--texto-soft);min-height:18px;max-width:420px}
+.painel-acesso{margin-top:20px;background:var(--bg-card);border:1px solid var(--linha);border-radius:8px;padding:24px;max-width:420px;width:100%;text-align:left;box-shadow:var(--sombra)}
+.painel-acesso h3{font-family:'Source Serif Pro',serif;margin-bottom:8px}
+.painel-acesso p{font-size:13px;color:var(--texto-soft);margin-bottom:16px}
+.painel-acesso .fg{margin-bottom:14px}
+.voltar-btn{background:transparent;border:1px solid rgba(255,255,255,.3);color:#FFF;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.voltar-btn:hover{background:rgba(255,255,255,.1)}
+@media(max-width:900px){.form-grid{grid-template-columns:1fr 1fr}.header,.main,.status-line{padding-left:20px;padding-right:20px}.landing-card{padding:32px 40px}}
 </style>
 </head>
 <body>
+<div id="tela-inicial" class="landing">
+  <svg viewBox="0 0 100 120" width="120" height="144" aria-label="Escudo CPE">
+    <path d="M50 4 L92 20 L92 58 C92 90 72 108 50 116 C28 108 8 90 8 58 L8 20 Z" fill="#373435" stroke="#A08F63" stroke-width="3"/>
+    <text x="50" y="66" text-anchor="middle" font-family="'Source Serif Pro', serif" font-size="28" font-weight="700" fill="#A08F63">CPE</text>
+  </svg>
+  <div class="landing-titulo">Estado-Maior do CPE</div>
+  <div class="landing-subtitulo">Sistema de Controle de Prazos 2026</div>
+
+  <div class="landing-card" id="card-agenda" onclick="abrirAgenda()">
+    <div class="landing-card-icone">🗓️</div>
+    <div class="landing-card-texto">Agenda de Tarefas</div>
+  </div>
+
+  <div id="landing-status" class="landing-status"></div>
+
+  <div id="painel-acesso" class="painel-acesso" hidden>
+    <h3>Solicitar acesso</h3>
+    <p>Sua conta (<strong id="acesso-email"></strong>) ainda não tem permissão pra acessar a Agenda. Preencha abaixo pra solicitar.</p>
+    <div class="fg"><label>Seu nome</label><input type="text" id="acesso-nome" maxlength="120" placeholder="Nome completo"></div>
+    <div class="fg"><label>Motivo (opcional)</label><input type="text" id="acesso-motivo" maxlength="200" placeholder="Ex: preciso lançar tarefas do meu setor"></div>
+    <button class="add-btn" onclick="enviarSolicitacao()">Solicitar acesso</button>
+    <div id="acesso-erro" class="form-error"></div>
+  </div>
+</div>
+
+<div id="tela-agenda" hidden>
 <header class="header"><div class="header-top">
   <div class="header-info"><div class="subtitle">Estado-Maior do CPE | Controle de Prazos 2026</div><h1>🗓️ Agenda de Tarefas</h1></div>
-  <button class="refresh-btn" onclick="carregar()">🔄 Atualizar</button>
+  <div style="display:flex;gap:10px">
+    <button class="voltar-btn" onclick="mostrarTelaInicial()">← Voltar</button>
+    <button class="refresh-btn" onclick="carregar()">🔄 Atualizar</button>
+  </div>
 </div></header>
 <div class="status-line" id="status">Carregando...</div>
 
@@ -158,8 +201,16 @@ tbody tr.concluida{opacity:.55}
     </div>
   </div>
 </div>
+</div>
 
 <script>
+var ESTADO_ACESSO = {
+  userEmail: <?!= JSON.stringify(userEmail) ?>,
+  isOwner: <?!= JSON.stringify(isOwner) ?>,
+  statusAcesso: <?!= JSON.stringify(statusAcesso) ?>,
+  mensagemAprovacao: <?!= JSON.stringify(mensagemAprovacao) ?>
+};
+
 let TAREFAS = [];
 let HOJE = null;
 let FILTRO = 'TODAS';
@@ -552,7 +603,60 @@ function escapeHtml(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-window.addEventListener('load', carregar);
+// ===== Tela inicial / controle de acesso =====
+function mostrarTelaInicial() {
+  document.getElementById('tela-inicial').hidden = false;
+  document.getElementById('tela-agenda').hidden = true;
+}
+
+function abrirAgenda() {
+  if (ESTADO_ACESSO.isOwner || ESTADO_ACESSO.statusAcesso === 'aprovado') {
+    document.getElementById('tela-inicial').hidden = true;
+    document.getElementById('tela-agenda').hidden = false;
+    carregar();
+    return;
+  }
+
+  document.getElementById('acesso-email').textContent = ESTADO_ACESSO.userEmail || '(desconhecido)';
+  const painel = document.getElementById('painel-acesso');
+  if (ESTADO_ACESSO.statusAcesso === 'pendente') {
+    painel.hidden = true;
+    document.getElementById('landing-status').textContent = 'Sua solicitação de acesso já foi enviada — aguarde a aprovação.';
+  } else {
+    painel.hidden = false;
+  }
+}
+
+function enviarSolicitacao() {
+  const erroEl = document.getElementById('acesso-erro');
+  erroEl.textContent = '';
+  const nome = document.getElementById('acesso-nome').value.trim();
+  const motivo = document.getElementById('acesso-motivo').value.trim();
+
+  if (!nome) {
+    erroEl.textContent = 'Informe seu nome.';
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function (resultado) {
+      document.getElementById('painel-acesso').hidden = true;
+      document.getElementById('landing-status').textContent = resultado.status === 'pendente'
+        ? 'Solicitação enviada! Você vai poder entrar assim que for aprovado.'
+        : 'Você já tem acesso — clique de novo no card da Agenda.';
+      ESTADO_ACESSO.statusAcesso = resultado.status;
+    })
+    .withFailureHandler(function (erro) {
+      erroEl.textContent = erro.message || String(erro);
+    })
+    .solicitarAcesso(nome, motivo);
+}
+
+window.addEventListener('load', function () {
+  if (ESTADO_ACESSO.mensagemAprovacao) {
+    document.getElementById('landing-status').textContent = ESTADO_ACESSO.mensagemAprovacao;
+  }
+});
 </script>
 </body>
 </html>
