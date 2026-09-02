@@ -205,12 +205,6 @@ function formatDataHora_(v) {
   return v;
 }
 
-function addDias_(dataStr, dias) {
-  const d = new Date(dataStr + 'T00:00:00');
-  d.setDate(d.getDate() + Number(dias));
-  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-}
-
 function contarObservacoesPorTarefa_() {
   const sheet = getObsSheet_();
   const values = sheet.getDataRange().getValues();
@@ -273,8 +267,11 @@ function listarObservacoes(tarefaId) {
 
 /**
  * Registra uma observação/justificativa numa tarefa e, opcionalmente, prorroga o prazo.
- * dados = {tarefaId, texto, diasExtra} — diasExtra é opcional (número de dias a somar ao
- * prazo atual da tarefa).
+ * dados = {tarefaId, texto, novoPrazo} — novoPrazo é opcional ('yyyy-MM-dd', escolhido
+ * direto num calendário), e substitui o prazo atual da tarefa por essa data exata. Optamos
+ * por data exata em vez de "dias a somar" porque somar dias ao prazo antigo de uma tarefa já
+ * vencida podia devolver uma data que ainda estava no passado (ou bem em cima da hora),
+ * confundindo o farol.
  */
 function adicionarObservacao(dados) {
   if (!dados || !dados.tarefaId || !dados.texto) {
@@ -294,11 +291,14 @@ function adicionarObservacao(dados) {
 
   let prazoAnterior = '';
   let prazoNovo = '';
-  const diasExtra = Number(dados.diasExtra);
-  if (diasExtra && diasExtra > 0) {
+  if (dados.novoPrazo) {
+    const novaData = new Date(dados.novoPrazo + 'T00:00:00');
+    if (isNaN(novaData.getTime())) {
+      throw new Error('Novo prazo inválido.');
+    }
     prazoAnterior = prazoAtual;
-    prazoNovo = addDias_(prazoAtual, diasExtra);
-    sheet.getRange(linha + 1, 5).setValue(new Date(prazoNovo + 'T00:00:00'));
+    prazoNovo = dados.novoPrazo;
+    sheet.getRange(linha + 1, 5).setValue(novaData);
   }
 
   const obsSheet = getObsSheet_();
