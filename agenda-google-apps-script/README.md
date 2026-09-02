@@ -23,11 +23,33 @@ Agenda com farol de prazo, rodando 100% no Google (Google Sheets + Google Apps S
 1. Clique em **Implantar → Nova implantação**
 2. Clique no ícone de engrenagem ao lado de "Selecionar tipo" → **App da Web**
 3. Em "Executar como": **Eu (sua conta)**
-4. Em "Quem pode acessar": escolha **"Qualquer pessoa"** (link público, requer login Google) ou **"Qualquer pessoa na [seu domínio]"** se quiser restringir à sua organização
-5. Clique em **Implantar** → autorize as permissões pedidas (é o próprio script acessando a planilha)
+4. Em "Quem pode acessar": escolha **"Qualquer pessoa"** (link público, requer login Google — obrigatório pra tela inicial reconhecer quem está entrando) ou **"Qualquer pessoa na [seu domínio]"** se quiser restringir à sua organização
+5. Clique em **Implantar** → autorize as permissões pedidas (é o próprio script acessando a planilha, mandando e-mail e identificando quem está logado)
 6. Copie a **URL do app da Web** gerada — é o link da agenda
 
+### PASSO 4️⃣ — Configura você como dono (obrigatório)
+
+1. No editor do Apps Script, **Configurações do projeto ⚙️ → Script Properties** → adicione:
+
+   | Propriedade | Valor |
+   |---|---|
+   | `OWNER_EMAIL` | o e-mail da sua conta Google (a mesma que você usa pra abrir a planilha), ex: `voce@gmail.com` |
+
+2. Sem isso, ninguém — nem você — consegue entrar na Agenda (o sistema não saberia quem é o dono).
+
 **Pronto!** ✅ Cada lançamento, conclusão ou exclusão de tarefa grava direto numa aba `Agenda` criada automaticamente na planilha.
+
+---
+
+## 🔐 Tela inicial e controle de acesso
+
+Ao abrir o link, aparece primeiro uma tela com o escudo do CPE e um card **"Agenda de Tarefas"**. Não existe usuário/senha digitados — o acesso é controlado pela própria **conta Google** de quem abriu o link (o Apps Script não tem como guardar senha com segurança, então reaproveitar o login do Google é a forma correta e simples de fazer isso).
+
+- **Você (dono)**, configurado via `OWNER_EMAIL`, sempre entra direto ao clicar no card
+- **Qualquer outra conta Google**, ao clicar no card pela primeira vez, vê um formulário de **"Solicitar acesso"** (nome + motivo opcional)
+- Isso dispara um **e-mail automático pra você**, com um link de aprovação — o link só funciona se você abrir logado com a mesma conta do `OWNER_EMAIL`
+- Depois de aprovado, a pessoa clica no card de novo e já entra direto — não precisa reenviar nada
+- Todos os pedidos (pendentes e aprovados) ficam registrados numa aba `Acesso`, criada automaticamente na planilha — dá pra ver e editar manualmente por lá também, se precisar
 
 ---
 
