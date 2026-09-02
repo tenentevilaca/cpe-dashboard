@@ -122,8 +122,10 @@ tbody tr.concluida{opacity:.55}
 
   <div id="painel-acesso" class="painel-acesso" hidden>
     <h3>Solicitar acesso</h3>
-    <p>Sua conta (<strong id="acesso-email"></strong>) ainda não tem permissão pra acessar a Agenda. Preencha abaixo pra solicitar.</p>
+    <p id="acesso-intro-conhecido">Sua conta (<strong id="acesso-email"></strong>) ainda não tem permissão pra acessar a Agenda. Preencha abaixo pra solicitar.</p>
+    <p id="acesso-intro-desconhecido" hidden>Não conseguimos identificar sua conta Google automaticamente. Informe seu nome e e-mail abaixo pra solicitar acesso.</p>
     <div class="fg"><label>Seu nome</label><input type="text" id="acesso-nome" maxlength="120" placeholder="Nome completo"></div>
+    <div class="fg" id="acesso-campo-email" hidden><label>Seu e-mail (Google)</label><input type="email" id="acesso-email-digitado" maxlength="200" placeholder="Ex: seunome@gmail.com"></div>
     <div class="fg"><label>Motivo (opcional)</label><input type="text" id="acesso-motivo" maxlength="200" placeholder="Ex: preciso lançar tarefas do meu setor"></div>
     <button class="add-btn" onclick="enviarSolicitacao()">Solicitar acesso</button>
     <div id="acesso-erro" class="form-error"></div>
@@ -617,14 +619,21 @@ function abrirAgenda() {
     return;
   }
 
-  document.getElementById('acesso-email').textContent = ESTADO_ACESSO.userEmail || '(desconhecido)';
   const painel = document.getElementById('painel-acesso');
   if (ESTADO_ACESSO.statusAcesso === 'pendente') {
     painel.hidden = true;
     document.getElementById('landing-status').textContent = 'Sua solicitação de acesso já foi enviada — aguarde a aprovação.';
-  } else {
-    painel.hidden = false;
+    return;
   }
+
+  const temEmail = !!ESTADO_ACESSO.userEmail;
+  document.getElementById('acesso-intro-conhecido').hidden = !temEmail;
+  document.getElementById('acesso-intro-desconhecido').hidden = temEmail;
+  document.getElementById('acesso-campo-email').hidden = temEmail;
+  if (temEmail) {
+    document.getElementById('acesso-email').textContent = ESTADO_ACESSO.userEmail;
+  }
+  painel.hidden = false;
 }
 
 function enviarSolicitacao() {
@@ -632,9 +641,14 @@ function enviarSolicitacao() {
   erroEl.textContent = '';
   const nome = document.getElementById('acesso-nome').value.trim();
   const motivo = document.getElementById('acesso-motivo').value.trim();
+  const emailDigitado = document.getElementById('acesso-email-digitado').value.trim();
 
   if (!nome) {
     erroEl.textContent = 'Informe seu nome.';
+    return;
+  }
+  if (!ESTADO_ACESSO.userEmail && !emailDigitado) {
+    erroEl.textContent = 'Informe seu e-mail do Google.';
     return;
   }
 
@@ -649,7 +663,7 @@ function enviarSolicitacao() {
     .withFailureHandler(function (erro) {
       erroEl.textContent = erro.message || String(erro);
     })
-    .solicitarAcesso(nome, motivo);
+    .solicitarAcesso(nome, emailDigitado, motivo);
 }
 
 window.addEventListener('load', function () {

@@ -91,13 +91,19 @@ function getStatusAcesso_(email) {
 }
 
 /**
- * Registra um pedido de acesso à Agenda pra conta Google atualmente logada e manda um
- * e-mail pro dono com um link de aprovação. Chamado pelo formulário "Solicitar acesso".
+ * Registra um pedido de acesso à Agenda e manda um e-mail pro dono com um link de aprovação.
+ * Chamado pelo formulário "Solicitar acesso". dados = {nome, email, motivo} — o Apps Script só
+ * consegue identificar sozinho o e-mail de quem já tem algum acesso à planilha (o dono, ou
+ * alguém já aprovado antes); pra qualquer outra pessoa, Session.getActiveUser() vem vazio por
+ * proteção de privacidade do Google, então pedimos o e-mail digitado como alternativa.
  */
-function solicitarAcesso(nome, motivo) {
-  const email = Session.getActiveUser().getEmail();
+function solicitarAcesso(nome, emailDigitado, motivo) {
+  let email = Session.getActiveUser().getEmail();
   if (!email) {
-    throw new Error('Não foi possível identificar sua conta Google. Faça login e tente de novo.');
+    email = String(emailDigitado || '').trim().toLowerCase();
+    if (!email || email.indexOf('@') === -1) {
+      throw new Error('Informe um e-mail do Google válido.');
+    }
   }
 
   const statusAtual = getStatusAcesso_(email);
@@ -135,14 +141,25 @@ function solicitarAcesso(nome, motivo) {
   return { status: 'pendente' };
 }
 
-/** Aprova um pedido de acesso pelo ID (chamado só a partir de doGet, após confirmar que é o dono). */
+/**
+ * Aprova um pedido de acesso pelo ID (chamado só a partir de doGet, após confirmar que é o
+ * dono). Também compartilha a planilha como Leitor com o e-mail aprovado — sem isso, o Apps
+ * Script continuaria sem conseguir identificar essa pessoa nas próximas visitas (veja o
+ * comentário em solicitarAcesso).
+ */
 function aprovarAcesso_(id) {
   const sheet = getAcessoSheet_();
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
+      const email = values[i][1];
       sheet.getRange(i + 1, 5).setValue('Aprovado');
       sheet.getRange(i + 1, 7).setValue(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'));
+      try {
+        SpreadsheetApp.getActiveSpreadsheet().addViewer(email);
+      } catch (e) {
+        Logger.log('Falha ao compartilhar a planilha com ' + email + ': ' + e);
+      }
       return true;
     }
   }
