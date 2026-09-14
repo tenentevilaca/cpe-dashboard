@@ -6,44 +6,82 @@
   <?!= include('Style'); ?>
 </head>
 <body>
-  <div id="header">
-    <div class="header-top">
-      <div class="header-left">
-        <?!= include('Escudo'); ?>
-        <div>
-          <div class="subtitle">PMMG · Estado-Maior do CPE</div>
-          <h1>Gestão à Vista — Subcorregedoria CPE</h1>
+
+  <div id="login-screen" class="login-wrap">
+    <div class="login-card">
+      <div class="login-escudo"><?!= include('Escudo'); ?></div>
+      <h1>Gestão à Vista<br>Subcorregedoria CPE</h1>
+
+      <div class="login-tabs">
+        <button type="button" class="login-tab active" id="tabEntrar" onclick="mostrarAbaLogin('entrar')">Entrar</button>
+        <button type="button" class="login-tab" id="tabCadastrar" onclick="mostrarAbaLogin('cadastrar')">Cadastrar</button>
+      </div>
+
+      <div id="loginMsg" class="login-msg" hidden></div>
+
+      <form id="formEntrar" class="login-form" onsubmit="return false;">
+        <label>Número PM</label>
+        <input id="loginPm" type="text" autocomplete="username" placeholder="Ex.: 123456-7">
+        <label>Senha</label>
+        <input id="loginSenha" type="password" autocomplete="current-password">
+        <button type="button" class="btn-login" onclick="fazerLogin()">Entrar</button>
+      </form>
+
+      <form id="formCadastrar" class="login-form" hidden onsubmit="return false;">
+        <label>Número PM</label>
+        <input id="cadPm" type="text" placeholder="Ex.: 123456-7">
+        <label>Nome completo</label>
+        <input id="cadNome" type="text" placeholder="Nome completo">
+        <label>Senha</label>
+        <input id="cadSenha" type="password">
+        <label>Confirmar senha</label>
+        <input id="cadSenha2" type="password">
+        <button type="button" class="btn-login" onclick="fazerCadastro()">Cadastrar</button>
+        <div class="login-hint">O primeiro cadastro da planilha vira administrador automaticamente. Os demais ficam pendentes até o administrador aprovar.</div>
+      </form>
+    </div>
+  </div>
+
+  <div id="dashboard-shell" hidden>
+    <div id="header">
+      <div class="header-top">
+        <div class="header-left">
+          <?!= include('Escudo'); ?>
+          <div>
+            <div class="subtitle">PMMG · Estado-Maior do CPE</div>
+            <h1>Gestão à Vista — Subcorregedoria CPE</h1>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="refresh-btn" onclick="atualizarTudo()">↻ Atualizar Dados</button>
+          <div class="last-update" id="clock"></div>
+          <div class="user-info" id="userInfo" hidden></div>
         </div>
       </div>
-      <div class="header-right">
-        <button class="refresh-btn" onclick="atualizarTudo()">↻ Atualizar Dados</button>
-        <div class="last-update" id="clock"></div>
+    </div>
+    <div class="status-line">✓ Dados lidos ao vivo diretamente da planilha da Subcorregedoria</div>
+
+    <div id="main">
+      <div id="menuWrap" class="menu-wrap">
+        <button class="menu-btn" onclick="toggleMenu()">☰ <span id="menuAtual">Visão Geral</span></button>
+        <div id="menuDropdown" class="menu-dropdown"></div>
+      </div>
+      <div id="app">
+        <div class="loading">Carregando…</div>
+      </div>
+    </div>
+
+    <div id="modal-backdrop" onclick="if(event.target===this) fecharModal()">
+      <div id="modal">
+        <div class="modal-head">
+          <h3 id="modal-title"></h3>
+          <button class="modal-close" onclick="fecharModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
       </div>
     </div>
   </div>
-  <div class="status-line">✓ Dados lidos ao vivo diretamente da planilha da Subcorregedoria</div>
 
-  <div id="main">
-    <div class="tabs-nav" id="tabbar"></div>
-    <div id="app">
-      <div class="loading">Carregando…</div>
-    </div>
-  </div>
-
-  <div id="modal-backdrop" onclick="if(event.target===this) fecharModal()">
-    <div id="modal">
-      <div class="modal-head">
-        <h3 id="modal-title"></h3>
-        <button class="modal-close" onclick="fecharModal()">✕</button>
-      </div>
-      <div class="modal-body" id="modal-body"></div>
-    </div>
-  </div>
-
-  <script>
-    var INITIAL_CONFIG = <?!= JSON.stringify(getAppConfig()) ?>;
-    var INITIAL_SUMMARY = null; // carregado de forma assíncrona pelo App.html, pra página abrir na hora
-  </script>
   <?!= include('App'); ?>
   <?!= include('ChartLib'); ?>
 </body>

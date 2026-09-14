@@ -2,7 +2,7 @@
  * Gestão à Vista — Subcorregedoria CPE
  * Backend Apps Script (bound ao arquivo "ROTINA DIÁRIA SUBCORREGEDORIA CPE").
  *
- * Duas fontes de verdade:
+ * Duas fontes de verdade dos dados:
  *  - CONFIG: abas que continuam sozinhas, cada uma com suas colunas e "papéis"
  *    (entrada/prazo/encerramento/unidade/status).
  *  - GRUPOS: painéis que juntam várias abas parecidas num só (ex.: as 4 OGE),
@@ -12,6 +12,11 @@
  *
  * A classificação de situação (FINALIZADO / ATRASADO / EM ANDAMENTO / SEM STATUS)
  * é sempre calculada aqui no servidor, nunca no cliente, para ter uma regra só.
+ *
+ * Login/permissões: cadastro por número PM + senha numa aba oculta da própria
+ * planilha (USUARIOS_PAINEL). O primeiro usuário cadastrado vira administrador
+ * automaticamente (acesso a tudo); os demais ficam pendentes até o administrador
+ * aprovar e escolher quais abas cada um pode ver.
  */
 
 var TITULO_APP = 'Gestão à Vista — Subcorregedoria CPE';
@@ -329,6 +334,185 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+// =====================================================================
+// Autenticação e controle de acesso
+// =====================================================================
+
+var USERS_SHEET_NAME = 'USUARIOS_PAINEL';
+var SESSAO_TTL_SEG = 21600; // 6h — limite máximo do CacheService
+
+// ids válidos de "aba" pra fins de permissão: as 4 abas avulsas + os 4 grupos + Encarregados
+function listaAbasDisponiveis_() {
+  var lista = [];
+  Object.keys(CONFIG).forEach(function (id) {
+    lista.push({ id: id, title: CONFIG[id].title, category: CONFIG[id].category });
+  });
+  Object.keys(GRUPOS).forEach(function (id) {
+    lista.push({ id: id, title: GRUPOS[id].title, category: GRUPOS[id].category });
+  });
+  lista.push({ id: 'ENCARREGADOS', title: 'Encarregados', category: 'Disciplinar' });
+  return lista;
+}
+
+function usersSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(USERS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(USERS_SHEET_NAME);
+    sheet.appendRow(['NUMERO_PM', 'NOME', 'SENHA_HASH', 'SALT', 'PERFIL', 'STATUS', 'ABAS_PERMITIDAS', 'CRIADO_EM']);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function lerUsuarios_() {
+  var sheet = usersSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  var lista = [];
+  values.forEach(function (row, i) {
+    if (!row[0]) return; // ignora linha vazia
+    lista.push({
+      _row: i + 2,
+      numeroPm: String(row[0]).trim(),
+      nome: String(row[1] || '').trim(),
+      senhaHash: row[2],
+      salt: row[3],
+      perfil: row[4],
+      status: row[5],
+      abas: row[6],
+      criadoEm: row[7]
+    });
+  });
+  return lista;
+}
+
+function acharUsuario_(numeroPm) {
+  var alvo = norm_(numeroPm);
+  var usuarios = lerUsuarios_();
+  for (var i = 0; i < usuarios.length; i++) {
+    if (norm_(usuarios[i].numeroPm) === alvo) return usuarios[i];
+  }
+  return null;
+}
+
+function gerarSalt_() {
+  return Utilities.getUuid();
+}
+
+function hashSenha_(senha, salt) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(senha) + '::' + salt);
+  return bytes.map(function (b) {
+    var v = b < 0 ? b + 256 : b;
+    var hex = v.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  }).join('');
+}
+
+/** Cadastro de novo usuário. O primeiro cadastro da planilha vira administrador
+ *  aprovado automaticamente (bootstrap); os demais ficam pendentes de aprovação. */
+function registerUser(numeroPm, nome, senha) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    numeroPm = String(numeroPm || '').trim();
+    nome = String(nome || '').trim();
+    senha = String(senha || '');
+    if (!numeroPm || !nome || !senha) throw new Error('Preencha número PM, nome e senha.');
+    if (senha.length < 4) throw new Error('A senha deve ter pelo menos 4 caracteres.');
+    if (acharUsuario_(numeroPm)) throw new Error('Já existe um cadastro com esse número PM.');
+
+    var usuarios = lerUsuarios_();
+    var ehPrimeiro = usuarios.length === 0;
+    var salt = gerarSalt_();
+    var hash = hashSenha_(senha, salt);
+    var sheet = usersSheet_();
+    sheet.appendRow([
+      numeroPm, nome, hash, salt,
+      ehPrimeiro ? 'ADMIN' : 'USUARIO',
+      ehPrimeiro ? 'APROVADO' : 'PENDENTE',
+      ehPrimeiro ? 'TODAS' : '',
+      new Date()
+    ]);
+    return { ok: true, autoAprovado: ehPrimeiro };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function login(numeroPm, senha) {
+  var usuario = acharUsuario_(numeroPm);
+  if (!usuario) throw new Error('Número PM não cadastrado.');
+  var hash = hashSenha_(senha, usuario.salt);
+  if (hash !== usuario.senhaHash) throw new Error('Senha incorreta.');
+  if (usuario.status === 'BLOQUEADO') throw new Error('Cadastro bloqueado. Procure o administrador.');
+  if (usuario.status !== 'APROVADO') throw new Error('Cadastro pendente de aprovação do administrador.');
+
+  var token = Utilities.getUuid();
+  var sessao = { numeroPm: usuario.numeroPm, nome: usuario.nome, perfil: usuario.perfil, abas: usuario.abas };
+  CacheService.getScriptCache().put('sessao_' + token, JSON.stringify(sessao), SESSAO_TTL_SEG);
+  return { ok: true, token: token, nome: sessao.nome, perfil: sessao.perfil, abas: sessao.abas };
+}
+
+function logout(token) {
+  if (token) CacheService.getScriptCache().remove('sessao_' + token);
+  return { ok: true };
+}
+
+function validarSessao_(token) {
+  if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+  var raw = CacheService.getScriptCache().get('sessao_' + token);
+  if (!raw) throw new Error('Sessão expirada. Faça login novamente.');
+  return JSON.parse(raw);
+}
+
+function getSessionInfo(token) {
+  try {
+    var sessao = validarSessao_(token);
+    return { ok: true, nome: sessao.nome, perfil: sessao.perfil, abas: sessao.abas };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+
+function temAcessoAba_(sessao, id) {
+  if (sessao.perfil === 'ADMIN') return true;
+  if (sessao.abas === 'TODAS') return true;
+  var lista = String(sessao.abas || '').split(',').map(function (s) { return s.trim(); });
+  return lista.indexOf(id) !== -1;
+}
+
+function exigirAcessoAba_(sessao, id) {
+  if (!temAcessoAba_(sessao, id)) throw new Error('Você não tem permissão para ver esta aba.');
+}
+
+function exigirAdmin_(token) {
+  var sessao = validarSessao_(token);
+  if (sessao.perfil !== 'ADMIN') throw new Error('Apenas administradores podem fazer isso.');
+  return sessao;
+}
+
+// ---------- Administração de usuários ----------
+
+function adminListUsers(token) {
+  exigirAdmin_(token);
+  return lerUsuarios_().map(function (u) {
+    return { numeroPm: u.numeroPm, nome: u.nome, perfil: u.perfil, status: u.status, abas: u.abas, criadoEm: u.criadoEm };
+  });
+}
+
+function adminSetPermissao(token, numeroPmAlvo, status, perfil, abas) {
+  exigirAdmin_(token);
+  if (['APROVADO', 'PENDENTE', 'BLOQUEADO'].indexOf(status) === -1) throw new Error('Status inválido.');
+  if (['ADMIN', 'USUARIO'].indexOf(perfil) === -1) throw new Error('Perfil inválido.');
+  var sheet = usersSheet_();
+  var usuario = acharUsuario_(numeroPmAlvo);
+  if (!usuario) throw new Error('Usuário não encontrado.');
+  sheet.getRange(usuario._row, 5, 1, 3).setValues([[perfil, status, perfil === 'ADMIN' ? 'TODAS' : (abas || '')]]);
+  return { ok: true };
+}
+
 // ---------- Leitura de planilha ----------
 
 function getSheet_(sheetName) {
@@ -492,11 +676,14 @@ function classify_(obj, cfg) {
   return { situacao: 'SEM STATUS', cor: 'cinza' };
 }
 
-// ---------- API chamada pelo cliente ----------
+// ---------- API chamada pelo cliente (todas exigem token de sessão) ----------
 
-function getAppConfig() {
+function getAppConfig(token) {
+  var sessao = validarSessao_(token);
+
   var sheets = [];
   Object.keys(CONFIG).forEach(function (id) {
+    if (!temAcessoAba_(sessao, id)) return;
     var c = CONFIG[id];
     sheets.push({
       id: id, isGroup: false, sheetName: c.sheetName,
@@ -507,6 +694,7 @@ function getAppConfig() {
 
   var grupos = [];
   Object.keys(GRUPOS).forEach(function (id) {
+    if (!temAcessoAba_(sessao, id)) return;
     var g = GRUPOS[id];
     grupos.push({
       id: id, isGroup: true, title: g.title, category: g.category, description: g.description,
@@ -516,10 +704,15 @@ function getAppConfig() {
     });
   });
 
-  return { categories: CATEGORY_ORDER, sheets: sheets, grupos: grupos };
+  return {
+    categories: CATEGORY_ORDER, sheets: sheets, grupos: grupos,
+    temEncarregados: temAcessoAba_(sessao, 'ENCARREGADOS'),
+    perfil: sessao.perfil, nome: sessao.nome
+  };
 }
 
-function getHomeSummary() {
+function getHomeSummary(token) {
+  var sessao = validarSessao_(token);
   var result = [];
 
   function contar(rows) {
@@ -535,6 +728,7 @@ function getHomeSummary() {
   }
 
   Object.keys(CONFIG).forEach(function (id) {
+    if (!temAcessoAba_(sessao, id)) return;
     var cfg = CONFIG[id];
     var counts = { FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, OUTROS: 0, total: 0 };
     try {
@@ -546,6 +740,7 @@ function getHomeSummary() {
   });
 
   Object.keys(GRUPOS).forEach(function (id) {
+    if (!temAcessoAba_(sessao, id)) return;
     var grupo = GRUPOS[id];
     var counts = { FINALIZADO: 0, ATRASADO: 0, 'EM ANDAMENTO': 0, OUTROS: 0, total: 0 };
     try {
@@ -559,7 +754,9 @@ function getHomeSummary() {
   return result;
 }
 
-function getSheetView(id) {
+function getSheetView(token, id) {
+  var sessao = validarSessao_(token);
+  exigirAcessoAba_(sessao, id);
   var cfg = CONFIG[id];
   if (!cfg) throw new Error('Aba desconhecida: ' + id);
   var rows = readConfiguredSheet_(cfg);
@@ -571,7 +768,9 @@ function getSheetView(id) {
   };
 }
 
-function getGroupView(id) {
+function getGroupView(token, id) {
+  var sessao = validarSessao_(token);
+  exigirAcessoAba_(sessao, id);
   var grupo = GRUPOS[id];
   if (!grupo) throw new Error('Grupo desconhecido: ' + id);
   var rows = readGrupo_(grupo);
@@ -585,7 +784,9 @@ function getGroupView(id) {
 }
 
 /** Página especial ENCARREGADOS: 3 sub-tabelas com layout próprio (não segue o padrão colunar). */
-function getEncarregadosView() {
+function getEncarregadosView(token) {
+  var sessao = validarSessao_(token);
+  exigirAcessoAba_(sessao, 'ENCARREGADOS');
   var sheet = getSheet_('ENCARREGADOS');
   var lastRow = sheet.getLastRow();
   var lastCol = Math.max(sheet.getLastColumn(), 6);

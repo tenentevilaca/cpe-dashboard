@@ -1,17 +1,17 @@
 <script>
 'use strict';
 
-var CFG_BY_ID = {};
-INITIAL_CONFIG.sheets.forEach(function (s) { CFG_BY_ID[s.id] = s; });
-
-var GRUPO_BY_ID = {};
-INITIAL_CONFIG.grupos.forEach(function (g) { GRUPO_BY_ID[g.id] = g; });
-
 var STATE = {
-  sheetData: {},       // cache: id -> resultado de getSheetView
-  groupData: {},        // cache: id -> resultado de getGroupView
+  session: null,         // {token, nome, perfil, abas}
+  config: null,          // resultado de getAppConfig
+  cfgById: {},
+  grupoById: {},
+  summary: null,
+  sheetData: {},         // cache: id -> resultado de getSheetView
+  groupData: {},         // cache: id -> resultado de getGroupView
   encarregados: null,
-  filters: {}           // por id: {tipo, unidade, situacao, busca, pendentes, pagina}
+  adminUsers: null,
+  filters: {}            // por id: {tipo, unidade, situacao, busca, pendentes, pagina}
 };
 
 // ---------- utilidades ----------
@@ -20,6 +20,19 @@ function gsRun(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
   return new Promise(function (resolve, reject) {
     google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn].apply(null, args);
+  });
+}
+
+// como gsRun, mas já injeta o token de sessão como 1º argumento e trata sessão expirada
+function gsRunAuth(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return gsRun.apply(null, [fn, STATE.session.token].concat(args)).catch(function (err) {
+    var msg = err && err.message ? err.message : String(err);
+    if (/sess[aã]o/i.test(msg)) {
+      fazerLogout(true);
+      mostrarMsgLogin('Sua sessão expirou. Faça login novamente.');
+    }
+    throw err;
   });
 }
 
@@ -48,44 +61,16 @@ function debounce(fn, ms) {
   return function () { var a = arguments; clearTimeout(t); t = setTimeout(function () { fn.apply(null, a); }, ms); };
 }
 
+function errorBox(err) {
+  return '<div class="error-box">Não foi possível carregar os dados.<br>' + esc(err && err.message ? err.message : err) + '</div>';
+}
+
 var charts = {}; // guarda instâncias Chart.js para destruir ao re-renderizar
-
-// ---------- barra de abas (topo) ----------
-
-function itensDaCategoria_(cat) {
-  var itens = [];
-  INITIAL_CONFIG.sheets.forEach(function (s) { if (s.category === cat) itens.push({ isGroup: false, id: s.id, title: s.title }); });
-  INITIAL_CONFIG.grupos.forEach(function (g) { if (g.category === cat) itens.push({ isGroup: true, id: g.id, title: g.title }); });
-  return itens;
-}
-
-function renderTabBar() {
-  var hash = location.hash || '#/';
-  var html = '<button class="tab-btn' + (hash === '#/' || hash === '' ? ' active' : '') +
-    '" onclick="location.hash=\'#/\'">📊 Visão Geral</button>';
-
-  INITIAL_CONFIG.categories.forEach(function (cat) {
-    var itens = itensDaCategoria_(cat);
-    if (!itens.length && cat !== 'Disciplinar') return;
-    itens.forEach(function (it) {
-      var target = (it.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(it.id);
-      html += '<button class="tab-btn' + (hash === target ? ' active' : '') + '" onclick="location.hash=\'' +
-        target + '\'">' + esc(it.title) + '</button>';
-    });
-    if (cat === 'Disciplinar') {
-      html += '<button class="tab-btn' + (hash === '#/encarregados' ? ' active' : '') +
-        '" onclick="location.hash=\'#/encarregados\'">Encarregados</button>';
-    }
-  });
-
-  document.getElementById('tabbar').innerHTML = html;
-}
-
 function destroyCharts() { Object.keys(charts).forEach(function (k) { charts[k].destroy(); }); charts = {}; }
 
 // Chart.js pode não estar disponível ainda (carrega depois do App.html de propósito,
 // pra nunca travar o resto do painel se o arquivo do Chart.js falhar). Nesses casos
-// os gráficos simplesmente não aparecem, mas tabelas/filtros/abas continuam normais.
+// os gráficos simplesmente não aparecem, mas tabelas/filtros/menu continuam normais.
 function chartDisponivel() { return typeof Chart !== 'undefined'; }
 function marcarGraficoIndisponivel(canvasId) {
   var el = document.getElementById(canvasId);
@@ -94,25 +79,182 @@ function marcarGraficoIndisponivel(canvasId) {
   }
 }
 
+// =====================================================================
+// LOGIN / CADASTRO
+// =====================================================================
+
+function mostrarAbaLogin(qual) {
+  document.getElementById('tabEntrar').classList.toggle('active', qual === 'entrar');
+  document.getElementById('tabCadastrar').classList.toggle('active', qual === 'cadastrar');
+  document.getElementById('formEntrar').hidden = qual !== 'entrar';
+  document.getElementById('formCadastrar').hidden = qual !== 'cadastrar';
+  esconderMsgLogin();
+}
+
+function mostrarMsgLogin(texto, tipo) {
+  var el = document.getElementById('loginMsg');
+  el.textContent = texto;
+  el.className = 'login-msg ' + (tipo || 'erro');
+  el.hidden = false;
+}
+function esconderMsgLogin() {
+  document.getElementById('loginMsg').hidden = true;
+}
+
+function fazerLogin() {
+  var pm = document.getElementById('loginPm').value.trim();
+  var senha = document.getElementById('loginSenha').value;
+  if (!pm || !senha) { mostrarMsgLogin('Informe número PM e senha.'); return; }
+  esconderMsgLogin();
+  gsRun('login', pm, senha).then(function (res) {
+    localStorage.setItem('cpe_token', res.token);
+    STATE.session = { token: res.token, nome: res.nome, perfil: res.perfil, abas: res.abas };
+    iniciarDashboard();
+  }).catch(function (err) { mostrarMsgLogin(err && err.message ? err.message : String(err)); });
+}
+
+function fazerCadastro() {
+  var pm = document.getElementById('cadPm').value.trim();
+  var nome = document.getElementById('cadNome').value.trim();
+  var senha = document.getElementById('cadSenha').value;
+  var senha2 = document.getElementById('cadSenha2').value;
+  if (!pm || !nome || !senha) { mostrarMsgLogin('Preencha todos os campos.'); return; }
+  if (senha !== senha2) { mostrarMsgLogin('As senhas não coincidem.'); return; }
+  esconderMsgLogin();
+  gsRun('registerUser', pm, nome, senha).then(function (res) {
+    mostrarAbaLogin('entrar');
+    document.getElementById('loginPm').value = pm;
+    mostrarMsgLogin(
+      res.autoAprovado ? 'Cadastro de administrador criado com sucesso! Faça login.' : 'Cadastro enviado! Aguarde a aprovação do administrador para acessar.',
+      'ok'
+    );
+  }).catch(function (err) { mostrarMsgLogin(err && err.message ? err.message : String(err)); });
+}
+
+function fazerLogout(silencioso) {
+  var token = STATE.session && STATE.session.token;
+  localStorage.removeItem('cpe_token');
+  STATE.session = null;
+  STATE.config = null;
+  if (token) gsRun('logout', token).catch(function () {});
+  document.getElementById('dashboard-shell').hidden = true;
+  document.getElementById('login-screen').hidden = false;
+  var elSenha = document.getElementById('loginSenha');
+  if (elSenha) elSenha.value = '';
+  if (!silencioso) mostrarMsgLogin('Sessão encerrada.', 'ok');
+}
+
+function renderUserBar() {
+  var el = document.getElementById('userInfo');
+  el.innerHTML = esc(STATE.session.nome) + ' · ' + (STATE.session.perfil === 'ADMIN' ? 'Administrador' : 'Usuário') +
+    ' · <a href="#" onclick="fazerLogout();return false;">Sair</a>';
+  el.hidden = false;
+}
+
+function iniciarDashboard() {
+  document.getElementById('login-screen').hidden = true;
+  document.getElementById('dashboard-shell').hidden = false;
+  renderUserBar();
+  gsRunAuth('getAppConfig').then(function (cfg) {
+    STATE.config = cfg;
+    STATE.cfgById = {};
+    STATE.grupoById = {};
+    cfg.sheets.forEach(function (s) { STATE.cfgById[s.id] = s; });
+    cfg.grupos.forEach(function (g) { STATE.grupoById[g.id] = g; });
+    router();
+  }).catch(function (err) {
+    document.getElementById('app').innerHTML = errorBox(err);
+  });
+}
+
+function boot() {
+  var token = localStorage.getItem('cpe_token');
+  if (!token) return; // fica na tela de login, que já é a visível por padrão
+  gsRun('getSessionInfo', token).then(function (info) {
+    if (!info || !info.ok) { localStorage.removeItem('cpe_token'); return; }
+    STATE.session = { token: token, nome: info.nome, perfil: info.perfil, abas: info.abas };
+    iniciarDashboard();
+  }).catch(function () { localStorage.removeItem('cpe_token'); });
+}
+
+// =====================================================================
+// MENU SUSPENSO (topo esquerdo)
+// =====================================================================
+
+function itensMenu_() {
+  var itens = [];
+  (STATE.config.sheets || []).forEach(function (s) { itens.push({ isGroup: false, id: s.id, title: s.title, category: s.category }); });
+  (STATE.config.grupos || []).forEach(function (g) { itens.push({ isGroup: true, id: g.id, title: g.title, category: g.category }); });
+  if (STATE.config.temEncarregados) itens.push({ isGroup: false, id: 'ENCARREGADOS', title: 'Encarregados', category: 'Disciplinar', especial: true });
+  return itens;
+}
+
+function renderTopbar() {
+  var hash = location.hash || '#/';
+  var itens = itensMenu_();
+
+  var menuHtml = '<a class="menu-item' + (hash === '#/' || hash === '' ? ' active' : '') + '" href="#/">📊 Visão Geral</a>';
+
+  STATE.config.categories.forEach(function (cat) {
+    var doCat = itens.filter(function (it) { return it.category === cat; });
+    if (!doCat.length) return;
+    menuHtml += '<div class="menu-cat">' + esc(cat) + '</div>';
+    doCat.forEach(function (it) {
+      var target = it.especial ? '#/encarregados' : (it.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(it.id);
+      menuHtml += '<a class="menu-item' + (hash === target ? ' active' : '') + '" href="' + target + '">' + esc(it.title) + '</a>';
+    });
+  });
+
+  if (STATE.session.perfil === 'ADMIN') {
+    menuHtml += '<div class="menu-cat">Administração</div>';
+    menuHtml += '<a class="menu-item' + (hash === '#/admin' ? ' active' : '') + '" href="#/admin">⚙️ Gerenciar acessos</a>';
+  }
+
+  document.getElementById('menuDropdown').innerHTML = menuHtml;
+
+  var tituloAtual = '📊 Visão Geral';
+  if (hash === '#/admin') tituloAtual = '⚙️ Administração';
+  else if (hash === '#/encarregados') tituloAtual = 'Encarregados';
+  else if (hash.indexOf('#/grupo/') === 0) {
+    var gid = decodeURIComponent(hash.replace('#/grupo/', ''));
+    if (STATE.grupoById[gid]) tituloAtual = STATE.grupoById[gid].title;
+  } else if (hash.indexOf('#/aba/') === 0) {
+    var id = decodeURIComponent(hash.replace('#/aba/', ''));
+    if (STATE.cfgById[id]) tituloAtual = STATE.cfgById[id].title;
+  }
+  document.getElementById('menuAtual').textContent = tituloAtual;
+}
+
+function toggleMenu() { document.getElementById('menuDropdown').classList.toggle('open'); }
+function fecharMenu() { document.getElementById('menuDropdown').classList.remove('open'); }
+document.addEventListener('click', function (e) {
+  var wrap = document.getElementById('menuWrap');
+  if (wrap && !wrap.contains(e.target)) fecharMenu();
+});
+
 // ---------- roteador ----------
 
 function router() {
+  if (!STATE.session || !STATE.config) return; // ainda não logado / config não carregada
   var hash = location.hash || '#/';
   destroyCharts();
   fecharModal();
-  renderTabBar();
+  fecharMenu();
+  renderTopbar();
   if (hash === '#/' || hash === '') {
     renderHome();
   } else if (hash === '#/encarregados') {
+    if (!STATE.config.temEncarregados) { location.hash = '#/'; return; }
     renderEncarregadosView();
+  } else if (hash === '#/admin') {
+    if (STATE.session.perfil !== 'ADMIN') { location.hash = '#/'; return; }
+    renderAdminView();
   } else if (hash.indexOf('#/grupo/') === 0) {
     var gid = decodeURIComponent(hash.replace('#/grupo/', ''));
-    if (GRUPO_BY_ID[gid]) renderGroupView(gid);
-    else renderHome();
+    if (STATE.grupoById[gid]) renderGroupView(gid); else location.hash = '#/';
   } else if (hash.indexOf('#/aba/') === 0) {
     var id = decodeURIComponent(hash.replace('#/aba/', ''));
-    if (CFG_BY_ID[id]) renderSheetView(id);
-    else renderHome();
+    if (STATE.cfgById[id]) renderSheetView(id); else location.hash = '#/';
   } else {
     renderHome();
   }
@@ -129,10 +271,13 @@ function atualizarTudo() {
     delete STATE.groupData[gid];
   } else if (hash === '#/encarregados') {
     STATE.encarregados = null;
+  } else if (hash === '#/admin') {
+    STATE.adminUsers = null;
   } else {
     STATE.sheetData = {};
     STATE.groupData = {};
     STATE.encarregados = null;
+    STATE.summary = null;
   }
   router();
 }
@@ -143,14 +288,14 @@ function renderHome() {
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando resumo…</div>';
 
-  gsRun('getHomeSummary').then(function (summary) {
-    INITIAL_SUMMARY = summary;
+  gsRunAuth('getHomeSummary').then(function (summary) {
+    STATE.summary = summary;
     drawHome(summary);
   }).catch(function (err) { app.innerHTML = errorBox(err); });
 
   // se já tem um resumo em cache (navegação de volta pra Home), pinta na hora;
   // senão fica com "Carregando resumo…" até a chamada acima responder
-  if (INITIAL_SUMMARY) drawHome(INITIAL_SUMMARY);
+  if (STATE.summary) drawHome(STATE.summary);
 }
 
 function itemBadges_(s) {
@@ -175,6 +320,11 @@ function drawHome(summary) {
     byCat[s.category].items.push(s);
   });
 
+  if (!summary.length) {
+    document.getElementById('app').innerHTML = '<div class="empty-state">Você ainda não tem nenhuma aba liberada. Procure o administrador do painel.</div>';
+    return;
+  }
+
   var html = '';
   html += '<div class="kpi-row">';
   html += kpiCard(totals.total, 'Registros no painel', 'azul');
@@ -188,9 +338,10 @@ function drawHome(summary) {
   html += '<div class="chart-card"><h2>Distribuição geral</h2><div class="chart-wrap"><canvas id="chartGeral"></canvas></div></div>';
   html += '</div>';
 
-  INITIAL_CONFIG.categories.forEach(function (cat) {
+  STATE.config.categories.forEach(function (cat) {
     var c = byCat[cat];
-    if (!c && cat !== 'Disciplinar') return;
+    var mostrarEncarregados = cat === 'Disciplinar' && STATE.config.temEncarregados;
+    if (!c && !mostrarEncarregados) return;
     html += '<div class="categoria"><h2>' + esc(cat) + '</h2><div class="cards">';
     if (c) {
       c.items.forEach(function (s) {
@@ -201,7 +352,7 @@ function drawHome(summary) {
           '<div class="badges">' + itemBadges_(s) + '</div></a>';
       });
     }
-    if (cat === 'Disciplinar') {
+    if (mostrarEncarregados) {
       html += '<a class="card" href="#/encarregados"><h3>Encarregados</h3>' +
         '<p>Escalas de Conselho de Justiça, indicados CPM e controle de processos entregues.</p>' +
         '<div class="badges"><span class="badge azul">ver painel</span></div></a>';
@@ -217,7 +368,7 @@ function drawHome(summary) {
     return;
   }
 
-  var catLabels = INITIAL_CONFIG.categories.filter(function (c) { return byCat[c]; });
+  var catLabels = STATE.config.categories.filter(function (c) { return byCat[c]; });
   charts.cat = new Chart(document.getElementById('chartCategorias'), {
     type: 'bar',
     data: {
@@ -246,20 +397,16 @@ function drawHome(summary) {
   });
 }
 
-function errorBox(err) {
-  return '<div class="error-box">Não foi possível carregar os dados.<br>' + esc(err && err.message ? err.message : err) + '</div>';
-}
-
 // ---------- VISÃO DE ABA (avulsa) ----------
 
 function renderSheetView(id) {
-  var cfg = CFG_BY_ID[id];
+  var cfg = STATE.cfgById[id];
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando "' + esc(cfg.title) + '"…</div>';
 
   STATE.filters[id] = STATE.filters[id] || { unidade: '', situacao: '', busca: '', pendentes: false, pagina: 1 };
 
-  var p = STATE.sheetData[id] ? Promise.resolve(STATE.sheetData[id]) : gsRun('getSheetView', id);
+  var p = STATE.sheetData[id] ? Promise.resolve(STATE.sheetData[id]) : gsRunAuth('getSheetView', id);
   p.then(function (data) {
     STATE.sheetData[id] = data;
     drawSheetView(id, data);
@@ -400,21 +547,16 @@ function bindToolbar_(id, data) {
   if (elB) elB.addEventListener('input', debounce(function () { f.busca = this.value; f.pagina = 1; drawSheetView(id, data); }, 250));
 }
 
-function mudarPagina(id, delta) {
-  STATE.filters[id].pagina += delta;
-  drawSheetView(id, STATE.sheetData[id]);
-}
-
 // ---------- VISÃO DE GRUPO (várias abas unidas + filtro de Tipo) ----------
 
 function renderGroupView(id) {
-  var grupo = GRUPO_BY_ID[id];
+  var grupo = STATE.grupoById[id];
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando "' + esc(grupo.title) + '"…</div>';
 
   STATE.filters[id] = STATE.filters[id] || { tipo: '', unidade: '', situacao: '', busca: '', pendentes: false, pagina: 1 };
 
-  var p = STATE.groupData[id] ? Promise.resolve(STATE.groupData[id]) : gsRun('getGroupView', id);
+  var p = STATE.groupData[id] ? Promise.resolve(STATE.groupData[id]) : gsRunAuth('getGroupView', id);
   p.then(function (data) {
     STATE.groupData[id] = data;
     drawGroupView(id, data);
@@ -557,10 +699,10 @@ function bindToolbarGrupo_(id, data) {
   if (elB) elB.addEventListener('input', debounce(function () { f.busca = this.value; f.pagina = 1; drawGroupView(id, data); }, 250));
 }
 
-// mudarPagina() acima já serve tanto pra aba avulsa quanto pra grupo — decide olhando o cache
+// mudarPagina() serve tanto pra aba avulsa quanto pra grupo — decide olhando o cache
 function mudarPagina(id, delta) {
   STATE.filters[id].pagina += delta;
-  if (GRUPO_BY_ID[id]) drawGroupView(id, STATE.groupData[id]);
+  if (STATE.grupoById[id]) drawGroupView(id, STATE.groupData[id]);
   else drawSheetView(id, STATE.sheetData[id]);
 }
 
@@ -568,7 +710,7 @@ function mudarPagina(id, delta) {
 
 function abrirModal(id, rowIndex) {
   var data = STATE.sheetData[id];
-  var cfg = CFG_BY_ID[id];
+  var cfg = STATE.cfgById[id];
   var row = data.rows.filter(function (r) { return r._row === rowIndex; })[0];
   if (!row) return;
   document.getElementById('modal-title').innerHTML = esc(cfg.title) + ' — <span class="' + badgeClass(row._situacaoCor) + '">' + esc(row._situacao) + '</span>';
@@ -607,7 +749,7 @@ function renderEncarregadosView() {
   var app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Carregando…</div>';
 
-  var p = STATE.encarregados ? Promise.resolve(STATE.encarregados) : gsRun('getEncarregadosView');
+  var p = STATE.encarregados ? Promise.resolve(STATE.encarregados) : gsRunAuth('getEncarregadosView');
   p.then(function (data) {
     STATE.encarregados = data;
     var html = '<div class="view-header"><div><h1>' + esc(data.title) + '</h1>' +
@@ -635,13 +777,124 @@ function renderEncarregadosView() {
   }).catch(function (err) { app.innerHTML = errorBox(err); });
 }
 
+// ---------- ADMINISTRAÇÃO (só perfil ADMIN) ----------
+
+function tabsParaAdmin_() {
+  var itens = [];
+  (STATE.config.sheets || []).forEach(function (s) { itens.push({ id: s.id, title: s.title }); });
+  (STATE.config.grupos || []).forEach(function (g) { itens.push({ id: g.id, title: g.title }); });
+  if (STATE.config.temEncarregados) itens.push({ id: 'ENCARREGADOS', title: 'Encarregados' });
+  return itens;
+}
+
+function statusBadgeCor_(status) {
+  if (status === 'APROVADO') return 'verde';
+  if (status === 'BLOQUEADO') return 'vermelho';
+  return 'amarelo';
+}
+
+function idAdminCard_(numeroPm) { return 'u_' + String(numeroPm).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+function renderAdminView() {
+  var app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando usuários…</div>';
+  gsRunAuth('adminListUsers').then(function (users) {
+    STATE.adminUsers = users;
+    drawAdminView(users);
+  }).catch(function (err) { app.innerHTML = errorBox(err); });
+}
+
+function drawAdminView(users) {
+  destroyCharts();
+  var tabs = tabsParaAdmin_();
+
+  var pendentes = users.filter(function (u) { return u.status === 'PENDENTE'; }).length;
+  var html = '<div class="view-header"><div><h1>Administração de acesso</h1>' +
+    '<p>Aprove cadastros e escolha quais abas cada usuário pode visualizar.' +
+    (pendentes ? ' <strong>' + pendentes + ' cadastro(s) pendente(s).</strong>' : '') + '</p></div>' +
+    '<button class="btn small" onclick="renderAdminView()">↻ Atualizar</button></div>';
+
+  if (!users.length) {
+    html += '<div class="empty-state">Nenhum usuário cadastrado ainda.</div>';
+    document.getElementById('app').innerHTML = html;
+    return;
+  }
+
+  html += '<div class="admin-list">';
+  users.forEach(function (u) {
+    var uid = idAdminCard_(u.numeroPm);
+    var todasMarcado = u.abas === 'TODAS';
+    var abasSelecionadas = todasMarcado ? tabs.map(function (t) { return t.id; }) :
+      String(u.abas || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+
+    html += '<div class="admin-card" id="' + uid + '">';
+    html += '<div class="admin-card-head"><div><strong>' + esc(u.nome) + '</strong>' +
+      '<span class="admin-pm">Nº PM ' + esc(u.numeroPm) + '</span></div>' +
+      '<span class="' + badgeClass(statusBadgeCor_(u.status)) + '">' + esc(u.status) + '</span></div>';
+
+    html += '<div class="admin-row">';
+    html += '<div class="grp"><label>Perfil</label><select class="adm-perfil">' +
+      '<option value="USUARIO"' + (u.perfil === 'USUARIO' ? ' selected' : '') + '>Usuário</option>' +
+      '<option value="ADMIN"' + (u.perfil === 'ADMIN' ? ' selected' : '') + '>Administrador</option>' +
+      '</select></div>';
+    html += '<div class="grp"><label>Status</label><select class="adm-status">' +
+      '<option value="PENDENTE"' + (u.status === 'PENDENTE' ? ' selected' : '') + '>Pendente</option>' +
+      '<option value="APROVADO"' + (u.status === 'APROVADO' ? ' selected' : '') + '>Aprovado</option>' +
+      '<option value="BLOQUEADO"' + (u.status === 'BLOQUEADO' ? ' selected' : '') + '>Bloqueado</option>' +
+      '</select></div>';
+    html += '</div>';
+
+    html += '<div class="admin-abas"><label class="chk"><input type="checkbox" class="adm-todas"' + (todasMarcado ? ' checked' : '') + '> Todas as abas</label>';
+    html += '<div class="admin-abas-grid"' + (todasMarcado ? ' style="display:none"' : '') + '>';
+    tabs.forEach(function (t) {
+      html += '<label class="chk"><input type="checkbox" class="adm-aba" value="' + esc(t.id) + '"' +
+        (abasSelecionadas.indexOf(t.id) !== -1 ? ' checked' : '') + '> ' + esc(t.title) + '</label>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="admin-actions"><button class="btn small" onclick="salvarPermissao(\'' + esc(u.numeroPm).replace(/'/g, "\\'") + '\')">Salvar</button>' +
+      '<span class="admin-save-msg" id="' + uid + '_msg"></span></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  document.getElementById('app').innerHTML = html;
+
+  users.forEach(function (u) {
+    var card = document.getElementById(idAdminCard_(u.numeroPm));
+    if (!card) return;
+    var chkTodas = card.querySelector('.adm-todas');
+    var grid = card.querySelector('.admin-abas-grid');
+    chkTodas.addEventListener('change', function () { grid.style.display = this.checked ? 'none' : ''; });
+  });
+}
+
+function salvarPermissao(numeroPm) {
+  var uid = idAdminCard_(numeroPm);
+  var card = document.getElementById(uid);
+  if (!card) return;
+  var perfil = card.querySelector('.adm-perfil').value;
+  var status = card.querySelector('.adm-status').value;
+  var todas = card.querySelector('.adm-todas').checked;
+  var abas = todas ? 'TODAS' : Array.prototype.slice.call(card.querySelectorAll('.adm-aba:checked')).map(function (el) { return el.value; }).join(',');
+  var msgEl = document.getElementById(uid + '_msg');
+  if (msgEl) msgEl.textContent = 'Salvando…';
+  gsRunAuth('adminSetPermissao', numeroPm, status, perfil, abas).then(function () {
+    if (msgEl) msgEl.textContent = 'Salvo ✓';
+  }).catch(function (err) {
+    if (msgEl) msgEl.textContent = '';
+    alert('Erro ao salvar: ' + (err && err.message ? err.message : err));
+  });
+}
+
 // ---------- boot ----------
 
 function tickClock() {
   var d = new Date();
-  document.getElementById('clock').textContent = 'Sincronizado: ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
+  var el = document.getElementById('clock');
+  if (el) el.textContent = 'Sincronizado: ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
 }
 setInterval(tickClock, 1000);
 tickClock();
-router();
+boot();
 </script>

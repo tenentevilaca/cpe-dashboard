@@ -36,17 +36,52 @@
 
   #main{max-width:1600px;margin:0 auto;padding:22px 32px 48px;}
 
-  /* ---- barra de abas ---- */
-  .tabs-nav{display:flex;gap:2px;border-bottom:2px solid var(--borda);margin-bottom:22px;flex-wrap:wrap;
-    align-items:center;row-gap:4px;}
-  .tab-group-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--texto-mute);
-    padding:0 8px 0 14px;white-space:nowrap;}
-  .tab-group-label:first-child{padding-left:2px;}
-  .tab-btn{background:transparent;border:none;padding:10px 14px;font-size:12.5px;font-weight:600;
-    color:var(--texto-suave);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
-    font-family:inherit;white-space:nowrap;}
-  .tab-btn:hover{color:var(--preto);}
-  .tab-btn.active{color:var(--preto);border-bottom-color:var(--dourado);}
+  [hidden]{display:none !important;}
+
+  /* ---- login / cadastro ---- */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--preto);
+    padding:24px;}
+  .login-card{background:#fff;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);padding:30px 28px;
+    width:100%;max-width:380px;text-align:center;}
+  .login-escudo{width:92px;height:92px;margin:0 auto 12px;}
+  .login-escudo img{width:100%;height:100%;object-fit:contain;}
+  .login-card h1{font-family:'Source Serif Pro',Georgia,serif;font-size:17px;color:var(--preto);margin:0 0 20px;
+    line-height:1.3;}
+  .login-tabs{display:flex;border-bottom:2px solid var(--borda);margin-bottom:16px;}
+  .login-tab{flex:1;background:transparent;border:none;padding:10px 0;font-size:13px;font-weight:700;
+    color:var(--texto-suave);cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px;}
+  .login-tab.active{color:var(--preto);border-bottom-color:var(--dourado);}
+  .login-msg{border-radius:6px;padding:9px 12px;font-size:12.5px;margin-bottom:14px;text-align:left;}
+  .login-msg.erro{background:var(--vermelho-bg);color:var(--vermelho);border:1px solid #E57373;}
+  .login-msg.ok{background:var(--verde-bg);color:var(--verde);border:1px solid #66BB6A;}
+  .login-form{display:flex;flex-direction:column;gap:4px;text-align:left;}
+  .login-form label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--texto-mute);margin-top:10px;}
+  .login-form input{font-size:14px;padding:10px 11px;border-radius:5px;border:1px solid var(--borda);
+    background:var(--bg);color:var(--texto);font-family:inherit;}
+  .btn-login{margin-top:18px;background:var(--dourado);color:var(--preto);border:none;padding:11px 16px;
+    border-radius:5px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .btn-login:hover{background:var(--dourado-claro);}
+  .login-hint{margin-top:12px;font-size:11px;color:var(--texto-mute);line-height:1.4;}
+
+  /* ---- menu suspenso (topo esquerdo) ---- */
+  .menu-wrap{position:relative;display:inline-block;margin-bottom:22px;}
+  .menu-btn{background:var(--preto);color:#fff;border:none;border-radius:6px;padding:11px 18px;
+    font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;
+    box-shadow:var(--sombra);}
+  .menu-btn:hover{background:#4a4645;}
+  .menu-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--card);
+    border:1px solid var(--borda);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);min-width:260px;
+    max-height:70vh;overflow-y:auto;z-index:40;padding:8px 0;}
+  .menu-dropdown.open{display:block;}
+  .menu-cat{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--texto-mute);
+    padding:10px 16px 4px;}
+  .menu-item{display:block;padding:9px 16px;font-size:13px;color:var(--texto);cursor:pointer;white-space:nowrap;}
+  .menu-item:hover{background:var(--bg-soft);}
+  .menu-item.active{color:var(--preto);font-weight:700;background:var(--bg-soft);border-left:3px solid var(--dourado);}
+
+  .user-info{font-size:10.5px;color:#fff;opacity:.85;margin-top:6px;font-family:'JetBrains Mono',monospace;}
+  .user-info a{color:var(--dourado-claro);text-decoration:underline;}
 
   /* ---- KPI ---- */
   .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:0 0 22px;}
@@ -144,4 +179,26 @@
   .loading{padding:40px;text-align:center;color:var(--texto-suave);}
   .error-box{background:var(--vermelho-bg);color:var(--vermelho);border-radius:6px;padding:12px 14px;font-size:13px;
     border:1px solid #E57373;}
+
+  /* ---- administração de acesso ---- */
+  label.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:400;color:var(--texto);
+    cursor:pointer;}
+  .admin-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .admin-card{background:var(--card);border:1px solid var(--borda);border-radius:var(--raio);box-shadow:var(--sombra);
+    padding:16px 18px;}
+  .admin-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:12px;}
+  .admin-card-head strong{display:block;font-size:14px;color:var(--texto);}
+  .admin-pm{display:block;font-size:11px;color:var(--texto-mute);font-family:'JetBrains Mono',monospace;margin-top:2px;}
+  .admin-row{display:flex;gap:12px;margin-bottom:12px;}
+  .admin-row .grp{flex:1;}
+  .admin-row label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-mute);
+    display:block;margin-bottom:5px;}
+  .admin-row select{width:100%;font-size:12.5px;padding:7px 9px;border-radius:4px;border:1px solid var(--borda);
+    background:var(--bg);color:var(--texto);font-family:inherit;}
+  .admin-abas{border-top:1px solid var(--borda);padding-top:10px;margin-bottom:12px;}
+  .admin-abas > label.chk{font-weight:700;margin-bottom:8px;}
+  .admin-abas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px 10px;
+    padding-left:2px;}
+  .admin-actions{display:flex;align-items:center;gap:10px;}
+  .admin-save-msg{font-size:11.5px;color:var(--verde);}
 </style>
