@@ -333,11 +333,23 @@ function soDigitos(s) {
   return String(s || '').replace(/\D/g, '');
 }
 
+function textoPrazoWhatsApp(t, f) {
+  if (t.concluida) return '';
+  if (f.nivel === 'preto') {
+    return f.diasAtraso > 0
+      ? '\nJá passaram ' + f.diasAtraso + ' dia(s) do prazo final (' + fmtData(t.prazo) + ').'
+      : '\nHoje é o último dia do prazo (' + fmtData(t.prazo) + ').';
+  }
+  if (f.diasRestantes === 0) return '\nHoje é o último dia do prazo (' + fmtData(t.prazo) + ').';
+  return '\nFaltam ' + f.diasRestantes + ' dia(s) para o prazo final (' + fmtData(t.prazo) + ').';
+}
+
 function mensagemStatusWhatsApp(t, f) {
   return '⚠️ Alerta de prazo — Agenda CPE\n\n' +
     'Tarefa: ' + t.tarefa +
     '\nResponsável: ' + t.responsavel +
-    '\nStatus atual: ' + farolLabel(f, t.concluida);
+    '\nStatus atual: ' + farolLabel(f, t.concluida) +
+    textoPrazoWhatsApp(t, f);
 }
 
 function linkWhatsApp(t, f) {
@@ -531,7 +543,9 @@ function calcularFarol(inicio, prazo, concluida, dataConclusao) {
     diasAtraso = Math.max(0, Math.round((dRef - dPrazo) / MS_DIA));
   }
 
-  return { pct: Math.round(pct), nivel: nivel, diasAtraso: diasAtraso, totalDias: totalDias };
+  const diasRestantes = Math.round((dPrazo - dRef) / MS_DIA);
+
+  return { pct: Math.round(pct), nivel: nivel, diasAtraso: diasAtraso, totalDias: totalDias, diasRestantes: diasRestantes };
 }
 
 function farolLabel(f, concluida) {
