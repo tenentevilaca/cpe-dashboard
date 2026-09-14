@@ -498,7 +498,10 @@ function exigirAdmin_(token) {
 function adminListUsers(token) {
   exigirAdmin_(token);
   return lerUsuarios_().map(function (u) {
-    return { numeroPm: u.numeroPm, nome: u.nome, perfil: u.perfil, status: u.status, abas: u.abas, criadoEm: u.criadoEm };
+    return {
+      numeroPm: u.numeroPm, nome: u.nome, perfil: u.perfil, status: u.status, abas: u.abas,
+      criadoEm: cellToJson_(u.criadoEm, 'date')
+    };
   });
 }
 
