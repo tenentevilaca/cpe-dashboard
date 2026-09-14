@@ -147,7 +147,7 @@ function fazerLogout(silencioso) {
 function renderUserBar() {
   var el = document.getElementById('userInfo');
   el.innerHTML = esc(STATE.session.nome) + ' · ' + (STATE.session.perfil === 'ADMIN' ? 'Administrador' : 'Usuário') +
-    ' · <a href="#" onclick="fazerLogout();return false;">Sair</a>';
+    ' · <a href="#" target="_self" onclick="fazerLogout();return false;">Sair</a>';
   el.hidden = false;
 }
 
@@ -193,7 +193,7 @@ function renderTopbar() {
   var hash = location.hash || '#/';
   var itens = itensMenu_();
 
-  var menuHtml = '<a class="menu-item' + (hash === '#/' || hash === '' ? ' active' : '') + '" href="#/">📊 Visão Geral</a>';
+  var menuHtml = '<a class="menu-item' + (hash === '#/' || hash === '' ? ' active' : '') + '" target="_self" href="#/">📊 Visão Geral</a>';
 
   STATE.config.categories.forEach(function (cat) {
     var doCat = itens.filter(function (it) { return it.category === cat; });
@@ -201,13 +201,13 @@ function renderTopbar() {
     menuHtml += '<div class="menu-cat">' + esc(cat) + '</div>';
     doCat.forEach(function (it) {
       var target = it.especial ? '#/encarregados' : (it.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(it.id);
-      menuHtml += '<a class="menu-item' + (hash === target ? ' active' : '') + '" href="' + target + '">' + esc(it.title) + '</a>';
+      menuHtml += '<a class="menu-item' + (hash === target ? ' active' : '') + '" target="_self" href="' + target + '">' + esc(it.title) + '</a>';
     });
   });
 
   if (STATE.session.perfil === 'ADMIN') {
     menuHtml += '<div class="menu-cat">Administração</div>';
-    menuHtml += '<a class="menu-item' + (hash === '#/admin' ? ' active' : '') + '" href="#/admin">⚙️ Gerenciar acessos</a>';
+    menuHtml += '<a class="menu-item' + (hash === '#/admin' ? ' active' : '') + '" target="_self" href="#/admin">⚙️ Gerenciar acessos</a>';
   }
 
   document.getElementById('menuDropdown').innerHTML = menuHtml;
@@ -346,14 +346,14 @@ function drawHome(summary) {
     if (c) {
       c.items.forEach(function (s) {
         var target = (s.isGroup ? '#/grupo/' : '#/aba/') + encodeURIComponent(s.id);
-        html += '<a class="card" href="' + target + '">' +
+        html += '<a class="card" target="_self" href="' + target + '">' +
           '<h3>' + esc(s.title) + '</h3>' +
           '<p>' + esc(s.description || '') + '</p>' +
           '<div class="badges">' + itemBadges_(s) + '</div></a>';
       });
     }
     if (mostrarEncarregados) {
-      html += '<a class="card" href="#/encarregados"><h3>Encarregados</h3>' +
+      html += '<a class="card" target="_self" href="#/encarregados"><h3>Encarregados</h3>' +
         '<p>Escalas de Conselho de Justiça, indicados CPM e controle de processos entregues.</p>' +
         '<div class="badges"><span class="badge azul">ver painel</span></div></a>';
     }
