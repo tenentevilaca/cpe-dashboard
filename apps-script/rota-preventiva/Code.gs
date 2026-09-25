@@ -1,15 +1,18 @@
 /**
  * Rota Preventiva | Estado-Maior do CPE / PMRv (PMMG)
  *
- * A planilha é lida de forma tolerante:
- *  1. todas as abas são examinadas (não só "STV"/"Frações");
- *  2. as colunas são achadas pelo CABEÇALHO (qualquer ordem, linha 1 a 15);
- *  3. se não houver cabeçalho de RPM/Cia/Pel/Gp, a coluna é achada pelo CONTEÚDO
- *     (ex.: "1ª RPM", "2ª Cia PMRv", "3º Pel", ou um texto combinado
- *     "1º Gp / 2º Pel / 3ª Cia PMRv / 4ª RPM");
- *  4. se a base STV só tiver o município, RPM/Cia/Pel/Gp vêm da aba de frações
- *     (município → fração responsável), cobrindo a área territorial da fração.
- * Códigos internos (nº REDS, IBGE, IDs) nunca aparecem na interface.
+ * Origem dos dados
+ *  - ARTICULACAO: frações (Cia / Pelotão / Grupamento), código de cada fração e
+ *    municípios (sede e área de responsabilidade). O cruzamento pelo código
+ *    define TODAS as cidades atendidas por cada fração.
+ *  - STV: registros georreferenciados (latitude/longitude, data/hora, rodovia...).
+ *  - Demais abas: lidas se tiverem RPM/Cia/Pel/Gp/Município (cabeçalho ou conteúdo).
+ *  - BLOQUEIOS / ALERTAS (opcional) e feed Waze for Cities (opcional): interdições,
+ *    acidentes e congestionamentos exibidos no mapa.
+ *
+ * Nomes na interface: apenas "01ª RPM", "01ª Cia PMRv", "01º Pelotão",
+ * "01º Grupamento" e nomes de municípios. Códigos, "Sim/Não" e erros de célula
+ * ("#######", "#N/A", "#REF!") nunca aparecem.
  */
 
 function doGet() {
@@ -21,17 +24,24 @@ function doGet() {
 
 const CFG = {
   STV_SHEETS: ['STV', 'Base STV', 'Dados STV'],
+  ARTICULACAO_SHEETS: ['ARTICULACAO', 'ARTICULAÇÃO', 'Articulacao', 'Articulação'],
+  ALERT_SHEETS: ['BLOQUEIOS', 'ALERTAS', 'INTERDICOES', 'INTERDIÇÕES'],
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
-  CACHE_PREFIX: 'rota_preventiva_v8_',
+  CACHE_PREFIX: 'rota_preventiva_v9_',
   CACHE_SECONDS: 1800,
   HEADER_SCAN_ROWS: 15,
   SAMPLE_ROWS: 300,
-  MAX_ROUTE_POINTS: 10,
-  MAX_MAP_POINTS: 600
+  MAX_CELLS: 12000,       // células de ~110 m enviadas ao mapa (reagrupadas no navegador)
+  MAX_WAYPOINTS: 23,      // limite do Google Directions (Apps Script)
+  W_RECENTE: 0.6,         // Ponderação Recente (w2026)
+  W_HISTORICO: 0.4,
+  UF: 'MG'
 };
 
 const TYPES = ['rpm', 'cia', 'pelotao', 'grupamento', 'cidade'];
 const HIER = ['rpm', 'cia', 'pelotao', 'grupamento'];
+const FRAC = ['cia', 'pelotao', 'grupamento'];
+const JOIN = ' › ';
 
 /** Sinônimos aceitos no cabeçalho (comparados sem acento, minúsculos, sem pontuação). */
 const FIELD_ALIASES = {
@@ -39,19 +49,23 @@ const FIELD_ALIASES = {
   cia: ['cia', 'companhia', 'cia pmrv', 'companhia pmrv', 'cia rv', 'cias'],
   pelotao: ['pelotao', 'pel', 'pel pmrv', 'pelotao pmrv', 'pelotoes'],
   grupamento: ['grupamento', 'gp', 'gp pmrv', 'grupamento pmrv', 'destacamento', 'grupamentos'],
-  cidade: ['municipio', 'cidade', 'municipio cidade', 'localidade', 'municipios', 'cidades'],
+  cidade: ['municipio', 'cidade', 'municipio cidade', 'localidade', 'municipios', 'cidades',
+           'municipio atendido', 'municipios atendidos', 'area de responsabilidade'],
+  sede: ['sede', 'municipio sede', 'cidade sede', 'sede da fracao'],
   fracao: ['fracao', 'fracao responsavel', 'unidade', 'unidade responsavel', 'ueop', 'subunidade',
            'lotacao', 'uop', 'fracao pmrv', 'unidade pmrv', 'hierarquia', 'responsavel', 'fracoes'],
   lat: ['latitude', 'lat', 'y', 'coord y'],
   lng: ['longitude', 'long', 'lng', 'lon', 'x', 'coord x'],
   coord: ['coordenadas', 'coordenada', 'lat long', 'latlong', 'lat lng', 'geolocalizacao'],
+  data: ['data', 'data fato', 'data do fato', 'data ocorrencia', 'dt fato', 'dt', 'data hora', 'data hora fato'],
   hora: ['hora', 'horario', 'hora fato', 'hora do fato', 'hora ocorrencia', 'data hora', 'data hora fato'],
-  escore: ['escore', 'score', 'escore de risco', 'risco', 'indice de risco', 'peso'],
-  rodovia: ['rodovia', 'br', 'via', 'rodovia km', 'trecho']
+  escore: ['escore', 'score', 'escore de risco', 'risco', 'indice de risco', 'peso', 'gravidade'],
+  rodovia: ['rodovia', 'br', 'via', 'rodovia km', 'trecho'],
+  km: ['km', 'marco km', 'quilometro', 'km inicial'],
+  tipo: ['tipo', 'natureza', 'tipo alerta', 'categoria'],
+  descricao: ['descricao', 'observacao', 'obs', 'detalhe', 'historico']
 };
-/** Palavras que indicam coluna de código/ID (usada só para traduzir código → nome). */
 const CODE_WORDS = ['cod', 'codigo', 'id', 'num', 'numero', 'nr', 'n', 'ibge', 'sigla', 'reds', 'chave'];
-/** Palavras que tornam a coluna preferencial como "nome por extenso". */
 const NAME_WORDS = ['nome', 'descricao', 'desc', 'extenso'];
 
 /** Reconhece RPM/Cia/Pel/Gp dentro de qualquer texto ("1ª RPM", "RPM 1", "3º PEL/2ª CIA"...). */
@@ -67,42 +81,50 @@ const HIER_RX = {
 /*  API chamada pelo front-end                                             */
 /* ======================================================================= */
 
-/** Opções dos seletores (nomes amigáveis, sem códigos). */
+/** Opções dos seletores em forma de "tuplas" [RPM, Cia, Pel, Gp, Município, Sede] para a cascata. */
 function getDadosCompletosFiltros() {
   const cached = cacheGet_('options');
   if (cached) return cached;
-
   const ctx = loadContext_();
   const result = {
-    rpms: ctx.options.rpm,
-    cias: ctx.options.cia,
-    pelotoes: ctx.options.pelotao,
-    grupamentos: ctx.options.grupamento,
-    cidades: ctx.options.cidade,
+    tuplas: ctx.tuples,
+    rpms: ctx.options.rpm, cias: ctx.options.cia, pelotoes: ctx.options.pelotao,
+    grupamentos: ctx.options.grupamento, cidades: ctx.options.cidade,
+    pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO },
     avisos: ctx.warnings
   };
-  // Só guarda em cache quando está tudo certo, para a correção da planilha valer na hora.
   if (!ctx.warnings.length) cacheSet_('options', result);
   return result;
 }
 
-/** Filtra a base STV. Cada filtro é opcional e 100% independente dos demais. */
+/**
+ * Filtra a base STV e devolve células de ~110 m já agregadas. O navegador reagrupa
+ * essas células conforme a régua de densidade, sem nova consulta à planilha.
+ */
 function calcularRotaAvancada(p) {
   p = p || {};
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ctx = cacheGet_('ctx') || loadContext_();
-  const labels = ctx.labels, cityHier = ctx.cityHier || {};
-
-  const found = findStvTable_(ss);
+  const found = findStvTable_(ss, ctx.codeToFrac);
   if (!found) throw new Error('Não encontrei a base STV: nenhuma aba tem colunas de Latitude/Longitude (ou "Coordenadas").');
   const table = found.table, col = table.columns;
-
-  const selected = {};
-  TYPES.forEach(t => selected[t] = selectedKey_(p[t]));
-  const from = finite_(p.horaInicio), to = finite_(p.horaFim), useHours = from !== null && to !== null;
-  const radius = Math.max(100, Math.min(5000, finite_(p.raioDensidade) || 1000));
   const tz = ss.getSpreadsheetTimeZone();
-  const grouped = Object.create(null);
+
+  const sel = {
+    rpm: selectedKey_(p.rpm), cia: selectedKey_(p.cia), pelotao: selectedKey_(p.pelotao),
+    grupamento: selectedKey_(p.grupamento), cidade: selectedKey_(p.cidade)
+  };
+  const fracFilter = !!(sel.cia || sel.pelotao || sel.grupamento);
+  const from = finite_(p.horaInicio), to = finite_(p.horaFim), useHours = from !== null && to !== null;
+
+  // Data de referência da ponderação recente: hoje; se a base for mais antiga, o registro mais recente.
+  let maxDate = 0;
+  if (col.data >= 0) table.rows.forEach(r => { const d = parseDate_(r[col.data]); if (d && d > maxDate) maxDate = d; });
+  const today = Date.now();
+  let ref = today, refAjustada = false;
+  if (maxDate && maxDate < today - 90 * 864e5) { ref = maxDate; refAjustada = true; }
+
+  const cells = Object.create(null), sedes = Object.create(null);
   const box = { s: 90, n: -90, w: 180, e: -180 };
   let total = 0;
 
@@ -112,61 +134,208 @@ function calcularRotaAvancada(p) {
     else { const c = splitCoord_(r[col.coord]); lat = c[0]; lng = c[1]; }
     if (lat === null || lng === null || (lat === 0 && lng === 0)) return;
 
-    const v = rowNames_(r, table, labels, cityHier);
-    for (let i = 0; i < TYPES.length; i++) {
-      const t = TYPES[i];
-      if (selected[t] && key_(v[t]) !== selected[t]) return;
-    }
-    if (useHours && col.hora >= 0) {
-      const hour = getHour_(r[col.hora], tz);
-      if (hour !== null) {
-        const inWindow = from <= to ? hour >= from && hour <= to : hour >= from || hour <= to;
-        if (!inWindow) return;
-      }
-    }
+    const v = rowOwn_(r, table, ctx);
+    const city = v.cidade ? ctx.cities[key_(v.cidade)] : null;
+    const rpm = v.rpm || (city ? city.rpm || city.rpmFrac : '') || '';
+    if (sel.rpm && key_(rpm) !== sel.rpm) return;
+    if (sel.cidade && key_(v.cidade) !== sel.cidade) return;
+    const cands = candidates_(v, city);
+    let frac = null;
+    if (fracFilter) { frac = cands.find(f => matchFrac_(f, sel)); if (!frac) return; }
+    else frac = cands[0] || null;
+
+    let hour = null;
+    if (col.hora >= 0) hour = getHour_(r[col.hora], tz);
+    if (useHours && hour !== null && !inWindow_(hour, from, to)) return;
 
     total++;
     box.s = Math.min(box.s, lat); box.n = Math.max(box.n, lat);
     box.w = Math.min(box.w, lng); box.e = Math.max(box.e, lng);
 
-    const road = col.rodovia >= 0 ? String(r[col.rodovia] || '').trim() : '';
-    const fraction = [v.cia, v.pelotao, v.grupamento].filter(Boolean).join(' / ') || v.rpm || 'PMRv';
-    const score = col.escore >= 0 ? number_(r[col.escore]) : null;
-    // Agrupa pontos próximos (~110 m) na mesma rodovia/cidade.
-    const k = [lat.toFixed(3), lng.toFixed(3), key_(road), key_(v.cidade)].join('|');
-    let h = grouped[k];
-    if (!h) h = grouped[k] = { sumLat: 0, sumLng: 0, rodovia: road, cidade: v.cidade, fracao: fraction, qtd: 0, total: 0, n: 0 };
-    h.sumLat += lat; h.sumLng += lng; h.qtd++;
-    if (score !== null) { h.total += score; h.n++; }
+    const k = lat.toFixed(3) + ',' + lng.toFixed(3);
+    let c = cells[k];
+    if (!c) c = cells[k] = { la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0], h: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
+    c.la += lat; c.lo += lng; c.n++;
+    const sev = col.escore >= 0 ? number_(r[col.escore]) : null;
+    if (sev !== null) { c.s += sev; c.sn++; }
+    if (hour !== null) { if (!c.h) c.h = new Array(24).fill(0); c.h[hour]++; }
+    const d = col.data >= 0 ? parseDate_(r[col.data]) : null;
+    if (d) {
+      const age = (ref - d) / 864e5;
+      if (age <= 30) c.r[0]++;
+      if (age <= 60) c.r[1]++;
+      if (age <= 90) c.r[2]++;
+      if (d > c.ul) c.ul = d;
+    }
+    if (!c.rd && col.rodovia >= 0) c.rd = String(r[col.rodovia] || '').trim();
+    if (!c.ci) c.ci = v.cidade || '';
+    if (!c.fr && frac) { c.fr = fracLabel_(frac); c.sd = frac.sede || ''; }
+    if (col.km >= 0) {
+      const km = number_(r[col.km]);
+      if (km !== null) c.km = c.km ? [Math.min(c.km[0], km), Math.max(c.km[1], km)] : [km, km];
+    }
+    if (frac && frac.sede) sedes[frac.sede] = (sedes[frac.sede] || 0) + 1;
   });
 
-  let hotspots = Object.keys(grouped).map(k => {
-    const h = grouped[k];
-    const media = h.n ? h.total / h.n : 1;
-    return {
-      lat: round_(h.sumLat / h.qtd, 6), lng: round_(h.sumLng / h.qtd, 6),
-      rodovia: h.rodovia, cidade: h.cidade, fracao: h.fracao, qtd: h.qtd,
-      // Escore combina a gravidade média com o volume de registros STV no ponto.
-      escore: round_(media * Math.log(1 + h.qtd) * 10, 1), raio: radius
-    };
-  }).sort((a, b) => b.escore - a.escore || b.qtd - a.qtd);
+  const out = Object.keys(cells).map(k => {
+    const c = cells[k];
+    c.la = round_(c.la / c.n, 6); c.lo = round_(c.lo / c.n, 6);
+    c.ul = c.ul ? Utilities.formatDate(new Date(c.ul), tz, 'dd/MM/yyyy') : '';
+    return c;
+  }).sort((a, b) => b.n - a.n).slice(0, CFG.MAX_CELLS);
 
-  const totalHotspots = hotspots.length;
-  hotspots = hotspots.slice(0, CFG.MAX_MAP_POINTS);
-  const route = orderRoute_(hotspots.slice(0, CFG.MAX_ROUTE_POINTS));
-  const linkMaps = route.length ? 'https://www.google.com/maps/dir/' + route.map(h => h.lat + ',' + h.lng).join('/') : '';
-  const linkWaze = route.length ? 'https://waze.com/ul?ll=' + route[0].lat + ',' + route[0].lng + '&navigate=yes' : '';
+  // Origem sugerida: sede da fração filtrada (ou o município escolhido).
+  let sedeNome = '';
+  if (fracFilter) sedeNome = Object.keys(sedes).sort((a, b) => sedes[b] - sedes[a])[0] || '';
+  if (!sedeNome && sel.cidade) sedeNome = String(p.cidade || '');
+  const origemSede = sedeNome ? geocode_(sedeNome) : null;
 
   return {
-    hotspots: hotspots,
-    rota: route.map(h => [h.lat, h.lng]),
+    cells: out,
     bounds: total ? [[box.s, box.w], [box.n, box.e]] : null,
     totalRegistros: total,
-    totalHotspots: totalHotspots,
-    linkMaps: linkMaps,
-    linkWaze: linkWaze,
-    raio: radius
+    referencia: Utilities.formatDate(new Date(ref), tz, 'dd/MM/yyyy'),
+    referenciaAjustada: refAjustada,
+    temHora: col.hora >= 0, temData: col.data >= 0, temEscore: col.escore >= 0,
+    origemSede: origemSede,
+    pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
+}
+
+/**
+ * Traçado viário da rota preventiva (Google Directions, dentro do app).
+ * req = { origem: {lat,lng,nome}|null, pontos: [{id,lat,lng}], retornar: bool }
+ */
+function calcularTrajeto(req) {
+  req = req || {};
+  const pts = (req.pontos || []).slice(0, CFG.MAX_WAYPOINTS + 1);
+  if (!pts.length) return { ok: false, motivo: 'Sem pontos' };
+  const cacheKey = 'dir_' + digest_(JSON.stringify(req));
+  const hit = cacheGet_(cacheKey);
+  if (hit) return hit;
+  try {
+    const df = Maps.newDirectionFinder().setLanguage('pt-BR').setRegion('br')
+      .setMode(Maps.DirectionFinder.Mode.DRIVING);
+    const rest = pts.slice();
+    const origin = req.origem && isFinite(req.origem.lat) ? req.origem : null;
+    const first = origin ? null : rest.shift();
+    const o = origin || first;
+    df.setOrigin(o.lat, o.lng);
+    let last = null;
+    if (origin && req.retornar) df.setDestination(origin.lat, origin.lng);
+    else if (rest.length) { last = rest.pop(); df.setDestination(last.lat, last.lng); }
+    else df.setDestination(o.lat, o.lng);
+    rest.slice(0, CFG.MAX_WAYPOINTS).forEach(p => df.addWaypoint(p.lat, p.lng));
+    if (rest.length > 1) df.setOptimizeWaypoints(true);
+    const res = df.getDirections();
+    if (!res || res.status !== 'OK' || !res.routes || !res.routes.length) return { ok: false, motivo: res && res.status };
+    const route = res.routes[0];
+    const order = route.waypoint_order || rest.map((_, i) => i);
+    const seq = [];
+    if (first) seq.push(first.id);
+    order.forEach(i => seq.push(rest[i].id));
+    if (last) seq.push(last.id);
+    const out = {
+      ok: true,
+      sequencia: seq,
+      path: pairs_(Maps.decodePolyline(route.overview_polyline.points)),
+      legs: route.legs.map(l => ({
+        km: round_(l.distance.value / 1000, 1), min: Math.round(l.duration.value / 60),
+        passos: (l.steps || []).slice(0, 40).map(s => ({ txt: stripHtml_(s.html_instructions), km: round_(s.distance.value / 1000, 1) }))
+      })),
+      resumo: route.summary || '',
+      avisos: route.warnings || []
+    };
+    out.km = round_(out.legs.reduce((a, l) => a + l.km, 0), 1);
+    out.min = out.legs.reduce((a, l) => a + l.min, 0);
+    cacheSet_(cacheKey, out, 21600);
+    return out;
+  } catch (e) {
+    return { ok: false, motivo: String(e && e.message || e) };
+  }
+}
+
+/** Rotas de acesso (principal + alternativas) da origem até um ponto: atendimento a acidente. */
+function rotasAcesso(req) {
+  req = req || {};
+  const o = req.origem, d = req.destino;
+  if (!o || !d) return { ok: false, motivo: 'Origem ou destino ausente' };
+  const cacheKey = 'alt_' + digest_(JSON.stringify(req));
+  const hit = cacheGet_(cacheKey);
+  if (hit) return hit;
+  try {
+    const df = Maps.newDirectionFinder().setLanguage('pt-BR').setRegion('br')
+      .setMode(Maps.DirectionFinder.Mode.DRIVING).setAlternatives(true);
+    if (isFinite(o.lat)) df.setOrigin(o.lat, o.lng); else df.setOrigin(String(o.nome) + ', ' + CFG.UF + ', Brasil');
+    df.setDestination(d.lat, d.lng);
+    const res = df.getDirections();
+    if (!res || res.status !== 'OK') return { ok: false, motivo: res && res.status };
+    const out = {
+      ok: true,
+      rotas: res.routes.slice(0, 3).map(rt => ({
+        via: rt.summary || '',
+        km: round_(rt.legs.reduce((a, l) => a + l.distance.value, 0) / 1000, 1),
+        min: Math.round(rt.legs.reduce((a, l) => a + l.duration.value, 0) / 60),
+        path: pairs_(Maps.decodePolyline(rt.overview_polyline.points)),
+        avisos: rt.warnings || []
+      }))
+    };
+    cacheSet_(cacheKey, out, 21600);
+    return out;
+  } catch (e) {
+    return { ok: false, motivo: String(e && e.message || e) };
+  }
+}
+
+/**
+ * Bloqueios, estrangulamentos, acidentes e congestionamentos dentro da área.
+ * Fontes: aba BLOQUEIOS/ALERTAS (manual) e, se configurado, o feed do Waze for Cities
+ * (Propriedades do script ▸ WAZE_FEED_URL).
+ */
+function getAlertasVia(bounds) {
+  const inBox = (lat, lng) => !bounds || (lat >= bounds[0][0] - 0.2 && lat <= bounds[1][0] + 0.2 &&
+    lng >= bounds[0][1] - 0.2 && lng <= bounds[1][1] + 0.2);
+  const out = { alertas: [], congestionamentos: [], fontes: [] };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = findSheet_(ss, CFG.ALERT_SHEETS);
+  if (sheet) {
+    const t = readTable_(sheet);
+    const c = t.columns;
+    t.rows.forEach(r => {
+      let lat = null, lng = null;
+      if (c.lat >= 0 && c.lng >= 0) { lat = coord_(r[c.lat], 90); lng = coord_(r[c.lng], 180); }
+      else if (c.coord >= 0) { const x = splitCoord_(r[c.coord]); lat = x[0]; lng = x[1]; }
+      if (lat == null || lng == null || !inBox(lat, lng)) return;
+      out.alertas.push({
+        lat: lat, lng: lng,
+        tipo: c.tipo >= 0 ? String(r[c.tipo] || '').trim() : 'Alerta',
+        desc: c.descricao >= 0 ? String(r[c.descricao] || '').trim() : '',
+        via: c.rodovia >= 0 ? String(r[c.rodovia] || '').trim() : '',
+        fonte: 'Planilha'
+      });
+    });
+    out.fontes.push('aba ' + sheet.getName());
+  }
+  const url = PropertiesService.getScriptProperties().getProperty('WAZE_FEED_URL');
+  if (url) {
+    try {
+      const feed = JSON.parse(UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getContentText());
+      (feed.alerts || []).forEach(a => {
+        const lat = a.location && a.location.y, lng = a.location && a.location.x;
+        if (!isFinite(lat) || !inBox(lat, lng)) return;
+        out.alertas.push({ lat: lat, lng: lng, tipo: wazeType_(a.type, a.subtype),
+          desc: a.reportDescription || '', via: a.street || '', fonte: 'Waze' });
+      });
+      (feed.jams || []).forEach(j => {
+        const path = (j.line || []).map(p => [p.y, p.x]);
+        if (!path.length || !inBox(path[0][0], path[0][1])) return;
+        out.congestionamentos.push({ path: path, via: j.street || '', nivel: j.level || 0,
+          atrasoMin: Math.round((j.delay || 0) / 60), km: round_((j.length || 0) / 1000, 1) });
+      });
+      out.fontes.push('Waze for Cities');
+    } catch (e) { out.fontes.push('Waze indisponível (' + (e.message || e) + ')'); }
+  }
+  return out;
 }
 
 /** Limpa o cache (rode pelo editor após alterar a planilha). */
@@ -179,139 +348,259 @@ function diagnosticarPlanilha() {
   limparCache();
   const ctx = loadContext_();
   const report = ctx.sheetsInfo.slice();
-  TYPES.forEach(t => report.push(t.toUpperCase() + ': ' + ctx.options[t].length + ' opções → ' + ctx.options[t].slice(0, 8).join(', ')));
+  TYPES.forEach(t => report.push(t.toUpperCase() + ': ' + ctx.options[t].length + ' opções → ' + ctx.options[t].slice(0, 12).join(', ')));
+  report.push('Municípios com fração vinculada: ' + Object.keys(ctx.cities).filter(k => Object.keys(ctx.cities[k].fracs).length).length);
+  report.push('Frações com código: ' + Object.keys(ctx.codeToFrac).length);
   ctx.warnings.forEach(w => report.push('AVISO: ' + w));
   Logger.log(report.join('\n'));
   return report;
 }
 
 /* ======================================================================= */
-/*  Montagem das opções, dicionário código → nome e município → fração     */
+/*  Contexto: dicionário, ARTICULACAO, município → frações                 */
 /* ======================================================================= */
 
 function loadContext_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const warnings = [], sheetsInfo = [];
   const labels = {}; TYPES.forEach(t => labels[t] = Object.create(null));
-  const optionSets = {}; TYPES.forEach(t => optionSets[t] = Object.create(null));
-  const opaqueSamples = {}; TYPES.forEach(t => opaqueSamples[t] = []);
-  const cityHier = Object.create(null);
+  const cities = Object.create(null);     // chave do município → {nome, rpm, rpmFrac, fracs}
+  const codeToFrac = Object.create(null); // código da fração → {cia, pelotao, grupamento, rpm, sede}
+  const loose = Object.create(null);      // tuplas sem município
+
+  const addCity = (name, rpm, f) => {
+    name = cityName_(name);
+    if (!name) return;
+    const k = key_(name);
+    const c = cities[k] || (cities[k] = { nome: name, rpm: '', rpmFrac: '', fracs: {} });
+    if (rpm && !c.rpm) c.rpm = rpm;
+    if (f && FRAC.some(t => f[t])) {
+      const fk = FRAC.map(t => f[t] || '').join('|');
+      const prev = c.fracs[fk];
+      c.fracs[fk] = { cia: f.cia || '', pelotao: f.pelotao || '', grupamento: f.grupamento || '', sede: (prev && prev.sede) || f.sede || '' };
+      if (f.rpm && !c.rpmFrac) c.rpmFrac = f.rpm;
+    }
+  };
 
   // 1) Dicionário explícito (opcional): Tipo | Código | Nome oficial
   const dict = findSheet_(ss, CFG.DICTIONARY_SHEETS);
   readDictionary_(ss).forEach(row => {
     const type = typeKey_(row[0]);
     const code = String(row[1] || '').trim();
-    const name = String(row[2] || '').trim();
-    if (type && code && name) labels[type][code] = friendly_(name, type);
+    const name = strictName_(row[2], type);
+    if (type && code && name) labels[type][code] = name;
   });
 
-  // 2) Todas as abas; lê só as colunas de hierarquia/município.
-  const tables = [];
+  // 2) ARTICULACAO
+  const art = findSheet_(ss, CFG.ARTICULACAO_SHEETS);
+  if (art) {
+    sheetsInfo.push(parseArticulacao_(art, codeToFrac, addCity));
+  } else {
+    warnings.push('Aba "ARTICULACAO" não encontrada: a área de responsabilidade das frações será deduzida das demais abas.');
+  }
+
+  // 3) Demais abas com hierarquia/município
+  const skip = [dict, art, findSheet_(ss, CFG.ALERT_SHEETS)].filter(Boolean).map(s => s.getSheetId());
   ss.getSheets().forEach(sheet => {
-    if (dict && sheet.getSheetId() === dict.getSheetId()) return;
-    const t = readTable_(sheet, { fields: TYPES });
+    if (skip.indexOf(sheet.getSheetId()) >= 0) return;
+    const t = readTable_(sheet, { fields: TYPES.concat(['fracao', 'sede']), fracCodes: codeToFrac });
     sheetsInfo.push(describeTable_(sheet, t));
-    if (TYPES.some(type => hasSource_(t, type)) && t.rows.length) tables.push(t);
-  });
-
-  // 2a) Pareia código ↔ nome quando a mesma linha traz os dois.
-  tables.forEach(t => TYPES.forEach(type => {
-    const nc = t.columns[type], cc = t.codeColumns[type];
-    if (nc < 0 || cc < 0) return;
+    const useful = TYPES.some(type => hasSource_(t, type)) || t.codeColumns.fracao >= 0;
+    if (!useful) return;
     t.rows.forEach(r => {
-      const name = String(r[nc] || '').trim(), code = String(r[cc] || '').trim();
-      if (name && code && !isOpaque_(name)) labels[type][code] = friendly_(name, type);
-    });
-  }));
-
-  // 2b) Opções + mapa município → RPM/Cia/Pel/Gp.
-  tables.forEach(t => t.rows.forEach(r => {
-    const v = {};
-    TYPES.forEach(type => {
-      v[type] = cellName_(r, t, type, labels);
-      if (v[type]) optionSets[type][key_(v[type])] = v[type];
-      else {
-        const raw = rawCell_(r, t, type);
-        if (raw && isOpaque_(raw) && opaqueSamples[type].length < 3 && opaqueSamples[type].indexOf(raw) < 0) opaqueSamples[type].push(raw);
+      const v = rowOwn_(r, t, { labels: labels, codeToFrac: codeToFrac });
+      if (v.cidade) addCity(v.cidade, v.rpm, v);
+      else if (HIER.some(x => v[x])) {
+        const tu = [v.rpm, v.cia, v.pelotao, v.grupamento, '', v.sede || ''];
+        loose[tu.join('|')] = tu;
       }
     });
-    if (v.cidade) {
-      const ck = key_(v.cidade);
-      const h = cityHier[ck] || (cityHier[ck] = {});
-      HIER.forEach(type => { if (v[type] && !h[type]) h[type] = v[type]; });
-    }
-  }));
-
-  const nice = { rpm: 'RPM', cia: 'Companhia', pelotao: 'Pelotão', grupamento: 'Grupamento', cidade: 'Município' };
-  const options = {};
-  TYPES.forEach(type => {
-    options[type] = Object.keys(optionSets[type]).map(k => optionSets[type][k]).sort(sortPt_);
-    if (options[type].length) return;
-    if (opaqueSamples[type].length) {
-      warnings.push(nice[type] + ': a planilha só tem códigos (ex.: ' + opaqueSamples[type].join(', ') +
-        '). Inclua uma coluna com o nome por extenso ou cadastre na aba "Mapa Frações" (Tipo | Código | Nome).');
-    } else {
-      warnings.push(nice[type] + ': nenhuma coluna reconhecida em nenhuma aba.');
-    }
   });
+
+  // Remove frações "incompletas" quando o mesmo município tem a versão detalhada.
+  Object.keys(cities).forEach(k => {
+    const fr = cities[k].fracs, keys = Object.keys(fr);
+    keys.forEach(a => {
+      const fa = fr[a];
+      const covered = keys.some(b => b !== a && fr[b] && FRAC.every(t => !fa[t] || fa[t] === fr[b][t]));
+      if (covered) delete fr[a];
+    });
+  });
+
+  // Tuplas para a cascata no navegador.
+  const tuples = [];
+  Object.keys(cities).forEach(k => {
+    const c = cities[k], rpm = c.rpm || c.rpmFrac || '';
+    const fr = Object.keys(c.fracs).map(x => c.fracs[x]);
+    if (!fr.length) tuples.push([rpm, '', '', '', c.nome, '']);
+    fr.forEach(f => tuples.push([rpm, f.cia, f.pelotao, f.grupamento, c.nome, f.sede || '']));
+  });
+  Object.keys(loose).forEach(k => tuples.push(loose[k]));
+
+  const options = {};
+  TYPES.forEach((type, i) => {
+    const set = Object.create(null);
+    tuples.forEach(t => { if (t[i]) set[key_(t[i])] = t[i]; });
+    options[type] = Object.keys(set).map(k => set[k]).sort(sortPt_);
+  });
+  const nice = { rpm: 'RPM', cia: 'Companhia', pelotao: 'Pelotão', grupamento: 'Grupamento', cidade: 'Município' };
+  TYPES.forEach(type => { if (!options[type].length) warnings.push(nice[type] + ': nenhum valor válido encontrado.'); });
   if (warnings.length) warnings.push('Abas lidas → ' + sheetsInfo.join(' ║ '));
 
-  const ctx = { labels: labels, cityHier: cityHier };
-  cacheSet_('ctx', ctx);
-  return { labels: labels, cityHier: cityHier, options: options, warnings: warnings, sheetsInfo: sheetsInfo };
+  cacheSet_('ctx', { labels: labels, cities: cities, codeToFrac: codeToFrac });
+  return { labels: labels, cities: cities, codeToFrac: codeToFrac, tuples: tuples, options: options,
+           warnings: warnings, sheetsInfo: sheetsInfo };
 }
 
-/** Nomes de uma linha da base; o que faltar é completado pelo município. */
-function rowNames_(r, table, labels, cityHier) {
+/**
+ * ARTICULACAO: aceita uma ou várias tabelas lado a lado (separadas por coluna vazia
+ * ou pela repetição de um campo). Em cada linha procura: código da fração,
+ * RPM/Cia/Pel/Gp (colunas próprias ou texto da coluna "Fração"), município e sede.
+ * Linhas só com município + código herdam a fração pelo código (cruzamento).
+ */
+function parseArticulacao_(sheet, codeToFrac, addCity) {
+  const vals = sheet.getDataRange().getDisplayValues();
+  if (vals.length < 2) return '"' + sheet.getName() + '" vazia';
+  let hr = 0, bestHits = 0;
+  for (let i = 0; i < Math.min(CFG.HEADER_SCAN_ROWS, vals.length); i++) {
+    const hits = vals[i].filter(h => articRole_(h)).length;
+    if (hits > bestHits) { bestHits = hits; hr = i; }
+  }
+  const blocks = [];
+  let cur = null;
+  vals[hr].forEach((h, c) => {
+    if (!String(h).trim()) { cur = null; return; }
+    const role = articRole_(h);
+    if (!role) return;
+    if (role === 'cidade' && cur && cur.cidade) { cur.cidade.push(c); return; } // vários municípios por linha
+    if (!cur || cur[role] !== undefined) { cur = {}; blocks.push(cur); }
+    cur[role] = role === 'cidade' ? [c] : c;
+  });
+
+  const recs = [];
+  const lastFrac = blocks.map(() => null);
+  for (let i = hr + 1; i < vals.length; i++) {
+    const row = vals[i];
+    blocks.forEach((b, bi) => {
+      const tuple = {};
+      HIER.forEach(t => {
+        let v = b[t] !== undefined ? strictName_(row[b[t]], t) : '';
+        if (!v && b.fracao !== undefined) v = extractHier_(row[b.fracao], t);
+        HIER.forEach(o => { if (!v && o !== t && b[o] !== undefined) v = extractHier_(row[b[o]], t); });
+        tuple[t] = v;
+      });
+      const code = b.code !== undefined ? codeKey_(row[b.code]) : '';
+      const cityList = [];
+      (b.cidade || []).forEach(c => String(row[c] || '').split(/\s*[;,\n]\s*|\s+e\s+/).forEach(x => {
+        const n = cityName_(x); if (n) cityList.push(n);
+      }));
+      let sede = b.sede !== undefined ? cityName_(row[b.sede]) : '';
+      if (!sede && b.fracao !== undefined) sede = sedeFromText_(row[b.fracao]);
+      // Linha que define a fração (com código) e um só município: esse município é a sede.
+      if (!sede && code && cityList.length === 1) sede = cityList[0];
+      let has = FRAC.some(t => tuple[t]);
+      if (has) { tuple.sede = sede; lastFrac[bi] = tuple; }
+      else if (!code && cityList.length && lastFrac[bi]) {
+        // Célula da fração mesclada/em branco: herda a fração da linha de cima.
+        Object.assign(tuple, lastFrac[bi], { rpm: tuple.rpm || '' });
+        has = true;
+      }
+      if (code && has) {
+        const prev = codeToFrac[code] || {};
+        HIER.concat(['sede']).forEach(t => { if (!prev[t] && tuple[t]) prev[t] = tuple[t]; });
+        codeToFrac[code] = prev;
+      }
+      if (!cityList.length) cityList.push('');
+      cityList.forEach(city => {
+        if (code || has || city || sede) recs.push({ code: code, tuple: tuple, has: has, city: city, sede: sede });
+      });
+    });
+  }
+  let served = 0;
+  recs.forEach(rec => {
+    let f = rec.has ? rec.tuple : (rec.code ? codeToFrac[rec.code] : null);
+    if (f && rec.code && codeToFrac[rec.code]) {
+      const full = codeToFrac[rec.code];
+      f = Object.assign({}, f);
+      FRAC.concat(['sede', 'rpm']).forEach(t => { if (!f[t] && full[t]) f[t] = full[t]; });
+    }
+    if (rec.city) { addCity(rec.city, rec.tuple.rpm, f); if (f) served++; }
+    const sede = rec.sede || (f && f.sede);
+    if (sede && f) addCity(sede, rec.city ? '' : rec.tuple.rpm, f);
+  });
+  const roles = blocks.map(b => '[' + Object.keys(b).map(k => k + '=' + [].concat(b[k]).map(c => vals[hr][c]).join('+')).join(', ') + ']').join(' ');
+  return '"' + sheet.getName() + '" (ARTICULACAO, cabeçalho linha ' + (hr + 1) + ') ' + roles +
+    ' → ' + Object.keys(codeToFrac).length + ' frações com código, ' + served + ' vínculos município→fração';
+}
+
+function articRole_(h) {
+  const n = key_(h).replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!n || n.length > 60) return '';
+  const tokens = n.split(' ');
+  const isCode = tokens.some(w => CODE_WORDS.indexOf(w) >= 0);
+  const field = bestField_(n);
+  if (tokens.indexOf('sede') >= 0) return 'sede';
+  if (tokens.indexOf('ibge') >= 0 || (isCode && field === 'cidade')) return 'cidadeCode';
+  if (tokens.indexOf('reds') >= 0) return '';
+  if (isCode) return field === 'cidade' ? 'cidadeCode' : 'code';
+  if (tokens.some(w => ['fracao', 'fracoes', 'unidade', 'ueop', 'subunidade', 'lotacao'].indexOf(w) >= 0)) return 'fracao';
+  return ['cidade', 'rpm', 'cia', 'pelotao', 'grupamento', 'fracao'].indexOf(field) >= 0 ? field : '';
+}
+
+/** Valores próprios da linha (colunas, códigos de fração, texto combinado). */
+function rowOwn_(r, table, ctx) {
   const v = {};
-  TYPES.forEach(t => v[t] = cellName_(r, table, t, labels));
-  const h = v.cidade ? cityHier[key_(v.cidade)] : null;
-  if (h) HIER.forEach(t => { if (!v[t] && h[t]) v[t] = h[t]; });
+  TYPES.forEach(t => v[t] = cellName_(r, table, t, ctx.labels));
+  v.sede = table.columns.sede >= 0 ? cityName_(r[table.columns.sede]) : '';
+  const cc = table.codeColumns.fracao;
+  if (cc >= 0 && ctx.codeToFrac) {
+    const f = ctx.codeToFrac[codeKey_(r[cc])];
+    if (f) { HIER.forEach(t => { if (!v[t] && f[t]) v[t] = f[t]; }); if (!v.sede) v.sede = f.sede || ''; }
+  }
   return v;
 }
+
+/** Frações candidatas de um registro: as próprias, completadas pela área do município. */
+function candidates_(v, city) {
+  const cityFr = city ? Object.keys(city.fracs).map(k => city.fracs[k]) : [];
+  if (!FRAC.some(t => v[t])) return cityFr;
+  const own = { cia: v.cia, pelotao: v.pelotao, grupamento: v.grupamento, sede: v.sede || '' };
+  const compat = cityFr.filter(f => FRAC.every(t => !own[t] || key_(own[t]) === key_(f[t])));
+  return compat.length ? compat : [own];
+}
+function matchFrac_(f, sel) {
+  if (sel.cia && key_(f.cia) !== sel.cia) return false;
+  if (sel.pelotao && key_([f.cia, f.pelotao].filter(Boolean).join(JOIN)) !== sel.pelotao) return false;
+  if (sel.grupamento && key_([f.cia, f.pelotao, f.grupamento].filter(Boolean).join(JOIN)) !== sel.grupamento) return false;
+  return true;
+}
+function fracLabel_(f) { return [f.cia, f.pelotao, f.grupamento].filter(Boolean).join(' / '); }
+
 function hasSource_(t, type) {
   return t.columns[type] >= 0 || t.codeColumns[type] >= 0 || (t.extract && t.extract[type] >= 0);
 }
-function rawCell_(r, t, type) {
-  const c = t.columns[type] >= 0 ? t.columns[type] : t.codeColumns[type];
-  return c >= 0 ? String(r[c] == null ? '' : r[c]).trim() : '';
-}
-/** Nome amigável: coluna de nome → coluna de código traduzida → extração do texto. */
+/** Nome válido: coluna de nome → código traduzido → extração de texto combinado. */
 function cellName_(r, table, type, labels) {
   const nc = table.columns[type], cc = table.codeColumns[type], xc = table.extract ? table.extract[type] : -1;
-  let v = nc >= 0 ? displayName_(r[nc], type, labels[type]) : '';
-  if (!v && cc >= 0) v = displayName_(r[cc], type, labels[type]);
-  if (v && HIER.indexOf(type) >= 0) {
-    // Coluna de Cia contendo "2ª Cia PMRv / 4ª RPM": fica só com a parte da Cia.
-    const only = extractHier_(v, type);
-    if (only && hierCount_(v) > 1) v = only;
-  }
+  let v = nc >= 0 ? nameFrom_(r[nc], type, labels) : '';
+  if (!v && cc >= 0) { const l = labels[type][cellStr_(r[cc])]; v = l ? strictName_(l, type) : ''; }
   if (!v && xc >= 0) v = extractHier_(r[xc], type);
   return v;
 }
-function extractHier_(value, type) {
-  const s = String(value == null ? '' : value);
-  const list = HIER_RX[type] || [];
-  for (let i = 0; i < list.length; i++) {
-    const m = s.match(list[i]);
-    if (m && Number(m[1]) > 0) return ordinal_(Number(m[1]), type);
-  }
-  return '';
+function nameFrom_(raw, type, labels) {
+  const s = cellStr_(raw);
+  if (!s) return '';
+  const l = labels && labels[type] && labels[type][s];
+  return strictName_(l || s, type);
 }
-function hierCount_(s) { return HIER.filter(t => extractHier_(s, t)).length; }
 
 /* ======================================================================= */
-/*  Leitura da planilha por cabeçalho (+ detecção pelo conteúdo)           */
+/*  Leitura de abas por cabeçalho (+ validação e detecção pelo conteúdo)   */
 /* ======================================================================= */
 
-/**
- * Lê uma aba identificando o cabeçalho automaticamente.
- * opts.fields: lê só as colunas desses campos (mais rápido). opts.maxRows: limita linhas.
- */
 function readTable_(sheet, opts) {
   opts = opts || {};
-  const table = { name: sheet.getName(), headers: [], headerRow: 0, rows: [],
+  const table = { name: sheet.getName(), headers: [], headerRow: 0, rows: [], rejected: {},
     columns: emptyColumns_(), codeColumns: emptyColumns_(), extract: emptyColumns_() };
   const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
   if (lastRow < 2 || lastCol < 1) return table;
@@ -333,27 +622,46 @@ function readTable_(sheet, opts) {
   if (opts.maxRows) nRows = Math.min(nRows, opts.maxRows);
   if (nRows < 1) return table;
 
-  // Detecção pelo conteúdo: RPM/Cia/Pel/Gp sem cabeçalho reconhecível.
-  const missing = HIER.filter(t => table.columns[t] < 0 && table.codeColumns[t] < 0);
-  if (missing.length) {
-    const sample = sheet.getRange(firstData, 1, Math.min(nRows, CFG.SAMPLE_ROWS), lastCol).getDisplayValues();
-    const used = Object.keys(table.columns).map(k => table.columns[k]).filter(c => c >= 0);
-    missing.forEach(type => {
-      let bestCol = -1, bestScore = 0;
-      for (let c = 0; c < lastCol; c++) {
-        let filled = 0, hit = 0;
-        sample.forEach(r => { const s = String(r[c] || '').trim(); if (!s) return; filled++; if (extractHier_(s, type)) hit++; });
-        if (!filled || !hit) continue;
-        let score = hit / filled;
-        if (c === table.columns.fracao) score += 0.3;
-        if (used.indexOf(c) < 0) score += 0.1;
-        if (hit / filled >= 0.3 && score > bestScore) { bestScore = score; bestCol = c; }
-      }
-      table.extract[type] = bestCol;
-    });
+  const sample = sheet.getRange(firstData, 1, Math.min(nRows, CFG.SAMPLE_ROWS), lastCol).getValues();
+  const validRatio = (c, fn) => {
+    let filled = 0, ok = 0;
+    sample.forEach(r => { const s = cellStr_(r[c]); if (!s) return; filled++; if (fn(r[c])) ok++; });
+    return filled ? ok / filled : 0;
+  };
+
+  // Colunas de RPM/Cia/Pel/Gp/Município com conteúdo inválido (ex.: "Sim/Não", "#######") são descartadas.
+  TYPES.forEach(t => {
+    const c = table.columns[t];
+    if (c >= 0 && validRatio(c, v => strictName_(v, t)) < 0.3) { table.rejected[t] = table.headers[c]; table.columns[t] = -1; }
+  });
+
+  // RPM/Cia/Pel/Gp sem coluna válida: procura pelo conteúdo.
+  const used = Object.keys(table.columns).map(k => table.columns[k]).filter(c => c >= 0);
+  HIER.filter(t => table.columns[t] < 0 && table.codeColumns[t] < 0).forEach(type => {
+    let bestCol = -1, bestScore = 0;
+    for (let c = 0; c < lastCol; c++) {
+      const ratio = validRatio(c, v => extractHier_(v, type));
+      if (ratio < 0.3) continue;
+      let score = ratio;
+      if (c === table.columns.fracao) score += 0.3;
+      if (used.indexOf(c) < 0) score += 0.1;
+      if (score > bestScore) { bestScore = score; bestCol = c; }
+    }
+    table.extract[type] = bestCol;
+  });
+
+  // Código da fração sem cabeçalho claro: coluna cujos valores são códigos da ARTICULACAO.
+  if (opts.fracCodes && Object.keys(opts.fracCodes).length && table.codeColumns.fracao < 0) {
+    const set = opts.fracCodes;
+    let bestCol = -1, bestR = 0;
+    for (let c = 0; c < lastCol; c++) {
+      if (used.indexOf(c) >= 0) continue;
+      const ratio = validRatio(c, v => !!set[codeKey_(v)]);
+      if (ratio >= 0.5 && ratio > bestR) { bestR = ratio; bestCol = c; }
+    }
+    table.codeColumns.fracao = bestCol;
   }
 
-  // Só lê o intervalo de colunas realmente necessário.
   const wanted = [];
   Object.keys(table.columns).forEach(k => {
     if (opts.fields && opts.fields.indexOf(k) < 0) return;
@@ -371,11 +679,10 @@ function readTable_(sheet, opts) {
   return table;
 }
 
-/** Base STV: aba "STV" se tiver coordenadas; senão, a aba com coordenadas e mais linhas. */
-function findStvTable_(ss) {
+function findStvTable_(ss, fracCodes) {
   const hasCoords = t => (t.columns.lat >= 0 && t.columns.lng >= 0) || t.columns.coord >= 0;
   const named = findSheet_(ss, CFG.STV_SHEETS);
-  if (named) { const t = readTable_(named); if (hasCoords(t) && t.rows.length) return { sheet: named, table: t }; }
+  if (named) { const t = readTable_(named, { fracCodes: fracCodes }); if (hasCoords(t) && t.rows.length) return { sheet: named, table: t }; }
   let best = null;
   ss.getSheets().forEach(sh => {
     if (named && sh.getSheetId() === named.getSheetId()) return;
@@ -383,42 +690,55 @@ function findStvTable_(ss) {
     if (!hasCoords(head)) return;
     if (!best || sh.getLastRow() > best.getLastRow()) best = sh;
   });
-  return best ? { sheet: best, table: readTable_(best) } : null;
+  return best ? { sheet: best, table: readTable_(best, { fracCodes: fracCodes }) } : null;
 }
 
 function describeTable_(sheet, t) {
   const hdr = (t.allHeaders || t.headers).map(h => String(h).trim()).filter(String).slice(0, 20);
   const found = TYPES.filter(type => hasSource_(t, type))
     .map(type => type + (t.columns[type] < 0 && t.codeColumns[type] < 0 ? '(pelo conteúdo)' : ''));
+  if (t.codeColumns.fracao >= 0) found.push('código da fração');
+  const rej = Object.keys(t.rejected || {}).map(k => k + ' ignorada ("' + t.rejected[k] + '": valores inválidos)');
   return '"' + sheet.getName() + '" [linha ' + t.headerRow + ': ' + (hdr.join(', ') || 'vazia') + '] → ' +
-    (found.length ? 'reconhecido: ' + found.join(', ') : 'nada reconhecido');
+    (found.length ? 'reconhecido: ' + found.join(', ') : 'nada reconhecido') + (rej.length ? '; ' + rej.join('; ') : '');
+}
+
+function bestField_(h) {
+  const tokens = h.split(' ');
+  let bestField = null, bestScore = 0;
+  Object.keys(FIELD_ALIASES).forEach(f => {
+    FIELD_ALIASES[f].forEach(alias => {
+      let s = 0;
+      if (h === alias) s = 3;
+      else if (containsWords_(tokens, alias.split(' '))) s = alias.length > 3 ? 2 : 1;
+      if (s > bestScore) { bestScore = s; bestField = f; }
+    });
+  });
+  return bestField;
 }
 
 /** Associa cada campo à melhor coluna do cabeçalho, separando colunas de nome e de código. */
 function mapHeaders_(headerRow) {
   const columns = emptyColumns_(), codeColumns = emptyColumns_();
   const score = {}, codeScore = {};
-  const fields = Object.keys(FIELD_ALIASES);
   headerRow.forEach((raw, idx) => {
     const h = key_(raw).replace(/[^a-z0-9]+/g, ' ').trim();
     if (!h || h.length > 60) return;
     const tokens = h.split(' ');
     const isCode = tokens.some(w => CODE_WORDS.indexOf(w) >= 0);
     const isName = tokens.some(w => NAME_WORDS.indexOf(w) >= 0);
-    let bestField = null, bestScore = 0;
-    fields.forEach(f => {
-      FIELD_ALIASES[f].forEach(alias => {
-        let s = 0;
-        if (h === alias) s = 3;
-        else if (containsWords_(tokens, alias.split(' '))) s = alias.length > 3 ? 2 : 1;
-        if (s > bestScore) { bestScore = s; bestField = f; }
-      });
-    });
-    if (!bestField) return;
-    const target = isCode && !isName && TYPES.indexOf(bestField) >= 0 ? codeColumns : columns;
+    let field = bestField_(h);
+    if (!field) return;
+    if (tokens.indexOf('sede') >= 0) field = 'sede';
+    const codeable = TYPES.indexOf(field) >= 0 || field === 'fracao';
+    const target = isCode && !isName && codeable ? codeColumns : columns;
     const board = target === columns ? score : codeScore;
-    const s = bestScore + (isName ? 1 : 0);
-    if (board[bestField] === undefined || s > board[bestField]) { board[bestField] = s; target[bestField] = idx; }
+    const s = (FIELD_ALIASES[field].indexOf(h) >= 0 ? 4 : 2) + (isName ? 1 : 0);
+    if (board[field] === undefined || s > board[field]) { board[field] = s; target[field] = idx; }
+    // "Data/Hora" serve para os dois campos.
+    if (tokens.indexOf('data') >= 0 && tokens.indexOf('hora') >= 0) {
+      ['data', 'hora'].forEach(f => { if (columns[f] < 0) columns[f] = idx; });
+    }
   });
   return { columns: columns, codeColumns: codeColumns };
 }
@@ -436,13 +756,11 @@ function containsWords_(tokens, aliasTokens) {
 }
 function findSheet_(ss, names) {
   for (let i = 0; i < names.length; i++) { const s = ss.getSheetByName(names[i]); if (s) return s; }
-  // Tolerante a acento/maiúsculas/espaços no nome da aba.
   const wanted = names.map(key_);
   const all = ss.getSheets();
   for (let i = 0; i < all.length; i++) if (wanted.indexOf(key_(all[i].getName())) >= 0) return all[i];
   return null;
 }
-/** Opcional: aba "Mapa Frações" com colunas Tipo | Código | Nome oficial. */
 function readDictionary_(ss) {
   const sheet = findSheet_(ss, CFG.DICTIONARY_SHEETS);
   if (!sheet || sheet.getLastRow() < 2) return [];
@@ -450,13 +768,76 @@ function readDictionary_(ss) {
 }
 
 /* ======================================================================= */
-/*  Nomes amigáveis                                                        */
+/*  Nomes amigáveis e validação                                            */
 /* ======================================================================= */
 
+/** Texto da célula; números formatados como data voltam a ser número; booleanos viram vazio. */
+function cellStr_(v) {
+  if (v === null || v === undefined || typeof v === 'boolean') return '';
+  if (v instanceof Date) {
+    if (v.getFullYear() <= 1900) return String(Math.round((v.getTime() - Date.UTC(1899, 11, 30)) / 864e5));
+    return '';
+  }
+  return String(v).trim().replace(/\s+/g, ' ');
+}
+function isJunk_(s) {
+  return !s || /^#/.test(s) || /^(sim|nao|não|s|n|x|ok|true|false|verdadeiro|falso|yes|no|-+|—|n\/?a|nd|null|undefined|0)$/i.test(s);
+}
 /** Código interno/ID (ex.: 2020-017737686-001, 310010) — nunca exibido na interface. */
 function isOpaque_(s) {
   s = String(s || '').trim();
   return /^\d{4,}$/.test(s) || /^\d[\d.\-\/]{5,}$/.test(s) || /^[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+){2,}$/.test(s);
+}
+/**
+ * Nome oficial validado. RPM e Cia só aceitam numeração ("01ª RPM", "03ª Cia PMRv");
+ * Pelotão/Grupamento aceitam numeração ou nome próprio; Município aceita nome.
+ */
+function strictName_(raw, type) {
+  const s = cellStr_(raw);
+  if (isJunk_(s)) return '';
+  if (type === 'cidade') return cityName_(s);
+  const x = extractHier_(s, type);
+  if (x) return x;
+  if (/^\d{1,2}$/.test(s) && Number(s) > 0) return ordinal_(Number(s), type);
+  if (type === 'rpm' || type === 'cia') return '';
+  if (isOpaque_(s) || hierCount_(s) > 0 || /^\d/.test(s)) return '';
+  if (!/[A-Za-zÀ-ú]{3,}/.test(s)) return '';
+  const m = s.match(type === 'pelotao' ? /^(?:Pel(?:ot[aã]o)?\.?)\s+(.+)$/i : /^(?:Gp|Grupamento)\s+(.+)$/i);
+  const base = m ? m[1] : s;
+  return (type === 'pelotao' ? 'Pelotão ' : 'Grupamento ') + (base === base.toUpperCase() ? titleCase_(base) : base);
+}
+function extractHier_(value, type) {
+  const s = cellStr_(value);
+  const list = HIER_RX[type] || [];
+  for (let i = 0; i < list.length; i++) {
+    const m = s.match(list[i]);
+    if (m && Number(m[1]) > 0) return ordinal_(Number(m[1]), type);
+  }
+  return '';
+}
+function hierCount_(s) { return HIER.filter(t => extractHier_(s, t)).length; }
+function ordinal_(n, type) {
+  const female = type === 'rpm' || type === 'cia';
+  const name = type === 'rpm' ? 'RPM' : type === 'cia' ? 'Cia PMRv' : type === 'pelotao' ? 'Pelotão' : 'Grupamento';
+  return (n < 10 ? '0' : '') + n + (female ? 'ª' : 'º') + ' ' + name;
+}
+/** Município: sem "/MG", sem código, com maiúsculas corretas. */
+function cityName_(raw) {
+  const s = cellStr_(raw).replace(/\s*[-/(]\s*MG\s*\)?$/i, '').trim();
+  if (isJunk_(s) || isOpaque_(s) || /^\d/.test(s) || hierCount_(s) > 0) return '';
+  if (!/[A-Za-zÀ-ú]{2,}/.test(s)) return '';
+  return s === s.toUpperCase() || s === s.toLowerCase() ? titleCase_(s) : s;
+}
+/** "2º Pel PMRv - Sete Lagoas" → "Sete Lagoas". */
+function sedeFromText_(raw) {
+  const parts = cellStr_(raw).split(/\s+[-–—]\s+/);
+  if (parts.length < 2) return '';
+  return cityName_(parts[parts.length - 1]);
+}
+function codeKey_(v) {
+  const s = cellStr_(v).toUpperCase();
+  if (isJunk_(s)) return '';
+  return s.replace(/\s+/g, '').replace(/^0+(?=\d)/, '');
 }
 function typeKey_(s) {
   const v = key_(s).replace(/[^a-z ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -467,37 +848,10 @@ function typeKey_(s) {
   if (/^(cidade|municipio|municipio cidade)$/.test(v)) return 'cidade';
   return '';
 }
-function friendly_(value, type) {
-  const s = String(value || '').trim().replace(/\s+/g, ' ');
-  if (type !== 'cidade' && /^\d{1,3}$/.test(s)) return ordinal_(Number(s), type);
-  const patterns = {
-    rpm: '(?:RPM|Regi[aã]o(?:\\s+(?:de\\s+)?Pol[ií]cia(?:\\s+Militar)?)?)',
-    cia: '(?:Cia|Companhia)(?:\\s*(?:de\\s+)?(?:PMRv|Pol[ií]cia\\s+Militar\\s+Rodovi[aá]ria))?',
-    pelotao: '(?:Pel(?:ot[aã]o)?\\.?)(?:\\s*PMRv)?',
-    grupamento: '(?:Gp|Grupamento)(?:\\s*PMRv)?'
-  };
-  if (patterns[type]) {
-    const m = s.match(new RegExp('^(\\d{1,3})\\s*[ªºao°]?\\.?\\s*' + patterns[type] + '$', 'i'));
-    if (m) return ordinal_(Number(m[1]), type);
-  }
-  if (type === 'cidade' && s === s.toUpperCase() && /[A-Z]/.test(s)) return titleCase_(s);
-  return s;
-}
-function ordinal_(n, type) {
-  const female = type === 'rpm' || type === 'cia';
-  const name = type === 'rpm' ? 'RPM' : type === 'cia' ? 'Cia PMRv' : type === 'pelotao' ? 'Pelotão' : 'Grupamento';
-  return n + (female ? 'ª' : 'º') + ' ' + name;
-}
 function titleCase_(s) {
   const small = ['de', 'da', 'do', 'das', 'dos', 'e'];
   return s.toLowerCase().split(' ').map((w, i) =>
     i > 0 && small.indexOf(w) >= 0 ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-function displayName_(raw, type, map) {
-  const s = String(raw == null ? '' : raw).trim();
-  if (!s) return '';
-  if (map && map[s]) return map[s];
-  return isOpaque_(s) ? '' : friendly_(s, type);
 }
 function selectedKey_(value) {
   const s = String(value || '').trim();
@@ -509,7 +863,7 @@ function key_(s) {
 function sortPt_(a, b) { return a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }); }
 
 /* ======================================================================= */
-/*  Números, coordenadas, horas e rota                                     */
+/*  Números, coordenadas, datas, horas, mapas                              */
 /* ======================================================================= */
 
 function number_(value) {
@@ -536,29 +890,60 @@ function finite_(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value); return Number.isFinite(n) ? n : null;
 }
+/** Janela horária com fim exclusivo; atravessa a meia-noite (ex.: 19h → 01h). */
+function inWindow_(h, from, to) {
+  if (from === to) return h === from;
+  return from < to ? h >= from && h < to : h >= from || h < to;
+}
 function getHour_(value, tz) {
-  if (value instanceof Date) return Number(Utilities.formatDate(value, tz, 'H'));
-  if (typeof value === 'number' && value >= 0 && value < 1) return Math.floor(value * 24); // fração do dia
+  if (value instanceof Date) {
+    if (value.getFullYear() > 1900 && value.getHours() === 0 && value.getMinutes() === 0 && value.getSeconds() === 0) return null; // só data
+    return Number(Utilities.formatDate(value, tz, 'H'));
+  }
+  if (typeof value === 'number') {
+    if (value >= 0 && value < 1) return Math.floor(value * 24);           // fração do dia
+    if (Number.isInteger(value) && value >= 0 && value <= 2359 && value % 100 < 60) return value > 23 ? Math.floor(value / 100) : value;
+    return null;
+  }
   const s = String(value || '').trim();
-  const m = s.match(/(\d{1,2}):\d{2}/) || s.match(/^(\d{1,2})$/);
+  const m = s.match(/(\d{1,2})[:h]\d{2}/i) || s.match(/^(\d{1,2})h?$/i);
   if (!m) return null;
   const h = Number(m[1]);
   return h >= 0 && h <= 23 ? h : null;
 }
-/** Ordena os pontos pelo vizinho mais próximo, partindo do mais crítico. */
-function orderRoute_(points) {
-  if (points.length < 3) return points.slice();
-  const rest = points.slice(1), out = [points[0]];
-  while (rest.length) {
-    const last = out[out.length - 1];
-    let bi = 0, bd = Infinity;
-    rest.forEach((p, i) => {
-      const d = Math.pow(p.lat - last.lat, 2) + Math.pow((p.lng - last.lng) * Math.cos(last.lat * Math.PI / 180), 2);
-      if (d < bd) { bd = d; bi = i; }
-    });
-    out.push(rest.splice(bi, 1)[0]);
-  }
-  return out;
+/** Data em milissegundos (Date, "dd/mm/aaaa", "aaaa-mm-dd"). */
+function parseDate_(v) {
+  if (v instanceof Date) return v.getFullYear() > 1900 ? v.getTime() : null;
+  if (typeof v === 'number' && v > 20000 && v < 80000) return Date.UTC(1899, 11, 30) + v * 864e5; // serial
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) { const y = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]); return new Date(y, Number(m[2]) - 1, Number(m[1])).getTime(); }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+  return null;
+}
+function geocode_(name) {
+  const k = 'geo_' + digest_(key_(name));
+  const hit = cacheGet_(k);
+  if (hit) return hit;
+  try {
+    const res = Maps.newGeocoder().setRegion('br').setLanguage('pt-BR').geocode(name + ', ' + CFG.UF + ', Brasil');
+    if (res.status !== 'OK' || !res.results.length) return { nome: name };
+    const loc = res.results[0].geometry.location;
+    const out = { nome: name, lat: loc.lat, lng: loc.lng };
+    cacheSet_(k, out, 21600);
+    return out;
+  } catch (e) { return { nome: name }; }
+}
+function wazeType_(type, sub) {
+  const t = { ACCIDENT: 'Acidente', JAM: 'Congestionamento', WEATHERHAZARD: 'Perigo', HAZARD: 'Perigo',
+    ROAD_CLOSED: 'Via interditada', POLICE: 'Polícia', MISC: 'Alerta' }[type] || 'Alerta';
+  return sub ? t + ' (' + String(sub).toLowerCase().replace(/_/g, ' ') + ')' : t;
+}
+function pairs_(flat) { const o = []; for (let i = 0; i + 1 < flat.length; i += 2) o.push([round_(flat[i], 5), round_(flat[i + 1], 5)]); return o; }
+function stripHtml_(s) { return String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim(); }
+function digest_(s) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s)).replace(/=+$/, '');
 }
 function round_(n, d) { const f = Math.pow(10, d); return Math.round(n * f) / f; }
 
@@ -566,7 +951,7 @@ function round_(n, d) { const f = Math.pow(10, d); return Math.round(n * f) / f;
 /*  Cache (divide em blocos para respeitar o limite de 100 KB por chave)   */
 /* ======================================================================= */
 
-function cacheSet_(name, obj) {
+function cacheSet_(name, obj, seconds) {
   try {
     const c = CacheService.getScriptCache();
     const json = JSON.stringify(obj), size = 90000, parts = Math.ceil(json.length / size);
@@ -574,7 +959,7 @@ function cacheSet_(name, obj) {
     const data = {};
     for (let i = 0; i < parts; i++) data[CFG.CACHE_PREFIX + name + '_' + i] = json.substr(i * size, size);
     data[CFG.CACHE_PREFIX + name] = String(parts);
-    c.putAll(data, CFG.CACHE_SECONDS);
+    c.putAll(data, seconds || CFG.CACHE_SECONDS);
   } catch (e) { /* cache é só otimização */ }
 }
 function cacheGet_(name) {
