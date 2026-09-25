@@ -140,7 +140,7 @@
         const vazios = FILTERS.filter(f => $(f[0]).disabled).map(f => f[2].replace(/^Tod[oa]s (as|os) /,''));
         if (avisos.length || vazios.length) {
           notice('<strong>Atenção:</strong> ' + (vazios.length ? 'sem opções para ' + escapeHtml(vazios.join(', ')) + '. ' : '') +
-            avisos.map(escapeHtml).join(' ') + (avisos.length ? ' <em>(No editor do Apps Script, execute <b>diagnosticarPlanilha</b> para ver o detalhe.)</em>' : ''));
+            avisos.map(a => '<div>• ' + escapeHtml(a) + '</div>').join(''));
         }
         loading(false);
       }).withFailureHandler(err => { loading(false); notice('<strong>Falha ao carregar filtros:</strong> ' + escapeHtml(err && err.message || err)); }).getDadosCompletosFiltros();

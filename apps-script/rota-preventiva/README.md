@@ -9,7 +9,12 @@ App web da Rota Preventiva / Policiamento Preditivo do Estado-Maior do CPE / PMR
 4. **Implantar ▸ Gerenciar implantações ▸ Editar ▸ Nova versão**.
 
 ## Como a planilha é lida
-As colunas são localizadas **pelo cabeçalho** (a ordem não importa):
+Todas as abas são examinadas. As colunas são localizadas **pelo cabeçalho** (em qualquer das
+15 primeiras linhas, em qualquer ordem) e, se não houver cabeçalho reconhecível, **pelo conteúdo**
+(valores como "1ª RPM", "2ª Cia PMRv", "3º Pel" ou um texto combinado
+"1º Gp / 2º Pel / 3ª Cia PMRv / 4ª RPM"). Se a base STV só tiver o município, RPM/Cia/Pel/Gp são
+completados pela aba que liga município → fração responsável.
+
 
 | Campo | Cabeçalhos aceitos (sem acento/maiúsculas) |
 |---|---|
@@ -18,7 +23,8 @@ As colunas são localizadas **pelo cabeçalho** (a ordem não importa):
 | Pelotão | Pelotão, Pel |
 | Grupamento | Grupamento, Gp |
 | Município | Município, Cidade |
-| Coordenadas | Latitude + Longitude, ou uma coluna "Coordenadas" |
+| Fração (texto combinado) | Fração, Unidade, UEOp, Subunidade, Lotação |
+| Coordenadas | Latitude + Longitude, X/Y, ou uma coluna "Coordenadas" |
 | Hora | Hora, Horário, Data/Hora |
 | Escore | Escore, Score, Risco |
 | Rodovia | Rodovia, BR, Via |

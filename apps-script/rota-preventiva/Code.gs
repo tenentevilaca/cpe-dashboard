@@ -1,11 +1,15 @@
 /**
  * Rota Preventiva | Estado-Maior do CPE / PMRv (PMMG)
  *
- * Leitura da planilha baseada em CABEÇALHOS (e não em posição fixa de coluna).
- * Na versão anterior o script lia as colunas A:E da aba "Frações" (ou C:G da aba
- * "STV") às cegas; quando a planilha tinha outra ordem, os valores lidos eram
- * códigos (nº REDS, código IBGE...) que o filtro "sem códigos" descartava,
- * e os seletores ficavam vazios.
+ * A planilha é lida de forma tolerante:
+ *  1. todas as abas são examinadas (não só "STV"/"Frações");
+ *  2. as colunas são achadas pelo CABEÇALHO (qualquer ordem, linha 1 a 15);
+ *  3. se não houver cabeçalho de RPM/Cia/Pel/Gp, a coluna é achada pelo CONTEÚDO
+ *     (ex.: "1ª RPM", "2ª Cia PMRv", "3º Pel", ou um texto combinado
+ *     "1º Gp / 2º Pel / 3ª Cia PMRv / 4ª RPM");
+ *  4. se a base STV só tiver o município, RPM/Cia/Pel/Gp vêm da aba de frações
+ *     (município → fração responsável), cobrindo a área territorial da fração.
+ * Códigos internos (nº REDS, IBGE, IDs) nunca aparecem na interface.
  */
 
 function doGet() {
@@ -17,36 +21,47 @@ function doGet() {
 
 const CFG = {
   STV_SHEETS: ['STV', 'Base STV', 'Dados STV'],
-  FRACTION_SHEETS: ['Frações', 'Fracoes', 'Fraçoes', 'Frações PMRv', 'Fracoes PMRv'],
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
-  CACHE_PREFIX: 'rota_preventiva_v7_',
+  CACHE_PREFIX: 'rota_preventiva_v8_',
   CACHE_SECONDS: 1800,
-  HEADER_SCAN_ROWS: 6,
+  HEADER_SCAN_ROWS: 15,
   SAMPLE_ROWS: 300,
   MAX_ROUTE_POINTS: 10,
   MAX_MAP_POINTS: 600
 };
 
 const TYPES = ['rpm', 'cia', 'pelotao', 'grupamento', 'cidade'];
+const HIER = ['rpm', 'cia', 'pelotao', 'grupamento'];
 
-/** Sinônimos aceitos no cabeçalho (comparados sem acento, minúsculos). */
+/** Sinônimos aceitos no cabeçalho (comparados sem acento, minúsculos, sem pontuação). */
 const FIELD_ALIASES = {
-  rpm: ['rpm', 'regiao', 'regiao policial', 'regiao da policia militar'],
-  cia: ['cia', 'companhia', 'cia pmrv', 'companhia pmrv', 'cia rv'],
-  pelotao: ['pelotao', 'pel', 'pel pmrv', 'pelotao pmrv'],
-  grupamento: ['grupamento', 'gp', 'gp pmrv', 'grupamento pmrv', 'destacamento'],
-  cidade: ['municipio', 'cidade', 'municipio cidade', 'localidade'],
-  lat: ['latitude', 'lat'],
-  lng: ['longitude', 'long', 'lng', 'lon'],
+  rpm: ['rpm', 'regiao', 'regiao policial', 'regiao da policia militar', 'regiao pm'],
+  cia: ['cia', 'companhia', 'cia pmrv', 'companhia pmrv', 'cia rv', 'cias'],
+  pelotao: ['pelotao', 'pel', 'pel pmrv', 'pelotao pmrv', 'pelotoes'],
+  grupamento: ['grupamento', 'gp', 'gp pmrv', 'grupamento pmrv', 'destacamento', 'grupamentos'],
+  cidade: ['municipio', 'cidade', 'municipio cidade', 'localidade', 'municipios', 'cidades'],
+  fracao: ['fracao', 'fracao responsavel', 'unidade', 'unidade responsavel', 'ueop', 'subunidade',
+           'lotacao', 'uop', 'fracao pmrv', 'unidade pmrv', 'hierarquia', 'responsavel', 'fracoes'],
+  lat: ['latitude', 'lat', 'y', 'coord y'],
+  lng: ['longitude', 'long', 'lng', 'lon', 'x', 'coord x'],
   coord: ['coordenadas', 'coordenada', 'lat long', 'latlong', 'lat lng', 'geolocalizacao'],
   hora: ['hora', 'horario', 'hora fato', 'hora do fato', 'hora ocorrencia', 'data hora', 'data hora fato'],
   escore: ['escore', 'score', 'escore de risco', 'risco', 'indice de risco', 'peso'],
   rodovia: ['rodovia', 'br', 'via', 'rodovia km', 'trecho']
 };
-/** Palavras que indicam coluna de código/ID (usada só para montar dicionário). */
+/** Palavras que indicam coluna de código/ID (usada só para traduzir código → nome). */
 const CODE_WORDS = ['cod', 'codigo', 'id', 'num', 'numero', 'nr', 'n', 'ibge', 'sigla', 'reds', 'chave'];
 /** Palavras que tornam a coluna preferencial como "nome por extenso". */
 const NAME_WORDS = ['nome', 'descricao', 'desc', 'extenso'];
+
+/** Reconhece RPM/Cia/Pel/Gp dentro de qualquer texto ("1ª RPM", "RPM 1", "3º PEL/2ª CIA"...). */
+const HIER_RX = {
+  rpm: [/(\d{1,2})\s*[ªºa°]?\s*\.?\s*RPM(?![A-Z])/i, /RPM\s*[-:]?\s*(\d{1,2})(?!\d)/i,
+        /(\d{1,2})\s*[ªºa°]?\s*\.?\s*REGI[AÃ]O/i],
+  cia: [/(\d{1,2})\s*[ªºa°]?\s*\.?\s*(?:CIA|COMPANHIA)(?![A-Z])/i, /(?:CIA|COMPANHIA)\s*[-:]?\s*(\d{1,2})(?!\d)/i],
+  pelotao: [/(\d{1,2})\s*[ºo°]?\s*\.?\s*PEL(?:OT[AÃ]O)?(?![A-Z])/i, /PEL(?:OT[AÃ]O)?\s*[-:]?\s*(\d{1,2})(?!\d)/i],
+  grupamento: [/(\d{1,2})\s*[ºo°]?\s*\.?\s*(?:GP|GRUP(?:AMENTO)?)(?![A-Z])/i, /(?:GP|GRUPAMENTO)\s*[-:]?\s*(\d{1,2})(?!\d)/i]
+};
 
 /* ======================================================================= */
 /*  API chamada pelo front-end                                             */
@@ -66,9 +81,8 @@ function getDadosCompletosFiltros() {
     cidades: ctx.options.cidade,
     avisos: ctx.warnings
   };
-  // Nunca guarda em cache um resultado vazio: evita "travar" os filtros vazios por 30 min.
-  const hasAny = TYPES.some(t => ctx.options[t].length);
-  if (hasAny) cacheSet_('options', result);
+  // Só guarda em cache quando está tudo certo, para a correção da planilha valer na hora.
+  if (!ctx.warnings.length) cacheSet_('options', result);
   return result;
 }
 
@@ -76,16 +90,12 @@ function getDadosCompletosFiltros() {
 function calcularRotaAvancada(p) {
   p = p || {};
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const labels = cacheGet_('labels') || loadContext_().labels;
-  const stv = findSheet_(ss, CFG.STV_SHEETS);
-  if (!stv) throw new Error('A aba "STV" não foi encontrada na planilha.');
+  const ctx = cacheGet_('ctx') || loadContext_();
+  const labels = ctx.labels, cityHier = ctx.cityHier || {};
 
-  const table = readTable_(stv);
-  const col = table.columns;
-  if ((col.lat < 0 || col.lng < 0) && col.coord < 0) {
-    throw new Error('Não encontrei as colunas de Latitude/Longitude na aba "' + stv.getName() +
-      '". Cabeçalhos lidos: ' + table.headers.filter(String).join(', '));
-  }
+  const found = findStvTable_(ss);
+  if (!found) throw new Error('Não encontrei a base STV: nenhuma aba tem colunas de Latitude/Longitude (ou "Coordenadas").');
+  const table = found.table, col = table.columns;
 
   const selected = {};
   TYPES.forEach(t => selected[t] = selectedKey_(p[t]));
@@ -102,11 +112,10 @@ function calcularRotaAvancada(p) {
     else { const c = splitCoord_(r[col.coord]); lat = c[0]; lng = c[1]; }
     if (lat === null || lng === null || (lat === 0 && lng === 0)) return;
 
+    const v = rowNames_(r, table, labels, cityHier);
     for (let i = 0; i < TYPES.length; i++) {
       const t = TYPES[i];
-      if (!selected[t]) continue;
-      if (col[t] < 0 && table.codeColumns[t] < 0) return; // filtro escolhido, mas a base não tem essa coluna
-      if (key_(cellName_(r, table, t, labels)) !== selected[t]) return;
+      if (selected[t] && key_(v[t]) !== selected[t]) return;
     }
     if (useHours && col.hora >= 0) {
       const hour = getHour_(r[col.hora], tz);
@@ -121,13 +130,12 @@ function calcularRotaAvancada(p) {
     box.w = Math.min(box.w, lng); box.e = Math.max(box.e, lng);
 
     const road = col.rodovia >= 0 ? String(r[col.rodovia] || '').trim() : '';
-    const city = cellName_(r, table, 'cidade', labels);
-    const fraction = fractionName_(r, table, labels);
+    const fraction = [v.cia, v.pelotao, v.grupamento].filter(Boolean).join(' / ') || v.rpm || 'PMRv';
     const score = col.escore >= 0 ? number_(r[col.escore]) : null;
     // Agrupa pontos próximos (~110 m) na mesma rodovia/cidade.
-    const k = [lat.toFixed(3), lng.toFixed(3), key_(road), key_(city)].join('|');
+    const k = [lat.toFixed(3), lng.toFixed(3), key_(road), key_(v.cidade)].join('|');
     let h = grouped[k];
-    if (!h) h = grouped[k] = { sumLat: 0, sumLng: 0, rodovia: road, cidade: city, fracao: fraction, qtd: 0, total: 0, n: 0 };
+    if (!h) h = grouped[k] = { sumLat: 0, sumLng: 0, rodovia: road, cidade: v.cidade, fracao: fraction, qtd: 0, total: 0, n: 0 };
     h.sumLat += lat; h.sumLng += lng; h.qtd++;
     if (score !== null) { h.total += score; h.n++; }
   });
@@ -163,23 +171,14 @@ function calcularRotaAvancada(p) {
 
 /** Limpa o cache (rode pelo editor após alterar a planilha). */
 function limparCache() {
-  const c = CacheService.getScriptCache();
-  c.removeAll(['options', 'labels'].map(k => CFG.CACHE_PREFIX + k));
+  CacheService.getScriptCache().removeAll(['options', 'ctx'].map(k => CFG.CACHE_PREFIX + k));
 }
 
 /** Diagnóstico: rode pelo editor (Executar ▸ diagnosticarPlanilha) e veja o Log. */
 function diagnosticarPlanilha() {
   limparCache();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const report = [];
-  ss.getSheets().forEach(sh => {
-    const t = readTable_(sh, CFG.SAMPLE_ROWS);
-    const found = Object.keys(t.columns).filter(k => t.columns[k] >= 0)
-      .map(k => k + '=' + t.headers[t.columns[k]]);
-    report.push('Aba "' + sh.getName() + '" (cabeçalho na linha ' + t.headerRow + '): ' +
-      (found.length ? found.join(' | ') : 'nenhuma coluna reconhecida'));
-  });
   const ctx = loadContext_();
+  const report = ctx.sheetsInfo.slice();
   TYPES.forEach(t => report.push(t.toUpperCase() + ': ' + ctx.options[t].length + ' opções → ' + ctx.options[t].slice(0, 8).join(', ')));
   ctx.warnings.forEach(w => report.push('AVISO: ' + w));
   Logger.log(report.join('\n'));
@@ -187,18 +186,19 @@ function diagnosticarPlanilha() {
 }
 
 /* ======================================================================= */
-/*  Montagem das opções e do dicionário código → nome                      */
+/*  Montagem das opções, dicionário código → nome e município → fração     */
 /* ======================================================================= */
 
 function loadContext_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const warnings = [];
+  const warnings = [], sheetsInfo = [];
   const labels = {}; TYPES.forEach(t => labels[t] = Object.create(null));
   const optionSets = {}; TYPES.forEach(t => optionSets[t] = Object.create(null));
   const opaqueSamples = {}; TYPES.forEach(t => opaqueSamples[t] = []);
-  const seenColumn = {}; TYPES.forEach(t => seenColumn[t] = false);
+  const cityHier = Object.create(null);
 
-  // 1) Dicionário explícito: Tipo | Código | Nome oficial
+  // 1) Dicionário explícito (opcional): Tipo | Código | Nome oficial
+  const dict = findSheet_(ss, CFG.DICTIONARY_SHEETS);
   readDictionary_(ss).forEach(row => {
     const type = typeKey_(row[0]);
     const code = String(row[1] || '').trim();
@@ -206,134 +206,202 @@ function loadContext_() {
     if (type && code && name) labels[type][code] = friendly_(name, type);
   });
 
-  // 2) Abas de hierarquia: Frações (se existir) e STV. Lê só as colunas necessárias.
-  const sources = [findSheet_(ss, CFG.FRACTION_SHEETS), findSheet_(ss, CFG.STV_SHEETS)].filter(Boolean);
-  if (!sources.length) warnings.push('Nenhuma aba "Frações" ou "STV" foi encontrada na planilha.');
+  // 2) Todas as abas; lê só as colunas de hierarquia/município.
+  const tables = [];
+  ss.getSheets().forEach(sheet => {
+    if (dict && sheet.getSheetId() === dict.getSheetId()) return;
+    const t = readTable_(sheet, { fields: TYPES });
+    sheetsInfo.push(describeTable_(sheet, t));
+    if (TYPES.some(type => hasSource_(t, type)) && t.rows.length) tables.push(t);
+  });
 
-  sources.forEach(sheet => {
-    const t = readTable_(sheet, null, TYPES);
+  // 2a) Pareia código ↔ nome quando a mesma linha traz os dois.
+  tables.forEach(t => TYPES.forEach(type => {
+    const nc = t.columns[type], cc = t.codeColumns[type];
+    if (nc < 0 || cc < 0) return;
+    t.rows.forEach(r => {
+      const name = String(r[nc] || '').trim(), code = String(r[cc] || '').trim();
+      if (name && code && !isOpaque_(name)) labels[type][code] = friendly_(name, type);
+    });
+  }));
+
+  // 2b) Opções + mapa município → RPM/Cia/Pel/Gp.
+  tables.forEach(t => t.rows.forEach(r => {
+    const v = {};
     TYPES.forEach(type => {
-      const nameCol = t.columns[type], codeCol = t.codeColumns[type];
-      if (nameCol < 0 && codeCol < 0) return;
-      seenColumn[type] = true;
-      t.rows.forEach(r => {
-        const name = nameCol >= 0 ? String(r[nameCol] || '').trim() : '';
-        const code = codeCol >= 0 ? String(r[codeCol] || '').trim() : '';
-        if (name && !isOpaque_(name)) {
-          const friendly = friendly_(name, type);
-          labels[type][name] = friendly;
-          if (code) labels[type][code] = friendly; // pareia código ↔ nome da mesma linha
-          optionSets[type][key_(friendly)] = friendly;
-        } else {
-          const raw = name || code;
-          if (!raw) return;
-          const mapped = labels[type][raw];
-          if (mapped) optionSets[type][key_(mapped)] = mapped;
-          else if (opaqueSamples[type].length < 3 && opaqueSamples[type].indexOf(raw) < 0) opaqueSamples[type].push(raw);
-        }
-      });
+      v[type] = cellName_(r, t, type, labels);
+      if (v[type]) optionSets[type][key_(v[type])] = v[type];
+      else {
+        const raw = rawCell_(r, t, type);
+        if (raw && isOpaque_(raw) && opaqueSamples[type].length < 3 && opaqueSamples[type].indexOf(raw) < 0) opaqueSamples[type].push(raw);
+      }
     });
-  });
-
-  // Códigos que só aparecem numa aba, mas têm nome no dicionário/outra aba.
-  TYPES.forEach(type => {
-    opaqueSamples[type] = opaqueSamples[type].filter(code => {
-      const mapped = labels[type][code];
-      if (mapped) optionSets[type][key_(mapped)] = mapped;
-      return !mapped;
-    });
-  });
+    if (v.cidade) {
+      const ck = key_(v.cidade);
+      const h = cityHier[ck] || (cityHier[ck] = {});
+      HIER.forEach(type => { if (v[type] && !h[type]) h[type] = v[type]; });
+    }
+  }));
 
   const nice = { rpm: 'RPM', cia: 'Companhia', pelotao: 'Pelotão', grupamento: 'Grupamento', cidade: 'Município' };
   const options = {};
   TYPES.forEach(type => {
     options[type] = Object.keys(optionSets[type]).map(k => optionSets[type][k]).sort(sortPt_);
-    if (!seenColumn[type]) {
-      warnings.push('Coluna de ' + nice[type] + ' não encontrada no cabeçalho das abas ' +
-        sources.map(s => '"' + s.getName() + '"').join(' / ') + '.');
-    } else if (!options[type].length && opaqueSamples[type].length) {
+    if (options[type].length) return;
+    if (opaqueSamples[type].length) {
       warnings.push(nice[type] + ': a planilha só tem códigos (ex.: ' + opaqueSamples[type].join(', ') +
         '). Inclua uma coluna com o nome por extenso ou cadastre na aba "Mapa Frações" (Tipo | Código | Nome).');
+    } else {
+      warnings.push(nice[type] + ': nenhuma coluna reconhecida em nenhuma aba.');
     }
   });
+  if (warnings.length) warnings.push('Abas lidas → ' + sheetsInfo.join(' ║ '));
 
-  cacheSet_('labels', labels);
-  return { labels: labels, options: options, warnings: warnings };
+  const ctx = { labels: labels, cityHier: cityHier };
+  cacheSet_('ctx', ctx);
+  return { labels: labels, cityHier: cityHier, options: options, warnings: warnings, sheetsInfo: sheetsInfo };
 }
 
-/** Nome amigável da célula; se a coluna de nome estiver vazia, traduz a coluna de código. */
+/** Nomes de uma linha da base; o que faltar é completado pelo município. */
+function rowNames_(r, table, labels, cityHier) {
+  const v = {};
+  TYPES.forEach(t => v[t] = cellName_(r, table, t, labels));
+  const h = v.cidade ? cityHier[key_(v.cidade)] : null;
+  if (h) HIER.forEach(t => { if (!v[t] && h[t]) v[t] = h[t]; });
+  return v;
+}
+function hasSource_(t, type) {
+  return t.columns[type] >= 0 || t.codeColumns[type] >= 0 || (t.extract && t.extract[type] >= 0);
+}
+function rawCell_(r, t, type) {
+  const c = t.columns[type] >= 0 ? t.columns[type] : t.codeColumns[type];
+  return c >= 0 ? String(r[c] == null ? '' : r[c]).trim() : '';
+}
+/** Nome amigável: coluna de nome → coluna de código traduzida → extração do texto. */
 function cellName_(r, table, type, labels) {
-  const nameCol = table.columns[type], codeCol = table.codeColumns[type];
-  const name = nameCol >= 0 ? displayName_(r[nameCol], type, labels[type]) : '';
-  if (name || codeCol < 0) return name;
-  return displayName_(r[codeCol], type, labels[type]);
+  const nc = table.columns[type], cc = table.codeColumns[type], xc = table.extract ? table.extract[type] : -1;
+  let v = nc >= 0 ? displayName_(r[nc], type, labels[type]) : '';
+  if (!v && cc >= 0) v = displayName_(r[cc], type, labels[type]);
+  if (v && HIER.indexOf(type) >= 0) {
+    // Coluna de Cia contendo "2ª Cia PMRv / 4ª RPM": fica só com a parte da Cia.
+    const only = extractHier_(v, type);
+    if (only && hierCount_(v) > 1) v = only;
+  }
+  if (!v && xc >= 0) v = extractHier_(r[xc], type);
+  return v;
 }
-function fractionName_(r, table, labels) {
-  const parts = ['cia', 'pelotao', 'grupamento'].map(t => cellName_(r, table, t, labels)).filter(Boolean);
-  return parts.join(' / ') || 'PMRv';
+function extractHier_(value, type) {
+  const s = String(value == null ? '' : value);
+  const list = HIER_RX[type] || [];
+  for (let i = 0; i < list.length; i++) {
+    const m = s.match(list[i]);
+    if (m && Number(m[1]) > 0) return ordinal_(Number(m[1]), type);
+  }
+  return '';
 }
+function hierCount_(s) { return HIER.filter(t => extractHier_(s, t)).length; }
 
 /* ======================================================================= */
-/*  Leitura da planilha por cabeçalho                                      */
+/*  Leitura da planilha por cabeçalho (+ detecção pelo conteúdo)           */
 /* ======================================================================= */
 
 /**
  * Lê uma aba identificando o cabeçalho automaticamente.
- * @param {Sheet} sheet
- * @param {number=} maxRows limita as linhas (diagnóstico)
- * @param {string[]=} onlyFields lê só as colunas desses campos (mais rápido)
+ * opts.fields: lê só as colunas desses campos (mais rápido). opts.maxRows: limita linhas.
  */
-function readTable_(sheet, maxRows, onlyFields) {
-  const empty = { headers: [], headerRow: 0, rows: [], columns: emptyColumns_(), codeColumns: emptyColumns_() };
+function readTable_(sheet, opts) {
+  opts = opts || {};
+  const table = { name: sheet.getName(), headers: [], headerRow: 0, rows: [],
+    columns: emptyColumns_(), codeColumns: emptyColumns_(), extract: emptyColumns_() };
   const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
-  if (lastRow < 1 || lastCol < 1) return empty;
+  if (lastRow < 2 || lastCol < 1) return table;
 
   const scan = sheet.getRange(1, 1, Math.min(CFG.HEADER_SCAN_ROWS, lastRow), lastCol).getDisplayValues();
-  let best = { row: 0, hits: -1, map: null };
+  let best = { row: 0, hits: 0, map: mapHeaders_([]) };
   scan.forEach((hdr, i) => {
     const m = mapHeaders_(hdr);
     const hits = Object.keys(m.columns).filter(k => m.columns[k] >= 0 || m.codeColumns[k] >= 0).length;
     if (hits > best.hits) best = { row: i, hits: hits, map: m };
   });
-  if (best.hits <= 0) return empty;
+  table.headerRow = best.row + 1;
+  table.headers = scan[best.row];
+  table.columns = best.map.columns;
+  table.codeColumns = best.map.codeColumns;
 
-  const headers = scan[best.row];
   const firstData = best.row + 2;
   let nRows = lastRow - firstData + 1;
-  if (maxRows) nRows = Math.min(nRows, maxRows);
-  if (nRows < 1) return Object.assign(empty, { headers: headers, headerRow: best.row + 1, columns: best.map.columns, codeColumns: best.map.codeColumns });
+  if (opts.maxRows) nRows = Math.min(nRows, opts.maxRows);
+  if (nRows < 1) return table;
+
+  // Detecção pelo conteúdo: RPM/Cia/Pel/Gp sem cabeçalho reconhecível.
+  const missing = HIER.filter(t => table.columns[t] < 0 && table.codeColumns[t] < 0);
+  if (missing.length) {
+    const sample = sheet.getRange(firstData, 1, Math.min(nRows, CFG.SAMPLE_ROWS), lastCol).getDisplayValues();
+    const used = Object.keys(table.columns).map(k => table.columns[k]).filter(c => c >= 0);
+    missing.forEach(type => {
+      let bestCol = -1, bestScore = 0;
+      for (let c = 0; c < lastCol; c++) {
+        let filled = 0, hit = 0;
+        sample.forEach(r => { const s = String(r[c] || '').trim(); if (!s) return; filled++; if (extractHier_(s, type)) hit++; });
+        if (!filled || !hit) continue;
+        let score = hit / filled;
+        if (c === table.columns.fracao) score += 0.3;
+        if (used.indexOf(c) < 0) score += 0.1;
+        if (hit / filled >= 0.3 && score > bestScore) { bestScore = score; bestCol = c; }
+      }
+      table.extract[type] = bestCol;
+    });
+  }
 
   // Só lê o intervalo de colunas realmente necessário.
-  let columns = best.map.columns, codeColumns = best.map.codeColumns;
   const wanted = [];
-  Object.keys(columns).forEach(k => {
-    if (onlyFields && onlyFields.indexOf(k) < 0) return;
-    if (columns[k] >= 0) wanted.push(columns[k]);
-    if (codeColumns[k] >= 0) wanted.push(codeColumns[k]);
+  Object.keys(table.columns).forEach(k => {
+    if (opts.fields && opts.fields.indexOf(k) < 0) return;
+    [table.columns[k], table.codeColumns[k], table.extract[k]].forEach(c => { if (c >= 0) wanted.push(c); });
   });
-  if (!wanted.length) return Object.assign(empty, { headers: headers, headerRow: best.row + 1 });
+  if (!wanted.length) return table;
   const minC = Math.min.apply(null, wanted), maxC = Math.max.apply(null, wanted);
-  const rows = sheet.getRange(firstData, minC + 1, nRows, maxC - minC + 1).getValues();
-  const shift = m => { const o = {}; Object.keys(m).forEach(k => o[k] = m[k] >= 0 ? m[k] - minC : -1); return o; };
+  table.rows = sheet.getRange(firstData, minC + 1, nRows, maxC - minC + 1).getValues();
+  const shift = m => { const o = {}; Object.keys(m).forEach(k => o[k] = m[k] >= minC && m[k] <= maxC ? m[k] - minC : -1); return o; };
+  table.allHeaders = table.headers;
+  table.headers = table.headers.slice(minC, maxC + 1);
+  table.columns = shift(table.columns);
+  table.codeColumns = shift(table.codeColumns);
+  table.extract = shift(table.extract);
+  return table;
+}
 
-  return {
-    headers: headers.slice(minC, maxC + 1),
-    headerRow: best.row + 1,
-    rows: rows,
-    columns: shift(columns),
-    codeColumns: shift(codeColumns)
-  };
+/** Base STV: aba "STV" se tiver coordenadas; senão, a aba com coordenadas e mais linhas. */
+function findStvTable_(ss) {
+  const hasCoords = t => (t.columns.lat >= 0 && t.columns.lng >= 0) || t.columns.coord >= 0;
+  const named = findSheet_(ss, CFG.STV_SHEETS);
+  if (named) { const t = readTable_(named); if (hasCoords(t) && t.rows.length) return { sheet: named, table: t }; }
+  let best = null;
+  ss.getSheets().forEach(sh => {
+    if (named && sh.getSheetId() === named.getSheetId()) return;
+    const head = readTable_(sh, { maxRows: 1 });
+    if (!hasCoords(head)) return;
+    if (!best || sh.getLastRow() > best.getLastRow()) best = sh;
+  });
+  return best ? { sheet: best, table: readTable_(best) } : null;
+}
+
+function describeTable_(sheet, t) {
+  const hdr = (t.allHeaders || t.headers).map(h => String(h).trim()).filter(String).slice(0, 20);
+  const found = TYPES.filter(type => hasSource_(t, type))
+    .map(type => type + (t.columns[type] < 0 && t.codeColumns[type] < 0 ? '(pelo conteúdo)' : ''));
+  return '"' + sheet.getName() + '" [linha ' + t.headerRow + ': ' + (hdr.join(', ') || 'vazia') + '] → ' +
+    (found.length ? 'reconhecido: ' + found.join(', ') : 'nada reconhecido');
 }
 
 /** Associa cada campo à melhor coluna do cabeçalho, separando colunas de nome e de código. */
 function mapHeaders_(headerRow) {
   const columns = emptyColumns_(), codeColumns = emptyColumns_();
-  const score = { }, codeScore = { };
+  const score = {}, codeScore = {};
   const fields = Object.keys(FIELD_ALIASES);
-  const words = headerRow.map(h => key_(h).replace(/[^a-z0-9]+/g, ' ').trim());
-
-  words.forEach((h, idx) => {
-    if (!h) return;
+  headerRow.forEach((raw, idx) => {
+    const h = key_(raw).replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!h || h.length > 60) return;
     const tokens = h.split(' ');
     const isCode = tokens.some(w => CODE_WORDS.indexOf(w) >= 0);
     const isName = tokens.some(w => NAME_WORDS.indexOf(w) >= 0);
@@ -347,7 +415,6 @@ function mapHeaders_(headerRow) {
       });
     });
     if (!bestField) return;
-    // "Data/Hora" não pode virar RPM etc.; e "Nº REDS" nunca é campo de hierarquia.
     const target = isCode && !isName && TYPES.indexOf(bestField) >= 0 ? codeColumns : columns;
     const board = target === columns ? score : codeScore;
     const s = bestScore + (isName ? 1 : 0);
