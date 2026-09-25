@@ -135,7 +135,7 @@ function calcularRotaAvancada(p) {
 
   const cells = Object.create(null), sedes = Object.create(null);
   const box = { s: 90, n: -90, w: 180, e: -180 };
-  let total = 0;
+  let total = 0, minDate = 0;
 
   table.rows.forEach(r => {
     let lat, lng;
@@ -163,7 +163,7 @@ function calcularRotaAvancada(p) {
 
     const k = lat.toFixed(3) + ',' + lng.toFixed(3);
     let c = cells[k];
-    if (!c) c = cells[k] = { la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0], h: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
+    if (!c) c = cells[k] = { la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0, 0, 0], h: null, w: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
     c.la += lat; c.lo += lng; c.n++;
     const sev = col.escore >= 0 ? number_(r[col.escore]) : null;
     if (sev !== null) { c.s += sev; c.sn++; }
@@ -174,7 +174,12 @@ function calcularRotaAvancada(p) {
       if (age <= 30) c.r[0]++;
       if (age <= 60) c.r[1]++;
       if (age <= 90) c.r[2]++;
+      if (age > 90 && age <= 180) c.r[3]++;   // trimestre anterior (tendência)
+      if (age <= 365) c.r[4]++;
+      if (!c.w) c.w = [0, 0, 0, 0, 0, 0, 0];
+      c.w[new Date(d).getDay()]++;
       if (d > c.ul) c.ul = d;
+      if (!minDate || d < minDate) minDate = d;
     }
     if (!c.rd && col.rodovia >= 0) c.rd = String(r[col.rodovia] || '').trim();
     if (!c.ci) c.ci = v.cidade || '';
@@ -207,11 +212,60 @@ function calcularRotaAvancada(p) {
     totalRegistros: total,
     referencia: Utilities.formatDate(new Date(ref), tz, 'dd/MM/yyyy'),
     referenciaAjustada: refAjustada,
+    diasBase: minDate ? Math.max(1, Math.round((ref - minDate) / 864e5)) : null,
     temHora: col.hora >= 0, temData: col.data >= 0, temEscore: col.escore >= 0,
     origemSede: origemSede,
     malha: malha,
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
+}
+
+/**
+ * Identifica a rodovia de cada ponto (geocodificação reversa do Google), já que a base
+ * STV não traz rodovia. Resultado guardado na aba oculta _CACHE_RODOVIAS para poupar cota.
+ * pts = [{id, lat, lng}] → { id: {rodovia, local} }
+ */
+function identificarRodovias(pts) {
+  pts = (pts || []).slice(0, 60);
+  const store = geoStore_(), out = {}, novos = [];
+  pts.forEach(p => {
+    const k = Number(p.lat).toFixed(3) + ',' + Number(p.lng).toFixed(3);
+    let v = store.map[k];
+    if (!v) {
+      try { v = parseRoad_(Maps.newGeocoder().setLanguage('pt-BR').setRegion('br').reverseGeocode(p.lat, p.lng)); }
+      catch (e) { v = null; }
+      if (v) { store.map[k] = v; novos.push([k, v.rodovia, v.local]); }
+    }
+    if (v) out[p.id] = v;
+  });
+  if (novos.length && store.sheet) {
+    try { store.sheet.getRange(store.sheet.getLastRow() + 1, 1, novos.length, 3).setValues(novos); } catch (e) { /* sem permissão de escrita */ }
+  }
+  return out;
+}
+function geoStore_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('_CACHE_RODOVIAS');
+  try {
+    if (!sh) { sh = ss.insertSheet('_CACHE_RODOVIAS'); sh.getRange(1, 1, 1, 3).setValues([['chave', 'via', 'local']]); sh.hideSheet(); }
+  } catch (e) { sh = null; }
+  const map = {};
+  if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues().forEach(r => { map[r[0]] = { rodovia: String(r[1] || ''), local: String(r[2] || '') }; });
+  return { sheet: sh, map: map };
+}
+function parseRoad_(res) {
+  if (!res || res.status !== 'OK' || !res.results) return null;
+  let road = '', local = '';
+  res.results.forEach(r => (r.address_components || []).forEach(c => {
+    const txt = (c.short_name || '') + ' ' + (c.long_name || '');
+    if (c.types.indexOf('route') >= 0) {
+      const m = txt.match(/\b(BR|MG|LMG|AMG|MGC)[- ]?(\d{2,3})\b/i);
+      if (m && !/^(BR|MG|LMG|AMG|MGC)-/.test(road)) road = m[1].toUpperCase() + '-' + m[2];
+      else if (!road) road = c.short_name || c.long_name;
+    }
+    if (!local && c.types.indexOf('administrative_area_level_2') >= 0) local = c.long_name;
+  }));
+  return { rodovia: road, local: local };
 }
 
 /** Trechos do PLANO_RODOVIARIO sob responsabilidade da área filtrada. */
@@ -449,7 +503,7 @@ function loadContext_() {
   const skip = [dict, art, findSheet_(ss, CFG.ALERT_SHEETS), findSheet_(ss, CFG.PLANO_SHEETS)].filter(Boolean).map(s => s.getSheetId());
   const tables = [];
   ss.getSheets().forEach(sheet => {
-    if (skip.indexOf(sheet.getSheetId()) >= 0) return;
+    if (skip.indexOf(sheet.getSheetId()) >= 0 || /^_/.test(sheet.getName())) return;
     const t = readTable_(sheet, { fields: TYPES.concat(['fracao', 'sede']), fracCodes: codeToFrac });
     sheetsInfo.push(describeTable_(sheet, t));
     const useful = TYPES.some(type => hasSource_(t, type)) || t.codeColumns.fracao >= 0;
@@ -504,7 +558,7 @@ function loadContext_() {
   });
   const nice = { rpm: 'RPM', cia: 'Companhia', pelotao: 'Pelotão', grupamento: 'Grupamento', cidade: 'Município' };
   TYPES.forEach(type => {
-    if (options[type].length) return;
+    if (options[type].length || type === 'rpm') return;
     if (type === 'rpm') warnings.push('RPM: nenhuma aba traz a RPM de cada município (ex.: "1ª RPM"). ' +
       'Inclua uma coluna "RPM" na aba de municípios (ANEXO_A, uma linha por município) para habilitar o filtro.');
     else warnings.push(nice[type] + ': nenhum valor válido encontrado.');
