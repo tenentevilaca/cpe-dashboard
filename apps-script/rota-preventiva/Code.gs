@@ -25,6 +25,9 @@ function doGet() {
 const CFG = {
   STV_SHEETS: ['DADOS_STV', 'STV', 'Base STV', 'Dados STV'],
   PLANO_SHEETS: ['PLANO_RODOVIARIO', 'PLANO RODOVIARIO', 'Plano Rodoviário'],
+  PLANO_CACHE: '_CACHE_PLANO',   // traçado calibrado de cada trecho do plano (aba oculta)
+  TOL_MALHA_M: 300,              // distância máxima do acidente ao traçado para contar como "na malha"
+  RAZAO_OK: [0.75, 1.35],        // comprimento do traçado ÷ extensão (Fim − Início) aceito na calibração
   ARTICULACAO_SHEETS: ['ARTICULACAO', 'ARTICULAÇÃO', 'Articulacao', 'Articulação'],
   ALERT_SHEETS: ['BLOQUEIOS', 'ALERTAS', 'INTERDICOES', 'INTERDIÇÕES'],
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
@@ -68,6 +71,10 @@ const FIELD_ALIASES = {
   extensao: ['extensao', 'extensao km', 'ext'],
   descIni: ['descricao inicio'],
   descFim: ['descricao fim'],
+  latIni: ['lat inicio', 'latitude inicio', 'lat ini', 'lat inicial', 'latitude inicial'],
+  lngIni: ['long inicio', 'longitude inicio', 'lon inicio', 'lng inicio', 'long ini', 'longitude inicial'],
+  latFim: ['lat fim', 'latitude fim', 'lat final', 'latitude final'],
+  lngFim: ['long fim', 'longitude fim', 'lon fim', 'lng fim', 'longitude final'],
   situacao: ['situacao'],
   tipo: ['tipo', 'natureza', 'tipo alerta', 'categoria'],
   descricao: ['descricao', 'observacao', 'obs', 'detalhe', 'historico']
@@ -192,10 +199,17 @@ function calcularRotaAvancada(p) {
     if (sd) sedes[sd] = (sedes[sd] || 0) + 1;
   });
 
+  const lin = linearRef_(ss, ctx);
   const out = Object.keys(cells).map(k => {
     const c = cells[k];
     c.la = round_(c.la / c.n, 6); c.lo = round_(c.lo / c.n, 6);
     c.ul = c.ul ? Utilities.formatDate(new Date(c.ul), tz, 'dd/MM/yyyy') : '';
+    if (lin.segs.length) {
+      // Km do acidente: projeção da coordenada sobre o traçado calibrado do plano rodoviário.
+      const m = lin.match(c.la, c.lo);
+      if (m) { c.rd = m.rod; c.km = [m.km, m.km]; c.mr = 1; c.sf = m.fr; c.dm = m.dist; }
+      else c.mr = 0;
+    }
     return c;
   }).sort((a, b) => b.n - a.n).slice(0, CFG.MAX_CELLS);
 
@@ -216,6 +230,7 @@ function calcularRotaAvancada(p) {
     temHora: col.hora >= 0, temData: col.data >= 0, temEscore: col.escore >= 0,
     origemSede: origemSede,
     malha: malha,
+    calibracao: lin.info,
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
 }
@@ -266,6 +281,192 @@ function parseRoad_(res) {
     if (!local && c.types.indexOf('administrative_area_level_2') >= 0) local = c.long_name;
   }));
   return { rodovia: road, local: local };
+}
+
+/* ======================================================================= */
+/*  Referência linear: km de cada acidente a partir do PLANO_RODOVIARIO     */
+/* ======================================================================= */
+
+/** Todos os trechos do plano (sem filtro), com a fração responsável e a chave de calibração. */
+function planoRows_(ss, ctx) {
+  const sh = findSheet_(ss, CFG.PLANO_SHEETS);
+  if (!sh) return [];
+  const t = readTable_(sh), c = t.columns;
+  if (c.rodovia < 0 || c.ini < 0 || c.fim < 0) return [];
+  const out = [];
+  t.rows.forEach(r => {
+    const rod = String(r[c.rodovia] || '').trim();
+    const ini = number_(r[c.ini]), fim = number_(r[c.fim]);
+    if (!rod || isJunk_(rod) || ini === null || fim === null || ini === fim) return;
+    const v = rowOwn_(r, t, ctx);
+    const city = v.cidade ? ctx.cities[key_(v.cidade)] : null;
+    const frac = candidates_(v, city)[0] || null;
+    const pt = (a, b) => { const la = a >= 0 ? coord_(r[a], 90) : null, lo = b >= 0 ? coord_(r[b], 180) : null; return la !== null && lo !== null ? [la, lo] : null; };
+    out.push({
+      key: [key_(rod).replace(/[^a-z0-9]/g, ''), ini, fim, key_(v.cidade)].join('|'),
+      rod: rod, ini: ini, fim: fim, mun: v.cidade || '', fr: frac ? fracLabel_(frac) : '',
+      di: c.descIni >= 0 ? String(r[c.descIni] || '').trim() : '',
+      df: c.descFim >= 0 ? String(r[c.descFim] || '').trim() : '',
+      a: pt(c.latIni, c.lngIni), b: pt(c.latFim, c.lngFim)
+    });
+  });
+  return out;
+}
+
+function planoCache_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(CFG.PLANO_CACHE);
+  if (!sh) {
+    try {
+      sh = ss.insertSheet(CFG.PLANO_CACHE);
+      sh.getRange(1, 1, 1, 7).setValues([['chave', 'via', 'origem', 'status', 'razao', 'comprimento_m', 'polyline']]);
+      sh.hideSheet();
+    } catch (e) { return { sheet: null, map: {}, rowOf: {} }; }
+  }
+  const map = {}, rowOf = {};
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach((r, i) => {
+    map[r[0]] = { status: String(r[3]), razao: Number(r[4]), len: Number(r[5]), poly: String(r[6] || ''), origem: String(r[2]) };
+    rowOf[r[0]] = i + 2;
+  });
+  return { sheet: sh, map: map, rowOf: rowOf };
+}
+
+/**
+ * Calibra o PLANO_RODOVIARIO: para cada trecho, localiza início e fim (coordenadas das
+ * colunas Lat/Long Início/Fim, se existirem; senão, pela Descrição Início/Fim + município),
+ * pede ao Google o traçado viário entre eles e confere o comprimento com Fim − Início.
+ * Roda por até ~4,5 min e agenda a continuação sozinha. Execute pelo editor (ou pelo botão no app).
+ */
+function calibrarPlanoRodoviario(refazer) {
+  const t0 = Date.now(), ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ctx = cacheGet_('ctx') || loadContext_();
+  const rows = planoRows_(ss, ctx);
+  if (!rows.length) return { ok: false, motivo: 'PLANO_RODOVIARIO sem colunas Rodovia, Início e Fim.' };
+  const cache = planoCache_();
+  if (!cache.sheet) return { ok: false, motivo: 'Sem permissão para criar a aba ' + CFG.PLANO_CACHE + '.' };
+  let feitos = 0, pendentes = 0;
+  const seen = {};
+  for (let i = 0; i < rows.length; i++) {
+    const s = rows[i];
+    if (seen[s.key]) continue; seen[s.key] = 1;
+    const prev = cache.map[s.key];
+    if (prev && (prev.status === 'ok' || (refazer !== true && prev.status))) continue;
+    if (Date.now() - t0 > 270000) { pendentes++; continue; }
+    const res = calibrarTrecho_(s);
+    const line = [s.key, s.rod, res.origem, res.status, res.razao, res.len, res.poly];
+    if (cache.rowOf[s.key]) cache.sheet.getRange(cache.rowOf[s.key], 1, 1, 7).setValues([line]);
+    else { cache.sheet.appendRow(line); cache.rowOf[s.key] = cache.sheet.getLastRow(); }
+    feitos++;
+  }
+  // Continua sozinho em 1 minuto se faltou tempo.
+  try {
+    ScriptApp.getProjectTriggers().filter(tr => tr.getHandlerFunction() === 'calibrarPlanoRodoviario').forEach(tr => ScriptApp.deleteTrigger(tr));
+    if (pendentes) ScriptApp.newTrigger('calibrarPlanoRodoviario').timeBased().after(60000).create();
+  } catch (e) { /* sem permissão de gatilho: basta executar de novo */ }
+  const resumo = resumoCalibracao_(rows, planoCache_().map);
+  resumo.feitosAgora = feitos; resumo.pendentes = pendentes;
+  Logger.log(JSON.stringify(resumo));
+  return resumo;
+}
+
+function calibrarTrecho_(s) {
+  const out = { origem: '', status: '', razao: '', len: '', poly: '' };
+  try {
+    let a = s.a, b = s.b;
+    out.origem = a && b ? 'coordenadas' : 'descrição';
+    const geo = txt => {
+      if (!txt) return null;
+      const q = [s.rod + ' ' + txt, txt].map(x => x + (s.mun ? ', ' + s.mun : '') + ', ' + CFG.UF + ', Brasil');
+      for (let i = 0; i < q.length; i++) {
+        const r = Maps.newGeocoder().setRegion('br').setLanguage('pt-BR').geocode(q[i]);
+        if (r.status === 'OK' && r.results.length) { const l = r.results[0].geometry.location; return [l.lat, l.lng]; }
+      }
+      return null;
+    };
+    if (!a) a = geo(s.di);
+    if (!b) b = geo(s.df);
+    if (!a || !b) { out.status = 'falha: início/fim não localizados'; return out; }
+    const res = Maps.newDirectionFinder().setRegion('br').setMode(Maps.DirectionFinder.Mode.DRIVING)
+      .setOrigin(a[0], a[1]).setDestination(b[0], b[1]).getDirections();
+    if (!res || res.status !== 'OK' || !res.routes.length) { out.status = 'falha: sem traçado (' + (res && res.status) + ')'; return out; }
+    const rt = res.routes[0];
+    const len = rt.legs.reduce((x, l) => x + l.distance.value, 0);
+    const razao = len / (Math.abs(s.fim - s.ini) * 1000);
+    out.len = len; out.razao = round_(razao, 2); out.poly = rt.overview_polyline.points;
+    out.status = razao >= CFG.RAZAO_OK[0] && razao <= CFG.RAZAO_OK[1] ? 'ok' : 'revisar';
+  } catch (e) { out.status = 'falha: ' + (e.message || e); }
+  return out;
+}
+
+function resumoCalibracao_(rows, map) {
+  const r = { trechos: 0, ok: 0, revisar: 0, falha: 0, semCalibrar: 0 };
+  const seen = {};
+  rows.forEach(s => {
+    if (seen[s.key]) return; seen[s.key] = 1; r.trechos++;
+    const m = map[s.key];
+    if (!m || !m.status) r.semCalibrar++;
+    else if (m.status === 'ok') r.ok++;
+    else if (m.status === 'revisar') r.revisar++;
+    else r.falha++;
+  });
+  return r;
+}
+
+/** Monta o índice espacial dos trechos calibrados ("ok") e a função de projeção ponto → km. */
+function linearRef_(ss, ctx) {
+  const rows = planoRows_(ss, ctx);
+  const empty = { segs: [], match: () => null, info: null };
+  if (!rows.length) return empty;
+  const cache = planoCache_();
+  const info = resumoCalibracao_(rows, cache.map);
+  const segs = [], grid = {}, G = 0.01, pad = CFG.TOL_MALHA_M / 111320;
+  const seen = {};
+  rows.forEach(s => {
+    const m = cache.map[s.key];
+    if (seen[s.key] || !m || m.status !== 'ok' || !m.poly) return;
+    seen[s.key] = 1;
+    const pts = pairs_(Maps.decodePolyline(m.poly));
+    if (pts.length < 2) return;
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + distM_(pts[i - 1], pts[i]));
+    const seg = { rod: s.rod, ini: s.ini, fim: s.fim, fr: s.fr, pts: pts, cum: cum, len: cum[cum.length - 1] };
+    const si = segs.push(seg) - 1;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const la0 = Math.min(pts[i][0], pts[i + 1][0]) - pad, la1 = Math.max(pts[i][0], pts[i + 1][0]) + pad;
+      const lo0 = Math.min(pts[i][1], pts[i + 1][1]) - pad, lo1 = Math.max(pts[i][1], pts[i + 1][1]) + pad;
+      for (let y = Math.floor(la0 / G); y <= Math.floor(la1 / G); y++)
+        for (let x = Math.floor(lo0 / G); x <= Math.floor(lo1 / G); x++) (grid[y + ':' + x] = grid[y + ':' + x] || []).push([si, i]);
+    }
+  });
+  info.malhaKm = round_(segs.reduce((a, s) => a + Math.abs(s.fim - s.ini), 0), 1);
+  const match = (lat, lng) => {
+    const cand = grid[Math.floor(lat / G) + ':' + Math.floor(lng / G)];
+    if (!cand) return null;
+    let best = null;
+    cand.forEach(([si, i]) => {
+      const s = segs[si], p = projM_([lat, lng], s.pts[i], s.pts[i + 1]);
+      if (p.d <= CFG.TOL_MALHA_M && (!best || p.d < best.d)) best = { s: s, i: i, t: p.t, d: p.d };
+    });
+    if (!best) return null;
+    const s = best.s, along = s.cum[best.i] + best.t * (s.cum[best.i + 1] - s.cum[best.i]);
+    const km = s.ini + (s.fim - s.ini) * (s.len ? along / s.len : 0);  // escala para a extensão oficial do plano
+    return { rod: s.rod, km: round_(km, 1), fr: s.fr, dist: Math.round(best.d) };
+  };
+  return { segs: segs, match: match, info: info };
+}
+function distM_(a, b) {
+  const cos = Math.cos(a[0] * Math.PI / 180), dy = (b[0] - a[0]) * 111320, dx = (b[1] - a[1]) * 111320 * cos;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+/** Projeção de p no segmento a→b (metros): distância e fração t do segmento. */
+function projM_(p, a, b) {
+  const cos = Math.cos(a[0] * Math.PI / 180);
+  const bx = (b[1] - a[1]) * 111320 * cos, by = (b[0] - a[0]) * 111320;
+  const px = (p[1] - a[1]) * 111320 * cos, py = (p[0] - a[0]) * 111320;
+  const L2 = bx * bx + by * by;
+  const t = L2 ? Math.max(0, Math.min(1, (px * bx + py * by) / L2)) : 0;
+  const dx = px - t * bx, dy = py - t * by;
+  return { t: t, d: Math.sqrt(dx * dx + dy * dy) };
 }
 
 /** Trechos do PLANO_RODOVIARIO sob responsabilidade da área filtrada. */
@@ -449,6 +650,8 @@ function diagnosticarPlanilha() {
   TYPES.forEach(t => report.push(t.toUpperCase() + ': ' + ctx.options[t].length + ' opções → ' + ctx.options[t].slice(0, 12).join(', ')));
   report.push('Municípios com fração vinculada: ' + Object.keys(ctx.cities).filter(k => Object.keys(ctx.cities[k].fracs).length).length);
   report.push('Frações com código: ' + Object.keys(ctx.codeToFrac).length);
+  const rows = planoRows_(SpreadsheetApp.getActiveSpreadsheet(), ctx);
+  if (rows.length) { const c = resumoCalibracao_(rows, planoCache_().map); report.push('Plano rodoviário: ' + c.trechos + ' trechos · calibrados ' + c.ok + ' · revisar ' + c.revisar + ' · falha ' + c.falha + ' · sem calibrar ' + c.semCalibrar); }
   ctx.warnings.forEach(w => report.push('AVISO: ' + w));
   Logger.log(report.join('\n'));
   return report;

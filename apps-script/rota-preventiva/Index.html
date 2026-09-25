@@ -179,11 +179,12 @@
         <div class="time-range"><select id="horaIni" aria-label="Hora inicial"></select><span>até</span><select id="horaFim" aria-label="Hora final"></select></div>
       </div>
       <div class="form-group span2">
-        <span class="group-title">Ponderação da predição</span>
+        <span class="group-title">Ponderação e abrangência</span>
         <div class="checks">
           <label><input type="checkbox" id="chkGravidade" checked> Gravidade × volume de registros STV</label>
           <label><input type="checkbox" id="chkRecente" checked> Ponderação recente (w₂₀₂₆ = <span id="lblPeso">0,6</span>) nos últimos
             <select id="selJanela"><option value="0">30</option><option value="1">60</option><option value="2" selected>90</option></select> dias</label>
+          <label title="Considera só acidentes a até 300 m de um trecho do PLANO_RODOVIARIO"><input type="checkbox" id="chkMalha" checked> Somente acidentes na malha PMRv (km do plano rodoviário)</label>
         </div>
       </div>
       <div class="form-group"><label for="selectOrigem">Início da rota</label>
@@ -369,9 +370,29 @@
         const b = res.bounds ? L.latLngBounds(res.bounds) : null;
         if (b && b.isValid()) map.fitBounds(b.pad(0.05), {padding:[30,30], maxZoom:14});
         $('viewbar').style.display = 'flex';
+        calibNotice();
         analyze(true);
         loadAlerts();
       }).catch(err => { $('btnGerar').disabled=false; loading(false); alert('Falha ao calcular: '+(err&&err.message||err)); });
+    }
+    function calibNotice() {
+      const c = RESULT.calibracao;
+      $('chkMalha').disabled = !calibrado();
+      if (!c || !c.trechos) return;
+      const falta = c.semCalibrar + c.falha + c.revisar;
+      if (!c.ok || c.semCalibrar) notice('<button class="x" type="button" onclick="notice(\'\')" aria-label="Fechar">✕</button><strong>Km dos acidentes:</strong> '+
+        (c.ok ? c.ok+' de '+c.trechos+' trechos do plano rodoviário já calibrados; faltam '+c.semCalibrar+'.' : 'o plano rodoviário ainda não foi calibrado — sem isso não dá para saber o km nem se o acidente está na malha PMRv.')+
+        ' <button class="btn-sm" type="button" onclick="calibrar()">Calibrar agora</button> <small>(leva alguns minutos; continua sozinho em segundo plano)</small>');
+      else if (falta) notice('<button class="x" type="button" onclick="notice(\'\')" aria-label="Fechar">✕</button><strong>Plano rodoviário:</strong> '+c.ok+' trechos calibrados; '+(c.revisar+c.falha)+' precisam de revisão (veja a aba oculta _CACHE_PLANO). Inclua as colunas Lat/Long Início e Lat/Long Fim nesses trechos para calibração exata.');
+    }
+    function calibrar() {
+      loading(true,'Calibrando o plano rodoviário (localizando início e fim de cada trecho)… pode levar até 5 minutos.');
+      run('calibrarPlanoRodoviario').then(r => {
+        loading(false);
+        if (!r || r.ok === false) { notice('<strong>Calibração:</strong> '+esc(r && r.motivo || 'falhou')); return; }
+        notice('<strong>Calibração:</strong> '+r.ok+' de '+r.trechos+' trechos calibrados'+(r.revisar+r.falha?'; '+(r.revisar+r.falha)+' para revisar':'')+(r.pendentes?'; '+r.pendentes+' continuam em segundo plano (gere a rota de novo em alguns minutos)':'')+'.');
+        processRoute();
+      }).catch(err => { loading(false); notice('<strong>Calibração:</strong> '+esc(err && err.message || err)); });
     }
     function clearMap() { [L_view,L_route,L_access,L_alerts].forEach(l => l.clearLayers()); if (HEAT) { map.removeLayer(HEAT); HEAT=null; } $('insight').style.display='none'; }
 
@@ -408,16 +429,17 @@
     function topKeys(o) { return Object.keys(o).sort((a,b)=>o[b]-o[a]); }
     function toTime(s) { const m=String(s).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(+m[3],m[2]-1,+m[1]).getTime() : 0; }
     function aggregate(ms) {
-      const a={lat:0,lng:0,n:0,s:0,sn:0,r:[0,0,0,0,0],h:null,w:null,rd:{},ci:{},fr:{},sd:{},km:null,ul:'',cells:ms.length};
+      const a={lat:0,lng:0,n:0,s:0,sn:0,r:[0,0,0,0,0],h:null,w:null,rd:{},ci:{},fr:{},sd:{},sf:{},km:null,ul:'',cells:ms.length,nm:0,dm:null};
       ms.forEach(m => {
         a.lat+=m.la*m.n; a.lng+=m.lo*m.n; a.n+=m.n; a.s+=m.s; a.sn+=m.sn; for (let k=0;k<5;k++) a.r[k]+=(m.r[k]||0);
         if (m.h) { a.h=a.h||new Array(24).fill(0); m.h.forEach((v,k)=>a.h[k]+=v); }
         if (m.w) { a.w=a.w||new Array(7).fill(0); m.w.forEach((v,k)=>a.w[k]+=v); }
-        inc(a.rd,m.rd,m.n); inc(a.ci,m.ci,m.n); inc(a.fr,m.fr,m.n); inc(a.sd,m.sd,m.n);
+        inc(a.rd,m.rd,m.n); inc(a.ci,m.ci,m.n); inc(a.fr,m.fr,m.n); inc(a.sd,m.sd,m.n); inc(a.sf,m.sf,m.n);
+        if (m.mr === 1) { a.nm += m.n; if (a.dm === null || m.dm < a.dm) a.dm = m.dm; }
         if (m.km) a.km = a.km ? [Math.min(a.km[0],m.km[0]),Math.max(a.km[1],m.km[1])] : m.km.slice();
         if (m.ul && (!a.ul || toTime(m.ul) > toTime(a.ul))) a.ul=m.ul;
       });
-      a.lat/=a.n; a.lng/=a.n; a.rodovias=topKeys(a.rd); a.cidades=topKeys(a.ci); a.fracoes=topKeys(a.fr); a.sede=topKeys(a.sd)[0]||'';
+      a.lat/=a.n; a.lng/=a.n; a.rodovias=topKeys(a.rd); a.cidades=topKeys(a.ci); a.fracoes=topKeys(a.fr); a.sede=topKeys(a.sd)[0]||''; a.fracMalha=topKeys(a.sf)[0]||'';
       return a;
     }
     /** Peso de cada registro na predição: recência (w₂₀₂₆) × gravidade, conforme os marcadores. */
@@ -452,9 +474,13 @@
     function peakHour(h) { if (!h || !h.some(Boolean)) return null; const m=Math.max(...h); return h.indexOf(m); }
     function enrich(c) { c.janela = bestWindow(c.h); c.diaPrev = bestDay(c.w); c.trend = trendOf(c); c.e30 = expected30(c); c.pico = peakHour(c.h); }
 
+    function calibrado() { return !!(RESULT && RESULT.calibracao && RESULT.calibracao.ok); }
+    /** Registros considerados: todos, ou só os projetados sobre a malha do plano rodoviário. */
+    function activeCells() { return $('chkMalha').checked && calibrado() ? RESULT.cells.filter(c => c.mr === 1) : RESULT.cells; }
     function analyze(withRoute) {
       if (!RESULT || !RESULT.cells.length) return;
-      const R = radius(), cells = RESULT.cells;
+      const R = radius(), cells = RESULT.act = activeCells();
+      if (!cells.length) { clearMap(); $('viewbar').style.display='flex'; notice('<strong>Malha:</strong> nenhum registro desta área está a até 300 m dos trechos calibrados do plano rodoviário. Desmarque “Somente na malha PMRv” para ver todos.'); INC=[]; PRED=[]; ROUTE=null; return; }
       G_HOURS = new Array(24).fill(0); G_DAYS = new Array(7).fill(0);
       cells.forEach(c => { if (c.h) c.h.forEach((v,i)=>G_HOURS[i]+=v); if (c.w) c.w.forEach((v,i)=>G_DAYS[i]+=v); });
       if (!G_HOURS.some(Boolean)) G_HOURS = null; if (!G_DAYS.some(Boolean)) G_DAYS = null;
@@ -479,7 +505,7 @@
     /** Validação retroativa: modelo treinado sem os últimos 90 dias; mede quanto os N pontos previstos captaram desses 90 dias. */
     function backtest(R) {
       if (!RESULT.temData) return null;
-      const cells = RESULT.cells, tot = cells.reduce((a,c)=>a+c.r[2],0);
+      const cells = RESULT.act, tot = cells.reduce((a,c)=>a+c.r[2],0);
       if (tot < 5 || cells.every(c => c.n === c.r[2])) return null;
       const lam = kde(cells, R, c => Math.max(0, c.n - c.r[2]));
       const order = cells.map((_,i)=>i).sort((a,b)=>lam[b]-lam[a]), K = Number($('selectPontos').value), seeds = [];
@@ -505,7 +531,7 @@
       if (MODE === 'incid') { if (map.hasLayer(L_route)) map.removeLayer(L_route); }
       else if (!map.hasLayer(L_route)) map.addLayer(L_route);
       if (MODE === 'rota' || !RESULT) return;
-      const cells = RESULT.cells, isPred = MODE === 'pred';
+      const cells = RESULT.act, isPred = MODE === 'pred';
       if (REPR === 'kernel' && !L.heatLayer) { notice('<strong>Kernel:</strong> a biblioteca de mapa de calor não carregou; exibindo clusters.'); setRepr('cluster'); }
       if (REPR === 'kernel') {
         const w = isPred ? Array.from(RESULT.lam) : cells.map(c=>c.n);
@@ -527,6 +553,13 @@
         .bindPopup(() => popupHtml(c)).on('click', () => openCard(c)).addTo(L_view);
     }
     function roadOf(c) { return (c.rodovias && c.rodovias[0]) || (ROADS[key3(c)] && ROADS[key3(c)].rodovia) || ''; }
+    function kmTxt(c) { return c.km ? 'km '+fmt(c.km[0],1)+(c.km[1]!==c.km[0]?' a '+fmt(c.km[1],1):'') : ''; }
+    function malhaTxt(c) {
+      if (!calibrado()) return '';
+      if (c.nm >= c.n) return '✅ dentro da malha PMRv'+(c.fracMalha?' · trecho de '+c.fracMalha:'');
+      if (c.nm > 0) return '◐ '+fmt(c.nm)+' de '+fmt(c.n)+' registros na malha PMRv';
+      return '⚠ fora da malha PMRv (a mais de 300 m dos trechos calibrados)';
+    }
     function winTxt(c) { return c.janela ? hh(c.janela.ini)+'–'+hh(c.janela.fim) : 'N/D'; }
     /** Escore de risco histórico, com a mesma ponderação dos marcadores. */
     function score(c) {
@@ -538,7 +571,8 @@
     function popupHtml(c) {
       const stop = ROUTE ? ROUTE.stops.findIndex(s => s.id===c.id) : -1;
       return '<div class="popup-card"><h4>'+(c.kind==='pred'?'Ponto Preditivo #':'Local de acidentes #')+c.rank+'</h4>'+
-        '<strong>Rodovia:</strong> '+esc(roadOf(c)||'N/D')+'<br>'+
+        '<strong>Rodovia:</strong> '+esc(roadOf(c)||'N/D')+(c.km?' · '+kmTxt(c):'')+'<br>'+
+        (malhaTxt(c)?'<small>'+esc(malhaTxt(c))+'</small><br>':'')+
         '<strong>Cidade:</strong> '+esc(c.cidades.slice(0,2).join(', ')||'N/D')+'<br>'+
         '<strong>Fração responsável:</strong> '+esc(c.fracoes[0]||'PMRv')+'<br>'+
         '<strong>Escore de Risco:</strong> '+(c.kind==='pred' ? fmt(c.escore,0)+'/100' : fmt(score(c),1))+'<br>'+
@@ -549,7 +583,7 @@
     }
     function updateSummary() {
       $('summary').innerHTML = '<span>Área: <b>'+esc(RESULT.area)+'</b></span><span>Horário: <b>'+esc(RESULT.janela)+'</b></span>'+
-        '<span>Registros STV: <b>'+fmt(RESULT.totalRegistros)+'</b></span>'+
+        '<span>Registros STV: <b>'+fmt(RESULT.totalRegistros)+'</b>'+(calibrado() && $('chkMalha').checked ? ' (na malha: <b>'+fmt(RESULT.act.reduce((a,c)=>a+c.n,0))+'</b>)' : '')+'</span>'+
         '<span>'+(MODE==='incid'?'Locais':'Pontos previstos')+' (raio '+km(radius())+'): <b>'+fmt((MODE==='incid'?INC:PRED).length)+'</b></span>'+
         (ROUTE ? '<span>Rota: <b>'+ROUTE.stops.length+' pontos'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):'')+'</b></span>' : '');
     }
@@ -557,8 +591,8 @@
     /* ---------- síntese da fração: incidência × predição ---------- */
     function placeTxt(c) {
       const road = roadOf(c), seg = planoFor(c).find(s => roadNum(s.rod) && roadNum(s.rod) === roadNum(road));
-      const kmTxt = c.km ? ' km '+fmt(c.km[0],0)+(c.km[1]!==c.km[0]?'–'+fmt(c.km[1],0):'') : (seg && seg.ini!=null ? ' (trecho km '+fmt(seg.ini,0)+'–'+fmt(seg.fim,0)+')' : '');
-      return [road ? road+kmTxt : '', c.cidades[0]].filter(Boolean).join(' · ') || fmt(c.lat,4)+', '+fmt(c.lng,4);
+      const k = c.km ? ' '+kmTxt(c) : (seg && seg.ini!=null ? ' (trecho km '+fmt(seg.ini,0)+'–'+fmt(seg.fim,0)+')' : '');
+      return [road ? road+k : '', c.cidades[0]].filter(Boolean).join(' · ') || fmt(c.lat,4)+', '+fmt(c.lng,4);
     }
     function renderInsight() {
       const box = $('insight'); if (!RESULT || !INC.length) { box.style.display='none'; return; }
@@ -573,8 +607,14 @@
           '<a onclick="focusC(PRED[0])">'+esc(placeTxt(p0))+'</a><br>'+
           'Janela prevista: <b>'+winTxt(p0)+'</b>'+(p0.diaPrev?' · <b>'+DIAS[p0.diaPrev.dia]+'</b>':'')+
           (p0.e30!=null?'<br>≈ <b>'+fmt(p0.e30,1)+'</b> acidente(s) esperado(s)':'')+(tr!=null?' · tendência '+(tr>0?'↑ '+tr+'%':tr<0?'↓ '+(-tr)+'%':'estável'):'')+'</div></div>' : '')+
+        (calibrado() ? '<div class="ins-block"><div class="ic">🛣</div><div><h5>Malha sob responsabilidade</h5>'+malhaResumo()+'</div></div>' : '')+
         (BACKTEST ? '<div class="ins-block"><div class="ic">✅</div><div><h5>Acerto retroativo do modelo</h5>Os '+BACKTEST.k+' pontos previstos (sem os últimos 90 dias) concentraram <b>'+fmt(BACKTEST.pct*100,0)+'%</b> dos '+fmt(BACKTEST.tot)+' acidentes seguintes, em ~'+fmt(BACKTEST.areaPct*100,1)+'% da área.</div></div>' : '');
       box.style.display = 'block';
+    }
+    function malhaResumo() {
+      const all = RESULT.cells.reduce((a,c)=>a+c.n,0), na = RESULT.cells.reduce((a,c)=>a+(c.mr===1?c.n:0),0), cal = RESULT.calibracao;
+      return '<b>'+fmt(na)+'</b> de '+fmt(all)+' registros (<b>'+fmt(all?na/all*100:0,0)+'%</b>) estão sobre a malha do plano ('+fmt(cal.malhaKm,1)+' km calibrados; '+cal.ok+' de '+cal.trechos+' trechos).'+
+        ($('chkMalha').checked ? ' A análise usa só esses registros.' : ' A análise inclui também os de fora da malha.');
     }
     function focusC(c) { if (!c) return; map.setView([c.lat,c.lng], Math.max(map.getZoom(), 12)); openCard(c); }
 
@@ -714,7 +754,8 @@
           (c.e30!=null?'<br>Esperado em 30 dias: <b>≈ '+fmt(c.e30,1)+'</b> acidente(s)':'')+(tr!=null?' · tendência trimestral '+(tr>0?'↑ '+tr+'%':tr<0?'↓ '+(-tr)+'%':'estável'):'')+
           (c.kind==='pred'?'<br>Intensidade prevista: <b>'+fmt(c.escore,0)+'/100</b>':'')+'</div>'+
         '<h4>Trecho</h4><dl class="kv">'+
-        '<dt>Rodovia</dt><dd>'+esc(roadOf(c)||'identificando…')+(c.km?' · km '+fmt(c.km[0],1)+(c.km[1]!==c.km[0]?' a '+fmt(c.km[1],1):''):'')+'</dd>'+
+        '<dt>Rodovia</dt><dd>'+esc(roadOf(c)||'identificando…')+(c.km?' · '+kmTxt(c):'')+'</dd>'+
+        (malhaTxt(c)?'<dt>Malha</dt><dd>'+esc(malhaTxt(c))+'</dd>':'')+
         '<dt>Município</dt><dd>'+esc(c.cidades.slice(0,3).join(', ')||'N/D')+'</dd>'+
         '<dt>Fração</dt><dd>'+esc(c.fracoes[0]||'PMRv')+'</dd>'+
         (sede?'<dt>Sede</dt><dd>'+esc(sede)+'</dd>':'')+
@@ -789,13 +830,14 @@
           '<div class="b i" style="width:'+Math.max(2,x.inc/mi*100)+'%"></div><div class="b p" style="width:'+Math.max(2,x.pred/mp*100)+'%"></div>'+
           '<span class="lbl">'+fmt(x.inc)+' reg. · '+(RESULT.temData?'≈ '+fmt(x.pred,1)+' previstos':fmt(x.pred*100,0))+'</span></div></div>').join('')+'</div>'
           : '<p class="muted">'+(pending?'Identificando as rodovias dos pontos…':'Sem rodovias identificadas.')+'</p>');
-      const withKm = RESULT.cells.filter(c => c.km && c.rd);
+      const withKm = RESULT.act.filter(c => c.km && c.rd);
       if (withKm.length) {
         const byRoad = {}; withKm.forEach(c => (byRoad[c.rd] = byRoad[c.rd] || []).push(c));
-        const road = Object.keys(byRoad).sort((a,b)=>byRoad[b].length-byRoad[a].length)[0];
-        html += '<h4>Perfil por km — '+esc(road)+'</h4>'+kmProfile(byRoad[road]);
+        Object.keys(byRoad).sort((a,b)=>byRoad[b].reduce((s,c)=>s+c.n,0)-byRoad[a].reduce((s,c)=>s+c.n,0)).slice(0,4).forEach(road => {
+          html += '<h4>Perfil por km — '+esc(road)+'</h4>'+kmProfile(byRoad[road])+'<p class="muted" style="font-size:.66rem"><span style="color:#dc2626">■</span> acidentes por km · <span style="color:var(--purple)">▬</span> intensidade prevista</p>';
+        });
       } else {
-        html += '<h4>Perfil por km (proposta)</h4><p class="muted" style="font-size:.72rem">A DADOS_STV não traz <b>rodovia</b> e <b>km</b>. Com essas duas colunas (o REDS registra ambas), esta aba passa a mostrar, para cada rodovia, a faixa de km com barras de incidência e a curva de predição — ex.: <i>BR-381 km 450–455: 18 acidentes; predição alta às sextas, 17h–20h</i>. Até lá, a rodovia de cada ponto é identificada pelo mapa e o trecho de km vem do PLANO_RODOVIARIO.</p>';
+        html += '<h4>Perfil por km</h4><p class="muted" style="font-size:.72rem">Disponível após calibrar o plano rodoviário: cada acidente recebe o km pela projeção da coordenada sobre o traçado do trecho (Início–Fim).</p>';
       }
       const malha = RESULT.malha || [];
       if (malha.length) {
@@ -867,7 +909,7 @@
     $('rangeRaio').addEventListener('input', onRadius);
     $('rangeRaio').addEventListener('change', () => { if (RESULT) { clearTimeout(tmr); analyze(true); } });
     $('selectTurno').addEventListener('change', e => { $('divCustomHora').hidden = e.target.value !== 'CUSTOM'; });
-    ['chkGravidade','chkRecente','selJanela'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) analyze(true); }));
+    ['chkGravidade','chkRecente','selJanela','chkMalha'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) analyze(true); }));
     ['selectPontos','selectKm','selectOrigem'].forEach(id => $(id).addEventListener('change', () => {
       if (id==='selectOrigem' && $(id).value==='GPS' && GPS.watch===null) toggleGps();
       if (RESULT) { if (id==='selectPontos') BACKTEST = backtest(radius()); buildRoute(); renderInsight(); }

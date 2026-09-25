@@ -40,4 +40,19 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
   trechos e km do PLANO_RODOVIARIO.
 - Cartão do trecho, rotas de acesso com alternativas, alertas (aba BLOQUEIOS / Waze for Cities) e GPS.
 
+## Km dos acidentes e malha sob responsabilidade
+A DADOS_STV não traz rodovia nem km. O app deduz os dois a partir do **PLANO_RODOVIARIO**:
+1. **Calibração** (uma vez; botão "Calibrar agora" no app ou função `calibrarPlanoRodoviario` no editor):
+   para cada trecho, localiza início e fim — pelas colunas **Lat/Long Início** e **Lat/Long Fim**, se existirem
+   (recomendado, exato), ou pela Descrição Início/Fim + município — e obtém do Google o traçado viário
+   entre eles. O comprimento do traçado é conferido com Fim − Início (aceito entre 75% e 135%).
+   O resultado fica na aba oculta `_CACHE_PLANO` (status `ok`, `revisar` ou `falha`). Se o tempo acabar,
+   a calibração continua sozinha em segundo plano.
+2. **Projeção**: cada acidente a até 300 m de um trecho calibrado recebe **rodovia e km**
+   (proporcional à extensão oficial Início–Fim) e é marcado como **dentro da malha PMRv**; os demais, fora.
+3. O marcador "Somente acidentes na malha PMRv" restringe a análise, a predição e a rota à malha.
+
+Trechos com status `revisar`/`falha`: preencha as coordenadas de início e fim no plano e rode
+`calibrarPlanoRodoviario(true)` para refazê-los.
+
 Após alterar a planilha, execute `limparCache` (o cache dura 30 min).
