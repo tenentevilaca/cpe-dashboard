@@ -23,7 +23,8 @@ function doGet() {
 }
 
 const CFG = {
-  STV_SHEETS: ['STV', 'Base STV', 'Dados STV'],
+  STV_SHEETS: ['DADOS_STV', 'STV', 'Base STV', 'Dados STV'],
+  PLANO_SHEETS: ['PLANO_RODOVIARIO', 'PLANO RODOVIARIO', 'Plano Rodoviário'],
   ARTICULACAO_SHEETS: ['ARTICULACAO', 'ARTICULAÇÃO', 'Articulacao', 'Articulação'],
   ALERT_SHEETS: ['BLOQUEIOS', 'ALERTAS', 'INTERDICOES', 'INTERDIÇÕES'],
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
@@ -50,7 +51,7 @@ const FIELD_ALIASES = {
   pelotao: ['pelotao', 'pel', 'pel pmrv', 'pelotao pmrv', 'pelotoes'],
   grupamento: ['grupamento', 'gp', 'gp pmrv', 'grupamento pmrv', 'destacamento', 'grupamentos'],
   cidade: ['municipio', 'cidade', 'municipio cidade', 'localidade', 'municipios', 'cidades',
-           'municipio atendido', 'municipios atendidos', 'area de responsabilidade'],
+           'municipio atendido', 'municipios atendidos', 'area de responsabilidade', 'mun', 'ibge'],
   sede: ['sede', 'municipio sede', 'cidade sede', 'sede da fracao'],
   fracao: ['fracao', 'fracao responsavel', 'unidade', 'unidade responsavel', 'ueop', 'subunidade',
            'lotacao', 'uop', 'fracao pmrv', 'unidade pmrv', 'hierarquia', 'responsavel', 'fracoes'],
@@ -61,7 +62,13 @@ const FIELD_ALIASES = {
   hora: ['hora', 'horario', 'hora fato', 'hora do fato', 'hora ocorrencia', 'data hora', 'data hora fato'],
   escore: ['escore', 'score', 'escore de risco', 'risco', 'indice de risco', 'peso', 'gravidade'],
   rodovia: ['rodovia', 'br', 'via', 'rodovia km', 'trecho'],
-  km: ['km', 'marco km', 'quilometro', 'km inicial'],
+  km: ['km', 'marco km', 'quilometro'],
+  ini: ['inicio', 'km inicio', 'km inicial', 'inicio km', 'km ini'],
+  fim: ['fim', 'km fim', 'km final', 'fim km'],
+  extensao: ['extensao', 'extensao km', 'ext'],
+  descIni: ['descricao inicio'],
+  descFim: ['descricao fim'],
+  situacao: ['situacao'],
   tipo: ['tipo', 'natureza', 'tipo alerta', 'categoria'],
   descricao: ['descricao', 'observacao', 'obs', 'detalhe', 'historico']
 };
@@ -91,7 +98,8 @@ function getDadosCompletosFiltros() {
     rpms: ctx.options.rpm, cias: ctx.options.cia, pelotoes: ctx.options.pelotao,
     grupamentos: ctx.options.grupamento, cidades: ctx.options.cidade,
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO },
-    avisos: ctx.warnings
+    avisos: ctx.warnings,
+    leitura: ctx.sheetsInfo
   };
   if (!ctx.warnings.length) cacheSet_('options', result);
   return result;
@@ -115,6 +123,7 @@ function calcularRotaAvancada(p) {
     grupamento: selectedKey_(p.grupamento), cidade: selectedKey_(p.cidade)
   };
   const fracFilter = !!(sel.cia || sel.pelotao || sel.grupamento);
+  const sedeLevel = sel.grupamento ? 'grupamento' : sel.pelotao ? 'pelotao' : 'cia';
   const from = finite_(p.horaInicio), to = finite_(p.horaFim), useHours = from !== null && to !== null;
 
   // Data de referência da ponderação recente: hoje; se a base for mais antiga, o registro mais recente.
@@ -174,7 +183,8 @@ function calcularRotaAvancada(p) {
       const km = number_(r[col.km]);
       if (km !== null) c.km = c.km ? [Math.min(c.km[0], km), Math.max(c.km[1], km)] : [km, km];
     }
-    if (frac && frac.sede) sedes[frac.sede] = (sedes[frac.sede] || 0) + 1;
+    const sd = frac ? (frac.sedes && frac.sedes[sedeLevel]) || frac.sede : '';
+    if (sd) sedes[sd] = (sedes[sd] || 0) + 1;
   });
 
   const out = Object.keys(cells).map(k => {
@@ -189,6 +199,7 @@ function calcularRotaAvancada(p) {
   if (fracFilter) sedeNome = Object.keys(sedes).sort((a, b) => sedes[b] - sedes[a])[0] || '';
   if (!sedeNome && sel.cidade) sedeNome = String(p.cidade || '');
   const origemSede = sedeNome ? geocode_(sedeNome) : null;
+  const malha = planoSegments_(ss, ctx, sel, fracFilter);
 
   return {
     cells: out,
@@ -198,8 +209,41 @@ function calcularRotaAvancada(p) {
     referenciaAjustada: refAjustada,
     temHora: col.hora >= 0, temData: col.data >= 0, temEscore: col.escore >= 0,
     origemSede: origemSede,
+    malha: malha,
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
+}
+
+/** Trechos do PLANO_RODOVIARIO sob responsabilidade da área filtrada. */
+function planoSegments_(ss, ctx, sel, fracFilter) {
+  const sh = findSheet_(ss, CFG.PLANO_SHEETS);
+  if (!sh) return [];
+  const t = readTable_(sh), c = t.columns;
+  if (c.rodovia < 0) return [];
+  const out = [];
+  t.rows.forEach(r => {
+    const v = rowOwn_(r, t, ctx);
+    const city = v.cidade ? ctx.cities[key_(v.cidade)] : null;
+    const rpm = v.rpm || (city ? city.rpm || city.rpmFrac : '') || '';
+    if (sel.rpm && key_(rpm) !== sel.rpm) return;
+    if (sel.cidade && key_(v.cidade) !== sel.cidade) return;
+    const cands = candidates_(v, city);
+    let frac = cands[0] || null;
+    if (fracFilter) { frac = cands.find(f => matchFrac_(f, sel)); if (!frac) return; }
+    const rod = String(r[c.rodovia] || '').trim();
+    if (!rod || isJunk_(rod)) return;
+    const ini = c.ini >= 0 ? number_(r[c.ini]) : null, fim = c.fim >= 0 ? number_(r[c.fim]) : null;
+    let ext = c.extensao >= 0 ? number_(r[c.extensao]) : null;
+    if (ext === null && ini !== null && fim !== null) ext = Math.abs(fim - ini);
+    out.push({
+      rod: rod, ini: ini, fim: fim, ext: ext !== null ? round_(ext, 1) : null,
+      di: c.descIni >= 0 ? String(r[c.descIni] || '').trim() : '',
+      df: c.descFim >= 0 ? String(r[c.descFim] || '').trim() : '',
+      mun: v.cidade || '', fr: frac ? fracLabel_(frac) : '',
+      sit: c.situacao >= 0 ? String(r[c.situacao] || '').trim() : ''
+    });
+  });
+  return out.slice(0, 800);
 }
 
 /**
@@ -377,7 +421,8 @@ function loadContext_() {
     if (f && FRAC.some(t => f[t])) {
       const fk = FRAC.map(t => f[t] || '').join('|');
       const prev = c.fracs[fk];
-      c.fracs[fk] = { cia: f.cia || '', pelotao: f.pelotao || '', grupamento: f.grupamento || '', sede: (prev && prev.sede) || f.sede || '' };
+      c.fracs[fk] = { cia: f.cia || '', pelotao: f.pelotao || '', grupamento: f.grupamento || '', sede: (prev && prev.sede) || f.sede || '',
+                      sedes: Object.assign({}, f.sedes || {}, (prev && prev.sedes) || {}) };
       if (f.rpm && !c.rpmFrac) c.rpmFrac = f.rpm;
     }
   };
@@ -388,7 +433,7 @@ function loadContext_() {
     const type = typeKey_(row[0]);
     const code = String(row[1] || '').trim();
     const name = strictName_(row[2], type);
-    if (type && code && name) labels[type][code] = name;
+    if (type && code && name) { labels[type][code] = name; codeVariants_(code).forEach(k => labels[type][k] = name); }
   });
 
   // 2) ARTICULACAO
@@ -400,13 +445,27 @@ function loadContext_() {
   }
 
   // 3) Demais abas com hierarquia/município
-  const skip = [dict, art, findSheet_(ss, CFG.ALERT_SHEETS)].filter(Boolean).map(s => s.getSheetId());
+  // O PLANO_RODOVIARIO descreve trechos de rodovia; não define a hierarquia das frações.
+  const skip = [dict, art, findSheet_(ss, CFG.ALERT_SHEETS), findSheet_(ss, CFG.PLANO_SHEETS)].filter(Boolean).map(s => s.getSheetId());
+  const tables = [];
   ss.getSheets().forEach(sheet => {
     if (skip.indexOf(sheet.getSheetId()) >= 0) return;
     const t = readTable_(sheet, { fields: TYPES.concat(['fracao', 'sede']), fracCodes: codeToFrac });
     sheetsInfo.push(describeTable_(sheet, t));
     const useful = TYPES.some(type => hasSource_(t, type)) || t.codeColumns.fracao >= 0;
-    if (!useful) return;
+    if (useful) tables.push(t);
+  });
+  // 3a) Código ↔ nome na mesma linha (ex.: ANEXO_A: MUNICIPIO + COD - IBGE + COD MUN REDS).
+  tables.forEach(t => TYPES.forEach(type => {
+    const nc = t.columns[type], cols = t.codeLists[type] || [];
+    if (nc < 0 || !cols.length) return;
+    t.rows.forEach(r => {
+      const name = strictName_(r[nc], type);
+      if (name) cols.forEach(c => codeVariants_(r[c]).forEach(k => { if (!labels[type][k]) labels[type][k] = name; }));
+    });
+  }));
+  // 3b) Município → frações e RPM.
+  tables.forEach(t => {
     t.rows.forEach(r => {
       const v = rowOwn_(r, t, { labels: labels, codeToFrac: codeToFrac });
       if (v.cidade) addCity(v.cidade, v.rpm, v);
@@ -444,11 +503,16 @@ function loadContext_() {
     options[type] = Object.keys(set).map(k => set[k]).sort(sortPt_);
   });
   const nice = { rpm: 'RPM', cia: 'Companhia', pelotao: 'Pelotão', grupamento: 'Grupamento', cidade: 'Município' };
-  TYPES.forEach(type => { if (!options[type].length) warnings.push(nice[type] + ': nenhum valor válido encontrado.'); });
-  if (warnings.length) warnings.push('Abas lidas → ' + sheetsInfo.join(' ║ '));
+  TYPES.forEach(type => {
+    if (options[type].length) return;
+    if (type === 'rpm') warnings.push('RPM: nenhuma aba traz a RPM de cada município (ex.: "1ª RPM"). ' +
+      'Inclua uma coluna "RPM" na aba de municípios (ANEXO_A, uma linha por município) para habilitar o filtro.');
+    else warnings.push(nice[type] + ': nenhum valor válido encontrado.');
+  });
 
   cacheSet_('ctx', { labels: labels, cities: cities, codeToFrac: codeToFrac });
-  return { labels: labels, cities: cities, codeToFrac: codeToFrac, tuples: tuples, options: options,
+  const semCidade = Object.keys(cities).length;
+  return { labels: labels, cities: cities, codeToFrac: codeToFrac, tuples: tuples, options: options, municipios: semCidade,
            warnings: warnings, sheetsInfo: sheetsInfo };
 }
 
@@ -490,14 +554,24 @@ function parseArticulacao_(sheet, codeToFrac, addCity) {
         tuple[t] = v;
       });
       const code = b.code !== undefined ? codeKey_(row[b.code]) : '';
+      const upperSedes = [];
       const cityList = [];
       (b.cidade || []).forEach(c => String(row[c] || '').split(/\s*[;,\n]\s*|\s+e\s+/).forEach(x => {
         const n = cityName_(x); if (n) cityList.push(n);
       }));
       let sede = b.sede !== undefined ? cityName_(row[b.sede]) : '';
+      ['grupamento', 'pelotao', 'cia'].forEach(lv => {
+        if (!sede && b['sede_' + lv] !== undefined && tuple[lv]) sede = cityName_(row[b['sede_' + lv]]);
+      });
+      ['cia', 'pelotao', 'grupamento'].forEach(lv => {  // sedes de níveis superiores também são atendidas
+        const c = b['sede_' + lv] !== undefined ? cityName_(row[b['sede_' + lv]]) : '';
+        if (c && tuple[lv]) upperSedes.push([c, lv]);
+      });
       if (!sede && b.fracao !== undefined) sede = sedeFromText_(row[b.fracao]);
       // Linha que define a fração (com código) e um só município: esse município é a sede.
       if (!sede && code && cityList.length === 1) sede = cityList[0];
+      tuple.sedes = {};
+      FRAC.forEach(lv => { if (b['sede_' + lv] !== undefined && tuple[lv]) { const c = cityName_(row[b['sede_' + lv]]); if (c) tuple.sedes[lv] = c; } });
       let has = FRAC.some(t => tuple[t]);
       if (has) { tuple.sede = sede; lastFrac[bi] = tuple; }
       else if (!code && cityList.length && lastFrac[bi]) {
@@ -508,11 +582,16 @@ function parseArticulacao_(sheet, codeToFrac, addCity) {
       if (code && has) {
         const prev = codeToFrac[code] || {};
         HIER.concat(['sede']).forEach(t => { if (!prev[t] && tuple[t]) prev[t] = tuple[t]; });
+        prev.sedes = Object.assign({}, tuple.sedes || {}, prev.sedes || {});
         codeToFrac[code] = prev;
       }
       if (!cityList.length) cityList.push('');
       cityList.forEach(city => {
         if (code || has || city || sede) recs.push({ code: code, tuple: tuple, has: has, city: city, sede: sede });
+      });
+      upperSedes.forEach(x => {
+        const f = { cia: tuple.cia, pelotao: x[1] === 'cia' ? '' : tuple.pelotao, grupamento: '', sede: x[0] };
+        recs.push({ code: '', tuple: f, has: true, city: x[0], sede: x[0] });
       });
     });
   }
@@ -523,6 +602,7 @@ function parseArticulacao_(sheet, codeToFrac, addCity) {
       const full = codeToFrac[rec.code];
       f = Object.assign({}, f);
       FRAC.concat(['sede', 'rpm']).forEach(t => { if (!f[t] && full[t]) f[t] = full[t]; });
+      f.sedes = Object.assign({}, full.sedes || {}, f.sedes || {});
     }
     if (rec.city) { addCity(rec.city, rec.tuple.rpm, f); if (f) served++; }
     const sede = rec.sede || (f && f.sede);
@@ -539,6 +619,7 @@ function articRole_(h) {
   const tokens = n.split(' ');
   const isCode = tokens.some(w => CODE_WORDS.indexOf(w) >= 0);
   const field = bestField_(n);
+  if (isSedeHeader_(tokens)) return 'sede_' + sedeLevel_(tokens);
   if (tokens.indexOf('sede') >= 0) return 'sede';
   if (tokens.indexOf('ibge') >= 0 || (isCode && field === 'cidade')) return 'cidadeCode';
   if (tokens.indexOf('reds') >= 0) return '';
@@ -583,9 +664,22 @@ function hasSource_(t, type) {
 function cellName_(r, table, type, labels) {
   const nc = table.columns[type], cc = table.codeColumns[type], xc = table.extract ? table.extract[type] : -1;
   let v = nc >= 0 ? nameFrom_(r[nc], type, labels) : '';
-  if (!v && cc >= 0) { const l = labels[type][cellStr_(r[cc])]; v = l ? strictName_(l, type) : ''; }
+  if (!v) {
+    const cols = (table.codeLists && table.codeLists[type] && table.codeLists[type].length) ? table.codeLists[type] : (cc >= 0 ? [cc] : []);
+    for (let i = 0; i < cols.length && !v; i++) { const l = lookupCode_(labels[type], r[cols[i]]); if (l) v = strictName_(l, type); }
+  }
   if (!v && xc >= 0) v = extractHier_(r[xc], type);
   return v;
+}
+function codeVariants_(raw) {
+  const k = codeKey_(raw);
+  if (!k) return [];
+  return /^\d{7}$/.test(k) ? [k, k.slice(0, 6)] : [k];
+}
+function lookupCode_(map, raw) {
+  const ks = codeVariants_(raw);
+  for (let i = 0; i < ks.length; i++) if (map[ks[i]]) return map[ks[i]];
+  return '';
 }
 function nameFrom_(raw, type, labels) {
   const s = cellStr_(raw);
@@ -601,7 +695,7 @@ function nameFrom_(raw, type, labels) {
 function readTable_(sheet, opts) {
   opts = opts || {};
   const table = { name: sheet.getName(), headers: [], headerRow: 0, rows: [], rejected: {},
-    columns: emptyColumns_(), codeColumns: emptyColumns_(), extract: emptyColumns_() };
+    columns: emptyColumns_(), codeColumns: emptyColumns_(), codeLists: {}, extract: emptyColumns_() };
   const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
   if (lastRow < 2 || lastCol < 1) return table;
 
@@ -616,6 +710,7 @@ function readTable_(sheet, opts) {
   table.headers = scan[best.row];
   table.columns = best.map.columns;
   table.codeColumns = best.map.codeColumns;
+  table.codeLists = best.map.codeLists;
 
   const firstData = best.row + 2;
   let nRows = lastRow - firstData + 1;
@@ -665,7 +760,7 @@ function readTable_(sheet, opts) {
   const wanted = [];
   Object.keys(table.columns).forEach(k => {
     if (opts.fields && opts.fields.indexOf(k) < 0) return;
-    [table.columns[k], table.codeColumns[k], table.extract[k]].forEach(c => { if (c >= 0) wanted.push(c); });
+    [table.columns[k], table.codeColumns[k], table.extract[k]].concat(table.codeLists[k] || []).forEach(c => { if (c >= 0) wanted.push(c); });
   });
   if (!wanted.length) return table;
   const minC = Math.min.apply(null, wanted), maxC = Math.max.apply(null, wanted);
@@ -676,6 +771,7 @@ function readTable_(sheet, opts) {
   table.columns = shift(table.columns);
   table.codeColumns = shift(table.codeColumns);
   table.extract = shift(table.extract);
+  Object.keys(table.codeLists).forEach(k => { table.codeLists[k] = table.codeLists[k].filter(c => c >= minC && c <= maxC).map(c => c - minC); });
   return table;
 }
 
@@ -694,7 +790,7 @@ function findStvTable_(ss, fracCodes) {
 }
 
 function describeTable_(sheet, t) {
-  const hdr = (t.allHeaders || t.headers).map(h => String(h).trim()).filter(String).slice(0, 20);
+  const hdr = (t.allHeaders || t.headers).map(h => String(h).trim()).filter(String).slice(0, 40);
   const found = TYPES.filter(type => hasSource_(t, type))
     .map(type => type + (t.columns[type] < 0 && t.codeColumns[type] < 0 ? '(pelo conteúdo)' : ''));
   if (t.codeColumns.fracao >= 0) found.push('código da fração');
@@ -719,7 +815,7 @@ function bestField_(h) {
 
 /** Associa cada campo à melhor coluna do cabeçalho, separando colunas de nome e de código. */
 function mapHeaders_(headerRow) {
-  const columns = emptyColumns_(), codeColumns = emptyColumns_();
+  const columns = emptyColumns_(), codeColumns = emptyColumns_(), codeLists = {};
   const score = {}, codeScore = {};
   headerRow.forEach((raw, idx) => {
     const h = key_(raw).replace(/[^a-z0-9]+/g, ' ').trim();
@@ -729,9 +825,10 @@ function mapHeaders_(headerRow) {
     const isName = tokens.some(w => NAME_WORDS.indexOf(w) >= 0);
     let field = bestField_(h);
     if (!field) return;
-    if (tokens.indexOf('sede') >= 0) field = 'sede';
+    if (tokens.indexOf('sede') >= 0 || isSedeHeader_(tokens)) field = 'sede';
     const codeable = TYPES.indexOf(field) >= 0 || field === 'fracao';
     const target = isCode && !isName && codeable ? codeColumns : columns;
+    if (target === codeColumns) (codeLists[field] = codeLists[field] || []).push(idx);
     const board = target === columns ? score : codeScore;
     const s = (FIELD_ALIASES[field].indexOf(h) >= 0 ? 4 : 2) + (isName ? 1 : 0);
     if (board[field] === undefined || s > board[field]) { board[field] = s; target[field] = idx; }
@@ -740,7 +837,20 @@ function mapHeaders_(headerRow) {
       ['data', 'hora'].forEach(f => { if (columns[f] < 0) columns[f] = idx; });
     }
   });
-  return { columns: columns, codeColumns: codeColumns };
+  if (columns.hora < 0 && columns.data >= 0) columns.hora = columns.data; // data com horário
+  return { columns: columns, codeColumns: codeColumns, codeLists: codeLists };
+}
+
+/** "CIA - MUNICÍPIO", "Pelotão - Município": município-sede da fração, não nome de fração. */
+function isSedeHeader_(tokens) {
+  const city = tokens.some(w => ['municipio', 'cidade', 'sede'].indexOf(w) >= 0);
+  const hier = tokens.some(w => ['cia', 'companhia', 'pelotao', 'pel', 'grupamento', 'gp'].indexOf(w) >= 0);
+  return city && hier;
+}
+function sedeLevel_(tokens) {
+  if (tokens.some(w => w === 'grupamento' || w === 'gp')) return 'grupamento';
+  if (tokens.some(w => w === 'pelotao' || w === 'pel')) return 'pelotao';
+  return 'cia';
 }
 
 function emptyColumns_() {
@@ -756,9 +866,10 @@ function containsWords_(tokens, aliasTokens) {
 }
 function findSheet_(ss, names) {
   for (let i = 0; i < names.length; i++) { const s = ss.getSheetByName(names[i]); if (s) return s; }
-  const wanted = names.map(key_);
+  const nk = s => key_(s).replace(/[_\-.]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const wanted = names.map(nk);
   const all = ss.getSheets();
-  for (let i = 0; i < all.length; i++) if (wanted.indexOf(key_(all[i].getName())) >= 0) return all[i];
+  for (let i = 0; i < all.length; i++) if (wanted.indexOf(nk(all[i].getName())) >= 0) return all[i];
   return null;
 }
 function readDictionary_(ss) {
@@ -803,7 +914,8 @@ function strictName_(raw, type) {
   if (isOpaque_(s) || hierCount_(s) > 0 || /^\d/.test(s)) return '';
   if (!/[A-Za-zÀ-ú]{3,}/.test(s)) return '';
   const m = s.match(type === 'pelotao' ? /^(?:Pel(?:ot[aã]o)?\.?)\s+(.+)$/i : /^(?:Gp|Grupamento)\s+(.+)$/i);
-  const base = m ? m[1] : s;
+  const base = (m ? m[1] : s).replace(/^(?:PM\s*RV|PRV|RV)\s+/i, '').trim();
+  if (!base) return '';
   return (type === 'pelotao' ? 'Pelotão ' : 'Grupamento ') + (base === base.toUpperCase() ? titleCase_(base) : base);
 }
 function extractHier_(value, type) {

@@ -42,7 +42,9 @@
     .btn-pair{display:flex;gap:6px}.btn-clear{flex:0 0 auto;width:auto;padding:0 10px;height:34px;background:#fff;border:1px solid #ccd2db;border-radius:6px;color:var(--muted);font-weight:750;font-size:.78rem;cursor:pointer}
     .span2{grid-column:span 2}
     .btn-filtros{display:none;border:1px solid #475569;background:transparent;color:#e5e7eb;border-radius:6px;padding:6px 10px;font-weight:800;font-size:.72rem;cursor:pointer}
-    .notice{display:none;padding:7px 16px;background:#fff7e0;border-bottom:1px solid #ecd9a0;color:#6b5210;font-size:.74rem;line-height:1.45;max-height:120px;overflow:auto}.notice strong{color:#4a3808}
+    .notice{display:none;position:relative;padding:7px 40px 7px 16px;background:#fff7e0;border-bottom:1px solid #ecd9a0;color:#6b5210;font-size:.74rem;line-height:1.45;max-height:150px;overflow:auto}
+    .notice details{margin-top:3px}.notice summary{cursor:pointer;font-weight:700}.notice .x{position:absolute;right:10px;top:5px;border:0;background:transparent;font-size:1rem;cursor:pointer;color:#6b5210}
+    .seg{padding:6px 8px;border-left:4px solid var(--gold);background:#faf7ee;margin:4px 0;border-radius:4px}.notice strong{color:#4a3808}
     .summary{display:none;gap:16px;flex-wrap:wrap;padding:6px 16px;background:#f9fafb;border-bottom:1px solid var(--line);font-size:.74rem;color:var(--muted)}.summary b{color:var(--navy)}
     /* Mapa + painel lateral */
     .map-wrap{position:relative;flex:1;min-height:0}#map{position:absolute;inset:0;background:#e8e5db}
@@ -276,8 +278,10 @@
         TUPLAS = Array.isArray(res.tuplas) ? res.tuplas : [];
         if (res.pesos) { PESOS = res.pesos; $('lblPeso').textContent = fmt(PESOS.recente,1); }
         refreshOptions(0);
-        const av = Array.isArray(res.avisos) ? res.avisos : [];
-        if (av.length) notice('<strong>Atenção:</strong>' + av.map(a => '<div>• '+esc(a)+'</div>').join(''));
+        const av = Array.isArray(res.avisos) ? res.avisos : [], lt = Array.isArray(res.leitura) ? res.leitura : [];
+        if (av.length) notice('<button class="x" type="button" onclick="notice(\'\')" aria-label="Fechar">✕</button><strong>Atenção:</strong>' + av.map(a => '<div>• '+esc(a)+'</div>').join('') +
+          (lt.length ? '<details><summary>Ver como cada aba foi lida</summary>' + lt.map(x => '<div>• '+esc(x)+'</div>').join('') + '</details>' : ''));
+        if (!TUPLAS.some(t => t[0])) $('selectRpm').title = 'A planilha ainda não informa a RPM dos municípios';
         loading(false);
       }).catch(err => { loading(false); notice('<strong>Falha ao carregar filtros:</strong> '+esc(err && err.message || err)); });
     }
@@ -514,6 +518,7 @@
         (c.ul?'<dt>Último registro</dt><dd>'+esc(c.ul)+'</dd>':'')+
         (c.sn?'<dt>Gravidade média</dt><dd>'+fmt(c.s/c.sn,1)+'</dd>':'')+
         '<dt>Abrangência</dt><dd>raio de '+km(radius())+' ('+c.cells+' células)</dd></dl>'+
+        '<h4>Plano rodoviário — trechos da área</h4>'+planoHtml(c)+
         '<h4>Horário dos registros</h4>'+hoursHtml(c.h)+
         '<h4>Alertas na via (até 5 km)</h4>'+(near.length ? near.slice(0,6).map(a=>'<div class="alert-item'+(alertIcon(a.tipo)==='⛔'?' closed':'')+'">'+alertIcon(a.tipo)+' <b>'+esc(a.tipo)+'</b> a '+km(a.d)+(a.via?' · '+esc(a.via):'')+(a.desc?'<br><small>'+esc(a.desc)+'</small>':'')+'</div>').join('') : '<p class="muted">Nenhum alerta cadastrado'+(ALERTS.fontes.length?' ('+esc(ALERTS.fontes.join(', '))+')':'')+'.</p>')+
         '<h4>Deslocamento para atendimento</h4>'+
@@ -522,6 +527,32 @@
         '<a class="btn-sm gm" target="_blank" rel="noopener" href="'+gmapsUrl(c)+'">Google Maps</a>'+
         '<button class="btn-sm ghost" type="button" onclick="map.setView(['+c.lat+','+c.lng+'],14)">Centralizar</button></div>'+
         '<div id="accessBox"></div>';
+    }
+    function roadNum(s) { const m=String(s||'').match(/(\d{2,3})/); return m ? String(Number(m[1])) : ''; }
+    function segKm(s) { return s.ini!=null && s.fim!=null ? 'km '+fmt(s.ini,1)+' a '+fmt(s.fim,1) : ''; }
+    function segHtml(s) {
+      return '<div class="seg"><b>'+esc(s.rod)+'</b>'+(segKm(s)?' · '+segKm(s):'')+(s.ext!=null?' · '+fmt(s.ext,1)+' km':'')+
+        ((s.di||s.df)?'<br><small>'+esc(s.di||'?')+' → '+esc(s.df||'?')+'</small>':'')+
+        '<br><small>'+esc([s.mun, s.fr, s.sit].filter(Boolean).join(' · '))+'</small></div>';
+    }
+    function planoHtml(c) {
+      const malha = (RESULT && RESULT.malha) || [];
+      if (!malha.length) return '<p class="muted">Sem trechos do PLANO_RODOVIARIO para a área filtrada.</p>';
+      const roads = c.rodovias.map(roadNum).filter(Boolean), cities = c.cidades.map(norm);
+      let segs = malha.filter(s => roads.length && roads.includes(roadNum(s.rod)) &&
+        (!c.km || s.ini==null || (c.km[1] >= Math.min(s.ini,s.fim)-1 && c.km[0] <= Math.max(s.ini,s.fim)+1)));
+      if (!segs.length) segs = malha.filter(s => cities.includes(norm(s.mun)));
+      if (!segs.length) return '<p class="muted">Nenhum trecho do plano rodoviário cadastrado para '+esc(c.cidades[0]||'este ponto')+'.</p>';
+      return segs.slice(0,6).map(segHtml).join('') + (segs.length>6?'<p class="muted">+ '+(segs.length-6)+' trecho(s)</p>':'');
+    }
+    function malhaHtml() {
+      const malha = (RESULT && RESULT.malha) || [];
+      if (!malha.length) return '';
+      const by = {}; malha.forEach(s => { const k=s.rod; by[k]=by[k]||{rod:k,ext:0,n:0}; by[k].ext+=Number(s.ext)||0; by[k].n++; });
+      const list = Object.values(by).sort((a,b)=>b.ext-a.ext), total = list.reduce((a,x)=>a+x.ext,0);
+      return '<h4>Malha sob responsabilidade (plano rodoviário)</h4><p>'+malha.length+' trechos · <b>'+fmt(total,1)+' km</b></p>'+
+        list.slice(0,12).map(x => '<div class="seg"><b>'+esc(x.rod)+'</b> · '+fmt(x.ext,1)+' km em '+x.n+' trecho(s)</div>').join('')+
+        (list.length>12?'<p class="muted">+ '+(list.length-12)+' rodovia(s)</p>':'');
     }
     function accessRoutes(id) {
       const c = CLUSTERS.find(x => x.id===id) || (ROUTE && ROUTE.stops.find(x => x.id===id)); if (!c) return;
@@ -561,7 +592,7 @@
           return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>#'+s.rank+' · '+esc(s.rodovias[0]||'Rodovia N/D')+'</b><br><small>'+esc(s.cidades[0]||'')+' · escore '+fmt(s.escore,1)+' · '+fmt(s.n)+' reg.'+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
             '<div style="display:flex;flex-direction:column;gap:3px"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><button class="btn-sm ghost" type="button" onclick="openCard(ROUTE.stops['+i+'])">Cartão</button></div></div>'; }).join('')+
         (ROUTE.back&&ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Retorno:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
-        (ROUTE.avisos&&ROUTE.avisos.length?'<p class="muted"><small>'+esc(ROUTE.avisos.join(' '))+'</small></p>':'');
+        (ROUTE.avisos&&ROUTE.avisos.length?'<p class="muted"><small>'+esc(ROUTE.avisos.join(' '))+'</small></p>':'')+malhaHtml();
     }
     function alertsHtml() {
       const a = ALERTS.alertas, j = ALERTS.congestionamentos;
