@@ -29,7 +29,8 @@
     .ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;font-size:.6rem;color:#94a3b8;padding-top:4px}
     .ticks span::before{content:"";position:absolute;left:50%;top:-1px;width:1px;height:5px;background:#94a3b8}
     .ruler-hint{font-size:.62rem;color:#94a3b8;display:flex;justify-content:space-between;margin-top:3px;gap:8px}
-    .btn-filtros{display:none;border:1px solid #475569;background:transparent;color:#e5e7eb;border-radius:6px;padding:6px 10px;font-weight:800;font-size:.72rem;cursor:pointer}
+    .controls-panel.collapsed{display:none}
+    .btn-filtros{display:inline-block;border:1px solid #475569;background:transparent;color:#e5e7eb;border-radius:6px;padding:6px 10px;font-weight:800;font-size:.72rem;cursor:pointer}
     /* Filtros */
     .controls-panel{display:grid;grid-template-columns:repeat(6,minmax(128px,1fr));gap:9px 10px;align-items:end;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 7px #0000000d;z-index:400}
     .form-group label,.group-title{display:block;margin:0 0 4px;font-size:.62rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
@@ -400,6 +401,7 @@
       run('calcularRotaAvancada', params).then(res => {
         $('btnGerar').disabled = false; loading(false);
         if (isPhone()) { $('controls').classList.add('collapsed'); $('insight').classList.add('min'); }
+        else if (window.innerHeight < 800) toggleFiltros(false);   // notebook: mais espaço para o mapa
         RESULT = res; ROUTE = null; CURRENT = null; L_access.clearLayers();
         if (!res || !res.cells || !res.cells.length) { clearMap(); alert('Nenhum registro encontrado para os filtros selecionados.'); return; }
         RESULT.janela = tw.label; RESULT.area = areaLabel();
