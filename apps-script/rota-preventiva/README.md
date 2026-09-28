@@ -24,6 +24,10 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
 ("01ª RPM", "03ª Cia PMRv"); valores como "Sim/Não", "#######" e "#N/A" são ignorados.
 
 ## Funcionalidades
+- **Dois ambientes.** *Efetivo* (padrão, sem login): só fração, horário e **📋 Gerar cartão programa**;
+  o mapa mostra apenas a rota do dia e o Cartão programa (paradas, horários, Google Maps/Waze, impressão).
+  A rota é a do gestor, se houver plano em vigor, ou a rota preditiva otimizada do sistema.
+  *Gestão* (após login na aba 🛡 Gestão): todas as opções abaixo, mais o botão **Ver como o efetivo**.
 - Filtros em cascata: Cia → Pelotão → Grupamento → Município (só mostra os subordinados). Sem RPM.
 - Três visões: **Locais de acidentes** (histórico), **Predição** (necessidade de operação preventiva)
   e **Somente rotas preditivas**; cada uma em **Cluster** ou **Kernel** (mapa de calor).
