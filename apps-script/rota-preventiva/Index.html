@@ -1510,7 +1510,7 @@
       loading(true,'Verificando acesso...');
       run('gestaoLogin', {usuario:u, senha:s}).then(r => {
         loading(false);
-        if (!r.ok) return gMsg(esc(r.motivo));
+        if (!r.ok) { GEST.status = undefined; return gMsg(esc(r.motivo)); }
         GEST.token = r.token; GEST.user = r; GEST.msg = ''; gStore(r.token);
         GEST.view = r.trocarSenha ? 'senha' : 'planos'; gLoadPlanos();
       }).catch(err => { loading(false); gMsg(esc(err.message||err)); });
@@ -1676,9 +1676,18 @@
     /* ---------- telas ---------- */
     function gestHtml() {
       const msg = GEST.msg || '';
-      if (!GEST.token) return '<h3>🛡 Gestão</h3><p class="muted">Acesso restrito a gestores autorizados pelo administrador. Aqui o gestor vê a sugestão do sistema e define a rota e os pontos base de operação da sua fração.</p>'+msg+
+      if (!GEST.token) {
+        if (GEST.status === undefined) { GEST.status = null; run('gestaoStatus').then(r => { GEST.status = r; gRender(); }).catch(() => {}); }
+        const semAdmin = GEST.status && !GEST.status.adminDefinido;
+        return '<h3>🛡 Gestão</h3><p class="muted">Acesso restrito a gestores autorizados pelo administrador. Aqui o gestor vê a sugestão do sistema e define a rota e os pontos base de operação da sua fração.</p>'+msg+
+        (semAdmin ? '<div class="g-banner sys"><b>Primeiro acesso do administrador</b><br>A senha do administrador ainda não foi criada. Ela é criada <b>na planilha do Google</b>, não aqui:<ol style="margin:6px 0 4px 18px;padding:0">'+
+          '<li>Abra a planilha e recarregue a página (F5).</li><li>No menu do alto, clique em <b>Rota Preventiva ▸ Definir senha do administrador</b> e digite a senha.</li>'+
+          '<li>Volte aqui e entre com o usuário <b>admin</b> e essa senha.</li></ol>'+
+          '<small>Sem o menu? No editor do Apps Script: ⚙ Configurações do projeto ▸ Propriedades do script ▸ adicionar <b>ADMIN_SENHA</b> com a senha.</small></div>' : '')+
         '<form class="g-form" onsubmit="gLogin(event)"><label>Usuário<input id="gUser" autocomplete="username" autocapitalize="none" required></label>'+
-        '<label>Senha<input id="gPass" type="password" autocomplete="current-password" required></label><button class="btn-sm" type="submit">Entrar</button></form>';
+        '<label>Senha<input id="gPass" type="password" autocomplete="current-password" required></label><button class="btn-sm" type="submit">Entrar</button></form>'+
+        '<p class="muted" style="font-size:.7rem">Administrador: usuário <b>admin</b>. Gestores: usuário e senha provisória recebidos do administrador.</p>';
+      }
       const u = GEST.user, adm = u.papel === 'admin';
       let h = '<div class="g-head"><div><b>'+esc(u.nome)+'</b><br><small>'+(adm ? 'Administrador · todo o CPE' : 'Gestor · '+esc(escopoTxt(u.escopo)))+'</small></div>'+
         '<div>'+(adm?'':'<button class="btn-sm ghost" type="button" onclick="GEST.view=\'senha\';gRender()">Senha</button> ')+'<button class="btn-sm ghost" type="button" onclick="gLogout()">Sair</button></div></div>';

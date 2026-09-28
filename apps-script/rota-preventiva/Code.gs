@@ -1553,6 +1553,11 @@ function gestaoLogin(req) {
   cache.put('gs_' + token, JSON.stringify(sess), GESTAO.SESSAO_S);
   return { ok: true, token: token, usuario: sess.usuario, nome: sess.nome, papel: sess.papel, escopo: sess.escopo, trocarSenha: sess.trocar };
 }
+/** Situação do acesso (sem dados sensíveis): a senha do administrador já foi definida? */
+function gestaoStatus() {
+  const p = PropertiesService.getScriptProperties();
+  return { adminDefinido: !!(p.getProperty('ADMIN_HASH') || p.getProperty('ADMIN_SENHA')) };
+}
 function gestaoSair(token) { if (token) CacheService.getScriptCache().remove('gs_' + token); return { ok: true }; }
 
 /** Valida o token; para gestor, confere na aba se continua ativo (o administrador pode desativar a qualquer momento). */
