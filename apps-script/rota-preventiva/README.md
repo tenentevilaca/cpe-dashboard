@@ -42,6 +42,17 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
   trechos e km do PLANO_RODOVIARIO.
 - Cartão do trecho, rotas de acesso com alternativas, alertas (aba BLOQUEIOS / Waze for Cities) e GPS.
 
+## Aprendizagem de máquina (sem custo, no navegador)
+- **Onde** (acidentes em 30 dias por trecho de 1 km): Gradient Boosting com perda de Poisson,
+  regressão Binomial Negativa e a regra w₂₀₂₆. Validação retroativa em 3 janelas (últimos 30/60/90 dias);
+  o modo automático usa o de maior acerto nos N trechos principais. Placar na aba **Modelo**.
+- **Quando**: regressão de Poisson por dia × faixa de 3 h × região, com calendário brasileiro
+  (feriados fixos e móveis, vésperas, férias) e chuva.
+- **Clima**: chuva horária do **Open-Meteo** (gratuito, sem cadastro, uso não comercial). O efeito é testado com
+  intervalo de 95%, descontando dia, horário e região; só entra na previsão se for comprovado.
+- **Próximos 7 dias**: risco por faixa horária (calendário + chuva prevista, quando comprovada).
+- **ST-DBSCAN** (1 km, 30 dias, mínimo 4): ativo, emergente, em queda, controlado, esporádico; a rota pode excluir os controlados.
+
 ## Km dos acidentes e malha sob responsabilidade
 A DADOS_STV não traz rodovia nem km. O app deduz os dois a partir do **PLANO_RODOVIARIO**:
 1. **Calibração** (uma vez; botão "Calibrar agora" no app ou função `calibrarPlanoRodoviario` no editor):
