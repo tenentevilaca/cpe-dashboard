@@ -110,7 +110,7 @@
     .g-form{display:grid;gap:8px;margin:8px 0}.g-form label,.g-lbl,.g-when label{display:grid;gap:3px;font-size:.7rem;font-weight:800;color:var(--muted)}
     .g-form input,.g-form select,.g-lbl input,.g-lbl textarea,.g-when input,.g-when select,.g-pt input,.g-pt select,.g-search input,.g-dia input{font:inherit;font-size:.8rem;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:#111827;min-width:0}
     .g-lbl{margin:8px 0}.g-lbl textarea{resize:vertical}
-    .g-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+    .g-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
     .g-nav{display:flex;gap:4px;margin:8px 0}.g-nav button{flex:1;padding:7px 4px;border:1px solid var(--line);background:#f8fafc;border-radius:6px;font-weight:800;font-size:.72rem;color:var(--muted);cursor:pointer}.g-nav button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
     .g-msg{padding:7px 9px;border-radius:6px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;margin:6px 0;font-size:.74rem}.g-msg.ok{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
     .g-box{padding:8px 10px;border-radius:8px;background:#f1f5f9;margin:6px 0;font-size:.74rem}
@@ -1007,6 +1007,9 @@
         else if (window.innerHeight < 800) toggleFiltros(false);   // notebook: mais espaço para o mapa
         RESULT = res; ROUTE = null; CURRENT = null; L_access.clearLayers();
         GPLANO = res && res.planoGestor || null; VER_SISTEMA = false;
+        if (PEND_DIA) { const d = PEND_DIA; PEND_DIA = null; AGUARDA_DIA = true;
+          const fim = () => { AGUARDA_DIA = false; if (PRED.length) { buildRoute(); renderInsight(); } };
+          run('planoDoDia', Object.assign({}, selection(), {data:d})).then(r => { GPLANO = r; fim(); }).catch(fim); }
         if (!res || !res.cells || !res.cells.length) { clearMap(); alert('Nenhum registro encontrado para os filtros selecionados.'); return; }
         RESULT.janela = tw.label; RESULT.area = areaLabel();
         const b = robustBounds(res.cells) || (res.bounds ? L.latLngBounds(res.bounds) : null);
@@ -1572,6 +1575,36 @@
       }).catch(()=>{});
     }
 
+    /* ---------- ver como o efetivo ---------- */
+    let PEND_DIA = null, ABRIR_ROTA = false, AGUARDA_DIA = false;
+    function setFiltros(s) {
+      LEVELS.forEach((l,i) => { const el = $(SEL[l]), v = s[l] || '';
+        el.value = v && [...el.options].some(o => o.value === v) ? v : 'TODOS';
+        el.classList.toggle('active-filter', el.value !== 'TODOS'); refreshOptions(i+1); });
+    }
+    /** Primeiro dia (a partir de hoje) em que o plano vale; null se já terminou. */
+    function diaVigente(p) {
+      const hoje = GEST.hoje || new Date().toISOString().slice(0,10);
+      const d = new Date((p.dataIni > hoje ? p.dataIni : hoje)+'T12:00:00Z'), fim = p.dataFim, ds = p.diasSemana || '0123456';
+      for (let k = 0; k < 400; k++) { const iso = d.toISOString().slice(0,10); if (iso > fim) return null; if (ds.indexOf(String(d.getUTCDay())) >= 0) return iso; d.setUTCDate(d.getUTCDate()+1); }
+      return null;
+    }
+    /** Gera a rota exatamente como o efetivo: mesma fração do plano, sem nenhuma diferença por estar logado. */
+    function gComoEfetivo(id) {
+      const p = id ? GEST.planos.find(x => x.id === id) : null;
+      let dia = null;
+      if (p) {
+        if (!p.ativo) return gMsg('Este plano está pausado: o efetivo recebe a sugestão do sistema. Reative-o para que ele valha.');
+        dia = diaVigente(p);
+        if (!dia) return gMsg('Este plano já terminou ('+dataBR(p.dataFim)+'): o efetivo recebe a sugestão do sistema.');
+        setFiltros(p);
+      }
+      GEST.edit = null; GEST.addMode = false; GEST.view = 'planos'; document.body.classList.remove('g-adding'); L_gest.clearLayers();
+      PEND_DIA = dia && dia !== (GEST.hoje || '') ? dia : null; ABRIR_ROTA = true;
+      $('panel').classList.remove('open');
+      processRoute();
+    }
+
     /* ---------- editor ---------- */
     function gSet(i, k, v) { const p = GEST.edit.pontos[i]; if (!p) return; p[k] = v; if (k === 'nome' || k === 'operacao') gDrawEdit(); }
     function gField(k, v) { GEST.edit[k] = v; if (k === 'repeticao' || k === 'dataIni' || k === 'dataFim') gRender(); }
@@ -1644,7 +1677,7 @@
         loading(false);
         if (!r.ok) return gMsg(esc(r.motivo));
         GEST.edit = null; GEST.view = 'planos'; GEST.addMode = false; document.body.classList.remove('g-adding'); L_gest.clearLayers();
-        GEST.msg = '<div class="g-msg ok">Plano salvo. Vale até '+dataBR(r.dataFim)+'.'+(r.conflitos && r.conflitos.length ? '<br>Coincide com: '+r.conflitos.map(esc).join('; ')+'. Na mesma fração, prevalece o atualizado por último.' : '')+(r.semOperacao ? '<br>'+r.semOperacao+' ponto(s) base sem operação descrita.' : '')+'</div>';
+        GEST.msg = '<div class="g-msg ok">Plano salvo na planilha. Vale até '+dataBR(r.dataFim)+'. <button class="linkish" type="button" onclick="gComoEfetivo(\''+r.id+'\')">👁 Ver como o efetivo vai receber</button>'+(r.conflitos && r.conflitos.length ? '<br>Coincide com: '+r.conflitos.map(esc).join('; ')+'. Na mesma fração, prevalece o atualizado por último.' : '')+(r.semOperacao ? '<br>'+r.semOperacao+' ponto(s) base sem operação descrita.' : '')+'</div>';
         gLoadPlanos(); gRefreshDia();
       }).catch(err => { loading(false); gMsg(esc(err.message||err)); });
     }
@@ -1690,7 +1723,7 @@
       }
       const u = GEST.user, adm = u.papel === 'admin';
       let h = '<div class="g-head"><div><b>'+esc(u.nome)+'</b><br><small>'+(adm ? 'Administrador · todo o CPE' : 'Gestor · '+esc(escopoTxt(u.escopo)))+'</small></div>'+
-        '<div>'+(adm?'':'<button class="btn-sm ghost" type="button" onclick="GEST.view=\'senha\';gRender()">Senha</button> ')+'<button class="btn-sm ghost" type="button" onclick="gLogout()">Sair</button></div></div>';
+        '<div><button class="btn-sm gm" type="button" title="Gera a rota da fração dos filtros exatamente como o efetivo recebe" onclick="gComoEfetivo()">👁 Visão do efetivo</button> '+(adm?'':'<button class="btn-sm ghost" type="button" onclick="GEST.view=\'senha\';gRender()">Senha</button> ')+'<button class="btn-sm ghost" type="button" onclick="gLogout()">Sair</button></div></div>';
       if (GEST.view === 'senha') return h + msg + '<h4>'+(u.trocarSenha?'Primeiro acesso: troque a senha provisória':'Trocar senha')+'</h4><form class="g-form" onsubmit="gSenha(event)">'+
         '<label>Senha atual<input id="gAtual" type="password" autocomplete="current-password" required></label><label>Nova senha (mín. 6)<input id="gNova" type="password" autocomplete="new-password" minlength="6" required></label>'+
         '<label>Confirmar nova senha<input id="gConf" type="password" autocomplete="new-password" required></label><div class="btn-row"><button class="btn-sm" type="submit">Salvar</button>'+(u.trocarSenha?'':'<button class="btn-sm ghost" type="button" onclick="GEST.view=\'planos\';gRender()">Voltar</button>')+'</div></form>';
@@ -1713,7 +1746,7 @@
       return sugestaoHtml() + '<h4>Planos da sua área ('+ps.length+')</h4>' + (ps.length ? ps.map(p => { const st = statusPlano(p);
         return '<div class="g-plan"><div class="g-plan-top"><b>'+esc(p.titulo||'Rota do gestor')+'</b><span class="g-st '+st[0]+'">'+st[1]+'</span></div>'+
           '<small>'+esc(escopoTxt(p))+'<br>'+vigenciaTxt(p)+' · '+p.pontos.length+' ponto(s) · por '+esc(p.autorNome||p.autor||'')+'</small>'+
-          '<div class="btn-row"><button class="btn-sm ghost" type="button" onclick="gVer(\''+p.id+'\')">Ver no mapa</button><button class="btn-sm" type="button" onclick="gEditar(\''+p.id+'\')">Editar</button>'+
+          '<div class="btn-row"><button class="btn-sm gm" type="button" onclick="gComoEfetivo(\''+p.id+'\')">👁 Ver como o efetivo</button><button class="btn-sm ghost" type="button" onclick="gVer(\''+p.id+'\')">Ver no mapa</button><button class="btn-sm" type="button" onclick="gEditar(\''+p.id+'\')">Editar</button>'+
           '<button class="btn-sm ghost" type="button" onclick="gEditar(\''+p.id+'\',true)">Duplicar</button><button class="btn-sm ghost" type="button" onclick="gPausar(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Pausar':'Reativar')+'</button>'+
           '<button class="btn-sm ghost danger" type="button" onclick="gExcluir(\''+p.id+'\')">Excluir</button></div></div>'; }).join('')
         : '<p class="muted">Nenhum plano ainda. Clique em <b>＋ Novo plano</b>.</p>');
@@ -1869,6 +1902,11 @@
     function traceRoute(r) {
       ROUTE = r; const origin = r.origin, back = r.back;
       drawRoute();
+      if (AGUARDA_DIA) {}   // a rota da data do plano ainda vai chegar
+      else if (ABRIR_ROTA && r.gestor) { ABRIR_ROTA = false; openPanel('rota');
+        notice('<strong>Visão do efetivo:</strong> esta é a rota que qualquer usuário recebe ao gerar a rota de <b>'+esc(areaLabel())+'</b> em '+dataBR(GPLANO.data)+'. Para voltar à Gestão, clique em 🛡 Gestão.'); }
+      else if (ABRIR_ROTA && !planoAtivo()) { ABRIR_ROTA = false; openPanel('rota');
+        notice('<strong>Visão do efetivo:</strong> não há rota do gestor em vigor para <b>'+esc(areaLabel())+'</b> nesta data; o efetivo recebe a sugestão do sistema.'); }
       loading(true, r.gestor ? 'Traçando a rota definida pelo gestor...' : 'Traçando a rota preditiva pelas rodovias...');
       run('calcularTrajeto', {origem:origin, retornar:back, manterOrdem:!!r.gestor, pontos:ROUTE.stops.map(s => ({id:s.id, lat:+s.lat.toFixed(6), lng:+s.lng.toFixed(6)}))}).then(res => {
         loading(false);
@@ -1901,6 +1939,8 @@
         links.push('https://www.google.com/maps/dir/?api=1&travelmode=driving&origin='+encodeURIComponent(place(seq[i]))+'&destination='+encodeURIComponent(place(seq[end]))+(wps.length?'&waypoints='+encodeURIComponent(wps.join('|')):''));
         i = end;
       }
+      // um único ponto e sem origem conhecida: o Google Maps parte da localização atual do aparelho
+      if (!links.length && ROUTE.stops.length) links.push(gmapsUrl(ROUTE.stops[0]));
       return links;
     }
     function wazeUrl(p) { return 'https://waze.com/ul?ll='+(+p.lat).toFixed(6)+','+(+p.lng).toFixed(6)+'&navigate=yes'; }
