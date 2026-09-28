@@ -1530,8 +1530,16 @@ function gestaoLogin(req) {
   let sess = null;
   if (usuario === 'admin') {
     const p = PropertiesService.getScriptProperties();
+    // Alternativa ao menu: propriedade ADMIN_SENHA (Configurações do projeto ▸ Propriedades do script).
+    // No primeiro login ela é convertida em hash e apagada.
+    const plana = p.getProperty('ADMIN_SENHA');
+    if (plana) {
+      const s0 = Utilities.getUuid();
+      p.setProperties({ ADMIN_SALT: s0, ADMIN_HASH: hashSenha_(s0, plana) });
+      p.deleteProperty('ADMIN_SENHA');
+    }
     const salt = p.getProperty('ADMIN_SALT'), hash = p.getProperty('ADMIN_HASH');
-    if (!salt || !hash) return { ok: false, motivo: 'O administrador ainda não definiu a senha. Na planilha: menu Rota Preventiva ▸ Definir senha do administrador.' };
+    if (!salt || !hash) return { ok: false, motivo: 'O administrador ainda não definiu a senha. Na planilha: menu Rota Preventiva ▸ Definir senha do administrador (ou a propriedade ADMIN_SENHA no editor do Apps Script).' };
     if (!iguais_(hashSenha_(salt, senha), hash)) return falhou();
     sess = { usuario: 'admin', nome: 'Administrador', papel: 'admin', escopo: { cia: '', pelotao: '', grupamento: '' }, trocar: false };
   } else {

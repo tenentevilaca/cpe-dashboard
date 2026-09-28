@@ -46,7 +46,7 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
   tem horário ideal e permanência sugerida proporcional ao que cobre. A rota passa pelos postos
   (ou pelos pontos previstos, na estratégia “Percorrer os pontos previstos”).
 - **Gestão** (aba 🛡, acesso por senha): o administrador define a própria senha pelo menu da planilha
-  *Rota Preventiva ▸ Definir senha do administrador* (usuário `admin`) e autoriza gestores por área
+  *Rota Preventiva ▸ Definir senha do administrador* (ou a propriedade do script `ADMIN_SENHA`; usuário `admin`) e autoriza gestores por área
   (Cia/Pelotão/Grupamento), com senha provisória trocada no primeiro acesso. O gestor cria a rota da fração:
   parte da sugestão do sistema, inclui pontos no mapa (clique, arraste, busca de endereço), define ponto base
   × passagem, a operação e o horário (ex.: 13:00–14:00), e a vigência (um dia, uma semana, um mês, um ano ou
