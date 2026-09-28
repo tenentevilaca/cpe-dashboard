@@ -59,7 +59,7 @@
     .map-wrap{position:relative;flex:1;min-height:0}#map{position:absolute;inset:0;background:#e8e5db}
     .insight{position:absolute;top:10px;left:56px;width:360px;max-width:calc(100% - 70px);z-index:445;background:#fff;border-radius:10px;box-shadow:0 6px 24px #0003;font-size:.74rem;line-height:1.45;display:none;overflow:hidden}
     .insight header{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--navy);color:#fff;font-weight:800;font-size:.72rem;cursor:pointer}
-    .insight .body{padding:8px 11px}.insight.min .body{display:none}
+    .insight .body{padding:8px 11px;max-height:calc(100vh - 470px);min-height:120px;overflow-y:auto}.insight.min .body{display:none}
     .ins-block{display:grid;grid-template-columns:22px 1fr;gap:6px;padding:5px 0;border-bottom:1px dashed var(--line)}.ins-block:last-child{border-bottom:0}
     .ins-block .ic{font-size:1rem;line-height:1.2}.ins-block h5{margin:0;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
     .ins-block a{color:var(--navy);font-weight:800;text-decoration:none;cursor:pointer}.ins-block.pred h5{color:var(--purple)}.ins-block.inc h5{color:#b91c1c}
@@ -88,6 +88,13 @@
     .bars .row{display:grid;grid-template-columns:78px 1fr;gap:6px;align-items:center;margin:5px 0;font-size:.72rem}
     .bars .b{height:9px;border-radius:3px;margin:1px 0}.bars .b.i{background:#dc2626}.bars .b.p{background:var(--purple)}
     .bars .lbl{font-size:.62rem;color:var(--muted)}
+    .st{display:inline-block;font-size:.68rem;font-weight:800;padding:1px 7px;border-radius:10px;background:#f1f5f9;color:#334155;white-space:nowrap}
+    .st-ativo{background:#fee2e2;color:#991b1b}.st-emergente{background:#ffedd5;color:#9a3412}.st-queda{background:#fef9c3;color:#854d0e}.st-controlado{background:#dcfce7;color:#166534}
+    .score{width:100%;border-collapse:collapse;font-size:.74rem;margin:6px 0}.score th,.score td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}.score th{font-size:.62rem;text-transform:uppercase;color:var(--muted)}.score tr.win td{background:#f5f3ff;font-weight:800}
+    .fx{display:grid;grid-template-columns:118px 1fr 58px;gap:6px;align-items:center;font-size:.72rem;margin:3px 0}
+    .fx .bar{position:relative;height:12px;background:#f1f5f9;border-radius:3px}.fx .bar i{position:absolute;top:0;bottom:0;border-radius:3px;background:#c4b5fd}.fx .bar b{position:absolute;top:-2px;width:3px;height:16px;background:var(--purple);border-radius:2px}.fx .bar u{position:absolute;top:-3px;bottom:-3px;width:1px;background:#475569}
+    .fx.sig .bar i{background:#a78bfa}.fx.nsig{color:var(--muted)}
+    .grid7{display:grid;grid-template-columns:62px repeat(8,1fr);gap:2px;font-size:.6rem;margin:6px 0}.grid7 div{padding:3px 1px;text-align:center;border-radius:3px}.grid7 .h{color:var(--muted);font-weight:700}.grid7 .d{text-align:left;font-weight:700}
     .kmprof{width:100%;height:120px;border:1px solid var(--line);border-radius:6px;background:#fff}
     .muted{color:var(--muted)}
     .legend{background:#fff;padding:7px 9px;border-radius:8px;box-shadow:0 2px 8px #0003;font-size:.68rem;line-height:1.5}.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
@@ -146,7 +153,7 @@
       .viewbar .segm:first-child{display:none}
       .leaflet-control-zoom{display:none}
       .map-wrap{flex:1;min-height:200px}
-      .insight{left:8px;right:8px;top:8px;width:auto;max-width:none;max-height:48%;overflow:auto}
+      .insight{left:8px;right:8px;top:8px;width:auto;max-width:none;max-height:48%;overflow:auto}.insight .body{max-height:none}
       .legend{display:none}
       .leaflet-control-scale{margin-bottom:4px!important}
       .fab{top:auto;bottom:18px;left:8px;flex-direction:row}
@@ -175,6 +182,7 @@
       <button class="menu-btn active" type="button" data-mode="pred"><span class="icon">🔮</span><span class="label">Predição</span></button>
       <button class="menu-btn" type="button" data-mode="rota"><span class="icon">🧭</span><span class="label">Rotas</span></button>
       <button class="menu-btn" type="button" data-tab="rodovias"><span class="icon">🛣</span><span class="label">Rodovias</span></button>
+      <button class="menu-btn" type="button" data-tab="modelo"><span class="icon">🧠</span><span class="label">Modelo</span></button>
       <button class="menu-btn" type="button" data-tab="alertas"><span class="icon">⚠</span><span class="label">Alertas</span></button>
       <a class="menu-btn menu-link" id="lnkTutorial" href="#" target="_blank" rel="noopener" hidden><span class="icon">📘</span><span class="label">Tutorial</span></a>
     </nav>
@@ -222,8 +230,11 @@
           <label><input type="checkbox" id="chkRecente" checked> Ponderação recente (w₂₀₂₆ = <span id="lblPeso">0,6</span>) nos últimos
             <select id="selJanela"><option value="0">30</option><option value="1">60</option><option value="2" selected>90</option></select> dias</label>
           <label title="Considera só acidentes a até 300 m de um trecho do PLANO_RODOVIARIO"><input type="checkbox" id="chkMalha" checked> Somente acidentes na malha PMRv (km do plano rodoviário)</label>
+          <label title="Tira da rota os pontos que o ST-DBSCAN classifica como controlados"><input type="checkbox" id="chkAtivos" checked> Rota só com pontos ativos (ST-DBSCAN)</label>
         </div>
       </div>
+      <div class="form-group"><label for="selModelo">Modelo preditivo</label>
+        <select id="selModelo"><option value="auto" selected>Automático (o que mais acertou)</option><option value="gbm">Gradient Boosting</option><option value="nb">Binomial Negativa</option><option value="rule">Regra w₂₀₂₆ (kernel)</option></select></div>
       <div class="form-group"><label for="selectOrigem">Início da rota</label>
         <select id="selectOrigem"><option value="SEDE">Sede da fração</option><option value="GPS">Minha localização (GPS)</option><option value="TOPO">Ponto mais crítico</option></select></div>
       <div class="form-group"><label for="selectPontos">Pontos na rota</label>
@@ -261,6 +272,7 @@
           <button type="button" data-tab="trecho" class="active">Cartão</button>
           <button type="button" data-tab="rota">Rota</button>
           <button type="button" data-tab="rodovias">Rodovias</button>
+          <button type="button" data-tab="modelo">Modelo</button>
           <button type="button" data-tab="alertas">Alertas</button>
           <button type="button" class="close" id="btnFechar" aria-label="Fechar">✕</button>
         </div>
@@ -271,6 +283,379 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script>
+    /* =====================================================================
+     * Aprendizagem de máquina da Rota Preventiva (roda no navegador, sem custo)
+     *  - Onde: previsão de acidentes em 30 dias por trecho de 1 km (malha) ou área de ~1 km.
+     *    Três candidatos: regra w₂₀₂₆ (atual), regressão Binomial Negativa e Gradient Boosting
+     *    (árvores com perda de Poisson, no estilo XGBoost). Validação retroativa em 3 janelas;
+     *    o modo automático usa o que acertou mais.
+     *  - Quando: regressão de Poisson por dia × faixa de 3 h × região, com calendário brasileiro
+     *    (feriados, vésperas, férias) e chuva (Open-Meteo), que só entra se o efeito for significativo.
+     *  - ST-DBSCAN: agrupa acidentes próximos no espaço e no tempo → ativo, emergente, em queda, controlado.
+     * ===================================================================== */
+    const MLX = (() => {
+      const DAY = 864e5;
+      const TIPOS = ['seg–qui', 'sexta', 'sábado', 'domingo', 'feriado'];
+      const BLOCOS = ['00h–03h','03h–06h','06h–09h','09h–12h','12h–15h','15h–18h','18h–21h','21h–24h'];
+
+      /* ---------- calendário brasileiro ---------- */
+      function easter(y) {
+        const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+          h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+          mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;
+        return Date.UTC(y, mo-1, da) / DAY;
+      }
+      const HOL = {};
+      function holidays(y) {
+        if (HOL[y]) return HOL[y];
+        const s = new Set(), fx = [[1,1],[4,21],[5,1],[9,7],[10,12],[11,2],[11,15],[12,25]];
+        if (y >= 2024) fx.push([11,20]);
+        fx.forEach(([m,d]) => s.add(Date.UTC(y,m-1,d)/DAY));
+        const e = easter(y); [-48,-47,-2,60].forEach(o => s.add(e+o));   // Carnaval, Sexta-feira Santa, Corpus Christi
+        return HOL[y] = s;
+      }
+      /** Dia (nº de dias desde 1970, data local) → tipo, véspera, férias. */
+      function dayInfo(day) {
+        const dt = new Date(day*DAY), y = dt.getUTCFullYear(), m = dt.getUTCMonth()+1, dd = dt.getUTCDate(), dow = dt.getUTCDay();
+        const hol = holidays(y).has(day), vesp = !hol && holidays(new Date((day+1)*DAY).getUTCFullYear()).has(day+1);
+        const ferias = m === 1 || m === 7 || (m === 12 && dd >= 20);
+        return { tipo: hol ? 4 : dow === 5 ? 1 : dow === 6 ? 2 : dow === 0 ? 3 : 0, vesp, ferias, dow };
+      }
+      function dateStr(day) { return new Date(day*DAY).toISOString().slice(0,10); }
+
+      /* ---------- álgebra ---------- */
+      function solve(A, b) {
+        const n = b.length, M = A.map((r,i) => r.concat([b[i]]));
+        for (let c=0;c<n;c++) {
+          let p=c; for (let r=c+1;r<n;r++) if (Math.abs(M[r][c])>Math.abs(M[p][c])) p=r;
+          [M[c],M[p]]=[M[p],M[c]];
+          if (Math.abs(M[c][c])<1e-12) M[c][c]=1e-12;
+          for (let r=0;r<n;r++) if (r!==c) { const f=M[r][c]/M[c][c]; if (f) for (let k=c;k<=n;k++) M[r][k]-=f*M[c][k]; }
+        }
+        return M.map((r,i) => r[n]/r[i]);
+      }
+      function invert(A) {
+        const n = A.length, out = [];
+        for (let j=0;j<n;j++) { const e = new Array(n).fill(0); e[j]=1; out.push(solve(A, e)); }
+        return A.map((_,i) => out.map(col => col[i]));
+      }
+      const clampEta = x => Math.max(-20, Math.min(20, x));
+
+      /** GLM log-link: Poisson (alpha=0) ou Binomial Negativa (NB2, alpha estimado). X sem intercepto. */
+      function fitGLM(X, y, opt) {
+        opt = opt || {};
+        const n = y.length, p = X[0].length + 1, lam = opt.ridge == null ? 1 : opt.ridge, off = opt.offset || null, wts = opt.weights || null;
+        const mean = new Array(p-1).fill(0), sd = new Array(p-1).fill(1);
+        if (opt.standardize !== false) {
+          for (let j=0;j<p-1;j++) { let s=0,s2=0; for (let i=0;i<n;i++){s+=X[i][j];s2+=X[i][j]*X[i][j];} mean[j]=s/n; const v=s2/n-mean[j]*mean[j]; sd[j]=v>1e-10?Math.sqrt(v):Infinity; }   // coluna constante: fica fora
+        }
+        const Z = X.map(r => [1].concat(r.map((v,j) => isFinite(sd[j]) ? (v-mean[j])/sd[j] : 0)));
+        let ybar = 0, wsum = 0; for (let i=0;i<n;i++){ const w = wts?wts[i]:1; ybar += y[i]*w; wsum += (off?Math.exp(off[i]):1)*w; }
+        let beta = new Array(p).fill(0); beta[0] = Math.log(Math.max(1e-6, ybar/wsum));
+        let alpha = 0;
+        for (let it=0; it<40; it++) {
+          const A = Array.from({length:p}, () => new Array(p).fill(0)), b = new Array(p).fill(0);
+          for (let i=0;i<n;i++) {
+            let eta = off ? off[i] : 0; for (let j=0;j<p;j++) eta += Z[i][j]*beta[j];
+            eta = clampEta(eta); const mu = Math.exp(eta);
+            const w = (wts?wts[i]:1) * mu/(1+alpha*mu), z = eta - (off?off[i]:0) + (y[i]-mu)/mu;
+            for (let j=0;j<p;j++) { const wz = w*Z[i][j]; b[j] += wz*z; for (let k=j;k<p;k++) A[j][k] += wz*Z[i][k]; }
+          }
+          for (let j=0;j<p;j++) { for (let k=0;k<j;k++) A[j][k]=A[k][j]; if (j>0) A[j][j]+=lam; }
+          const nb = solve(A, b);
+          const delta = Math.max(...nb.map((v,j)=>Math.abs(v-beta[j])));
+          beta = nb;
+          if (opt.nb) {   // sobredispersão pelo método dos momentos
+            let num=0, den=0;
+            for (let i=0;i<n;i++){ let eta=off?off[i]:0; for(let j=0;j<p;j++) eta+=Z[i][j]*beta[j]; const mu=Math.exp(clampEta(eta)); num+=(y[i]-mu)*(y[i]-mu)-mu; den+=mu*mu; }
+            alpha = Math.max(0, Math.min(10, den ? num/den : 0));
+          }
+          if (delta < 1e-6) break;
+        }
+        // Erros-padrão (escala de Pearson quando Poisson)
+        const A = Array.from({length:p}, () => new Array(p).fill(0)); let pearson = 0;
+        for (let i=0;i<n;i++){ let eta=off?off[i]:0; for(let j=0;j<p;j++) eta+=Z[i][j]*beta[j]; const mu=Math.exp(clampEta(eta)); const w=(wts?wts[i]:1)*mu/(1+alpha*mu);
+          pearson += (wts?wts[i]:1)*(y[i]-mu)*(y[i]-mu)/(mu*(1+alpha*mu)); for(let j=0;j<p;j++) for(let k=0;k<p;k++) A[j][k]+=w*Z[i][j]*Z[i][k]; }
+        const phi = opt.nb ? 1 : Math.max(1, pearson/Math.max(1, n-p));
+        let se = null; try { const inv = invert(A); se = inv.map((r,i) => Math.sqrt(Math.max(0, r[i]*phi))); } catch (e) {}
+        return { beta, alpha, mean, sd, se, phi, predict(x, o) { let eta = (typeof o === 'number' ? o : 0) + beta[0]; for (let j=0;j<p-1;j++) if (isFinite(sd[j])) eta += beta[j+1]*(x[j]-mean[j])/sd[j]; const v = Math.exp(clampEta(eta)); return isFinite(v) ? v : Math.exp(beta[0]); } };
+      }
+
+      /** Gradient Boosting com perda de Poisson (Newton, estilo XGBoost), histogramas de 32 faixas. */
+      function fitGBM(X, y, opt) {
+        opt = Object.assign({ rounds: 120, lr: 0.08, depth: 3, lambda: 1, minH: 1.5 }, opt || {});
+        const n = y.length, m = X[0].length, NB = 32;
+        const edges = [], bins = [];
+        for (let f=0; f<m; f++) {
+          const v = X.map(r => r[f]).sort((a,b)=>a-b), e = [];
+          for (let q=1;q<NB;q++) { const t = v[Math.floor(q*(n-1)/NB)]; if (!e.length || t > e[e.length-1]) e.push(t); }
+          edges.push(e);
+          const bf = new Uint8Array(n);
+          for (let i=0;i<n;i++) { let lo=0, hi=e.length; const x=X[i][f]; while (lo<hi) { const md=(lo+hi)>>1; if (x<=e[md]) hi=md; else lo=md+1; } bf[i]=lo; }
+          bins.push(bf);
+        }
+        const ybar = y.reduce((a,b)=>a+b,0)/n, base = Math.log(Math.max(1e-6, ybar));
+        const F = new Float64Array(n).fill(base), g = new Float64Array(n), h = new Float64Array(n), trees = [];
+        function build(idx, depth) {
+          let G=0,H=0; for (const i of idx){G+=g[i];H+=h[i];}
+          const leaf = { v: Math.max(-3, Math.min(3, G/(H+opt.lambda))) };
+          if (depth === 0 || idx.length < 20) return leaf;
+          let best = null;
+          for (let f=0; f<m; f++) {
+            const nb = edges[f].length + 1, GB = new Float64Array(nb), HB = new Float64Array(nb), bf = bins[f];
+            for (const i of idx) { GB[bf[i]] += g[i]; HB[bf[i]] += h[i]; }
+            let GL=0, HL=0;
+            for (let t=0; t<nb-1; t++) {
+              GL += GB[t]; HL += HB[t]; const GR = G-GL, HR = H-HL;
+              if (HL < opt.minH || HR < opt.minH) continue;
+              const gain = GL*GL/(HL+opt.lambda) + GR*GR/(HR+opt.lambda) - G*G/(H+opt.lambda);
+              if (gain > 1e-6 && (!best || gain > best.gain)) best = { gain, f, t };
+            }
+          }
+          if (!best) return leaf;
+          const L = [], R = []; for (const i of idx) (bins[best.f][i] <= best.t ? L : R).push(i);
+          return { f: best.f, thr: edges[best.f][best.t], l: build(L, depth-1), r: build(R, depth-1) };
+        }
+        const walk = (node, x) => { while (node.f !== undefined) node = x[node.f] <= node.thr ? node.l : node.r; return node.v; };
+        const all = Array.from({length:n}, (_,i) => i);
+        for (let r=0; r<opt.rounds; r++) {
+          for (let i=0;i<n;i++) { const mu = Math.exp(clampEta(F[i])); g[i] = y[i]-mu; h[i] = mu; }
+          const tree = build(all, opt.depth); trees.push(tree);
+          for (let i=0;i<n;i++) F[i] += opt.lr * walk(tree, X[i]);
+        }
+        return { predict(x) { let s = base; for (const t of trees) s += opt.lr*walk(t, x); return Math.exp(clampEta(s)); } };
+      }
+
+      /* ---------- unidades espaciais (trecho de 1 km da malha ou área de ~1 km) ---------- */
+      function unitKey(c) {
+        if (c.mr === 1 && c.rd && c.km) return 'r|' + c.rd + '|' + Math.floor(c.km[0]);
+        return 'g|' + Math.floor(c.la/0.009) + '|' + Math.floor(c.lo/0.0095);
+      }
+      function lowerBound(a, x) { let lo=0, hi=a.length; while (lo<hi) { const m=(lo+hi)>>1; if (a[m]<x) lo=m+1; else hi=m; } return lo; }
+      const cnt = (a, from, to) => lowerBound(a, to) - lowerBound(a, from);
+
+      function buildUnits(cells, active, ev) {
+        const map = new Map(), cellUnit = new Int32Array(cells.length).fill(-1), units = [];
+        cells.forEach((c,i) => {
+          if (!active[i]) return;
+          const k = unitKey(c); let u = map.get(k);
+          if (u === undefined) { u = units.length; map.set(k, u); units.push({ key:k, lat:0, lng:0, n:0, days:[], cells:[] }); }
+          const U = units[u]; U.lat += c.la*c.n; U.lng += c.lo*c.n; U.n += c.n; U.cells.push(i); cellUnit[i] = u;
+        });
+        for (let i=0;i<ev.length;i+=3) { const u = cellUnit[ev[i]]; if (u >= 0) units[u].days.push(ev[i+1]); }
+        units.forEach(U => { U.lat /= U.n; U.lng /= U.n; U.days.sort((a,b)=>a-b); U.days = Int32Array.from(U.days); });
+        // vizinhos a até 2 km (efeito de transbordamento espacial)
+        const G = new Map(), gs = 0.02;
+        units.forEach((U,i) => { const k = Math.floor(U.lat/gs)+':'+Math.floor(U.lng/gs); if (!G.has(k)) G.set(k, []); G.get(k).push(i); });
+        units.forEach((U,i) => {
+          U.nb = []; const y0 = Math.floor(U.lat/gs), x0 = Math.floor(U.lng/gs), cos = Math.cos(U.lat*Math.PI/180);
+          for (let y=-1;y<=1;y++) for (let x=-1;x<=1;x++) (G.get((y0+y)+':'+(x0+x))||[]).forEach(j => {
+            if (j === i) return; const V = units[j], d = Math.hypot((V.lat-U.lat)*111320, (V.lng-U.lng)*111320*cos);
+            if (d <= 2000) U.nb.push(j);
+          });
+        });
+        return { units, cellUnit };
+      }
+
+      /** Variáveis de um trecho no corte c (só usa o que aconteceu antes de c). */
+      function features(units, u, c, start) {
+        const d = units[u].days;
+        const n30 = cnt(d,c-30,c), n90 = cnt(d,c-90,c), n90p = cnt(d,c-180,c-90), n365 = cnt(d,c-365,c), nAll = cnt(d,start,c);
+        const age = Math.max(30, c-start), li = lowerBound(d, c) - 1, since = li >= 0 ? Math.min(730, c-d[li]) : 730;
+        let nb = 0; for (const j of units[u].nb) nb += cnt(units[j].days, c-365, c);
+        return { x: [Math.log1p(n30), Math.log1p(n90), Math.log1p(n365), Math.log1p(nAll*365/age), Math.log((n90+1)/(n90p+1)), Math.log1p(nb), Math.log1p(since)],
+                 raw: { n90, n90p, n365 } };
+      }
+      const FEAT_NAMES = ['últimos 30 dias','últimos 90 dias','últimos 365 dias','média anual histórica','tendência trimestral','vizinhança (2 km, 1 ano)','dias desde o último'];
+
+      /** Regra atual (w₂₀₂₆) como candidato: taxa recente + restante do ano, × tendência. */
+      function rulePred(raw, pesos, recency) {
+        const tr = Math.max(.6, Math.min(1.8, (raw.n90+1)/(raw.n90p+1)));
+        const rate = recency ? pesos.recente*raw.n90/90 + pesos.historico*Math.max(0, raw.n365-raw.n90)/275 : raw.n365/365;
+        return Math.max(1e-4, rate*30*tr);
+      }
+      function capture(pred, y, N) {
+        const tot = y.reduce((a,b)=>a+b,0); if (!tot) return null;
+        const ord = pred.map((p,i)=>i).sort((a,b)=>pred[b]-pred[a]); let s = 0; for (let i=0;i<Math.min(N,ord.length);i++) s += y[ord[i]];
+        return s/tot;
+      }
+      function deviance(pred, y) { let d=0; for (let i=0;i<y.length;i++){ const mu=Math.max(1e-6,pred[i]); d += 2*((y[i]>0?y[i]*Math.log(y[i]/mu):0)-(y[i]-mu)); } return d/y.length; }
+
+      /**
+       * Treina e valida os modelos de "onde".
+       * Retorna previsão de 30 dias por trecho e o placar da validação retroativa.
+       */
+      function trainWhere(cells, active, ev, ref, opt) {
+        const { units, cellUnit } = buildUnits(cells, active, ev);
+        const allDays = []; units.forEach(U => { if (U.days.length) { allDays.push(U.days[0]); } });
+        if (!units.length || !allDays.length) return { ok:false, motivo:'Sem registros com data.' };
+        const start = Math.min(...allDays), span = ref - start;
+        const H = 30, K = Math.min(30, Math.floor((span - 180) / H));
+        if (K < 5) return { ok:false, motivo:'Histórico curto: são necessários pelo menos ~10 meses de registros com data para treinar e validar.', units, cellUnit };
+        // limita a quantidade de trechos (os de maior volume) para manter o treino rápido
+        const order = units.map((U,i)=>i).sort((a,b)=>units[b].n-units[a].n).slice(0, 1500);
+        const rowsAt = k => { const c = ref - H*k, X = [], Y = [], R = [];
+          order.forEach(u => { const f = features(units, u, c, start); X.push(f.x); R.push(f.raw); Y.push(k > 0 ? cnt(units[u].days, c, c+H) : 0); });
+          return { X, Y, R }; };
+        const byK = []; for (let k=0; k<=K; k++) byK.push(rowsAt(k));
+        const N = opt.N || 10, pesos = opt.pesos, recency = opt.recency;
+        const cand = {
+          rule: { nome:'Regra w₂₀₂₆ (kernel atual)', fit: () => ({ predict: (x, raw) => rulePred(raw, pesos, recency) }) },
+          nb:   { nome:'Regressão Binomial Negativa', fit: (X,Y) => { const m = fitGLM(X, Y, { nb:true, ridge:1 }); return { m, beta:m.beta, se:m.se, alpha:m.alpha, predict: x => m.predict(x) }; } },
+          gbm:  { nome:'Gradient Boosting (Poisson)', fit: (X,Y) => fitGBM(X, Y, { rounds: 100 }) }
+        };
+        const score = {};
+        const tests = [1,2,3].filter(k => k+2 <= K);
+        Object.keys(cand).forEach(id => {
+          const caps = [], devs = [];
+          tests.forEach(kt => {
+            const X = [], Y = []; for (let k=kt+1; k<=K; k++) { X.push(...byK[k].X); Y.push(...byK[k].Y); }
+            const model = cand[id].fit(X, Y), T = byK[kt];
+            const pred = T.X.map((x,i) => model.predict(x, T.R[i]));
+            const cp = capture(pred, T.Y, N); if (cp !== null) caps.push(cp);
+            devs.push(deviance(pred, T.Y));
+          });
+          score[id] = { nome: cand[id].nome, captura: caps.length ? caps.reduce((a,b)=>a+b,0)/caps.length : null, desvio: devs.reduce((a,b)=>a+b,0)/Math.max(1,devs.length), janelas: caps.length };
+        });
+        const ranked = Object.keys(score).filter(k => score[k].captura !== null).sort((a,b) => (score[b].captura - score[a].captura) || (score[a].desvio - score[b].desvio));
+        const melhor = ranked[0] || 'rule';
+        // modelos finais treinados com todas as janelas conhecidas; previsão a partir de hoje (k=0)
+        const X = [], Y = []; for (let k=1; k<=K; k++) { X.push(...byK[k].X); Y.push(...byK[k].Y); }
+        const finais = {}, prev = {};
+        Object.keys(cand).forEach(id => { finais[id] = cand[id].fit(X, Y); prev[id] = byK[0].X.map((x,i) => finais[id].predict(x, byK[0].R[i])); });
+        // importância das variáveis (NB: |coeficiente padronizado|)
+        const nbm = finais.nb, imp = nbm.beta.slice(1).map((b,j) => ({ nome: FEAT_NAMES[j], coef: b, se: nbm.se ? nbm.se[j+1] : null }));
+        return { ok:true, units, cellUnit, order, prev, score, melhor, start, K, H, testes: tests.length, importancia: imp, alpha: nbm.alpha };
+      }
+
+      /** Distribui a previsão de cada trecho entre as suas células (pelo peso recente de cada uma). */
+      function cellPredictions(cells, W, modelId) {
+        const out = new Float64Array(cells.length), p = W.prev[modelId];
+        W.order.forEach((u, r) => {
+          const U = W.units[u]; let tot = 0; U.cells.forEach(i => tot += cells[i].r[4] + 0.2*cells[i].n);
+          U.cells.forEach(i => out[i] = p[r] * (tot ? (cells[i].r[4] + 0.2*cells[i].n)/tot : 1/U.cells.length));
+        });
+        return out;
+      }
+
+      /* ---------- regiões (para o clima) ---------- */
+      function regions(cells, active, maxK) {
+        const pts = []; cells.forEach((c,i) => { if (active[i]) pts.push(i); });
+        if (!pts.length) return { centers: [], of: new Int32Array(cells.length).fill(-1) };
+        let la0=90,la1=-90,lo0=180,lo1=-180; pts.forEach(i => { const c=cells[i]; la0=Math.min(la0,c.la); la1=Math.max(la1,c.la); lo0=Math.min(lo0,c.lo); lo1=Math.max(lo1,c.lo); });
+        const diag = Math.hypot((la1-la0)*111, (lo1-lo0)*105), k = Math.max(1, Math.min(maxK||6, Math.round(diag/60)));
+        const centers = [ { la: cells[pts[0]].la, lo: cells[pts[0]].lo } ];
+        while (centers.length < k) { let best=null, bd=-1; pts.forEach(i => { const c=cells[i]; const d=Math.min(...centers.map(z=>Math.hypot(z.la-c.la, z.lo-c.lo))); if (d>bd){bd=d;best=c;} }); centers.push({ la: best.la, lo: best.lo }); }
+        const of = new Int32Array(cells.length).fill(-1);
+        for (let it=0; it<8; it++) {
+          const acc = centers.map(() => ({la:0,lo:0,w:0}));
+          pts.forEach(i => { const c=cells[i]; let b=0,bd=Infinity; centers.forEach((z,j)=>{ const d=Math.hypot(z.la-c.la,z.lo-c.lo); if(d<bd){bd=d;b=j;} }); of[i]=b; acc[b].la+=c.la*c.n; acc[b].lo+=c.lo*c.n; acc[b].w+=c.n; });
+          acc.forEach((a,j) => { if (a.w) { centers[j].la=a.la/a.w; centers[j].lo=a.lo/a.w; } });
+        }
+        return { centers, of };
+      }
+
+      /** Horas com chuva (≥ 0,5 mm) por região: Set de índices de hora desde o início do histórico. */
+      function rainSets(clima, startDay) {
+        return (clima && clima.pontos || []).map(p => {
+          const s = new Set(); if (!p.horas) return null;
+          for (let i=0;i<p.chuva.length;i+=2) if (p.chuva[i+1] >= 5) s.add(p.chuva[i]);
+          return { set: s, horas: p.horas, start: startDay };
+        });
+      }
+
+      /**
+       * Modelo de "quando": Poisson (com escala de sobredispersão) por dia × faixa de 3 h × região.
+       * Variáveis: tipo de dia, véspera, férias, faixa horária, região e, se houver clima, chuva na faixa.
+       */
+      function trainWhen(cells, active, ev, ref, reg, rain, climaStartDay, desde) {
+        const R = reg.centers.length || 1;
+        const counts = new Map(), key = (d,b,r) => (d*8+b)*8+r;
+        let first = Infinity;
+        for (let i=0;i<ev.length;i+=3) { const ci=ev[i], d=ev[i+1], h=ev[i+2]; if (!active[ci] || h < 0) continue; const r = Math.max(0, reg.of[ci]); const k = key(d, Math.floor(h/3), r); counts.set(k, (counts.get(k)||0)+1); if (d<first) first=d; }
+        if (!counts.size) return null;
+        const d0 = Math.max(first, desde || first, ref - 1095), useRain = !!rain;
+        const agg = new Map();
+        for (let d=d0; d<ref; d++) {
+          const di = dayInfo(d);
+          for (let b=0;b<8;b++) for (let r=0;r<R;r++) {
+            let rf = 0;
+            if (useRain) {
+              const rs = rain[r]; if (!rs) continue;
+              const hi = (d - climaStartDay)*24 + b*3; if (hi < 0 || hi+3 > rs.horas) continue;
+              rf = rs.set.has(hi) || rs.set.has(hi+1) || rs.set.has(hi+2) ? 1 : 0;
+            }
+            const pk = [di.tipo, di.vesp?1:0, di.ferias?1:0, b, r, rf].join(',');
+            let a = agg.get(pk); if (!a) agg.set(pk, a = { tipo:di.tipo, vesp:di.vesp, ferias:di.ferias, b, r, rf, y:0, m:0 });
+            a.y += counts.get(key(d,b,r)) || 0; a.m++;
+          }
+        }
+        const rows = [...agg.values()]; if (rows.length < 10) return null;
+        const vec = a => { const x=[]; for (let t=1;t<5;t++) x.push(a.tipo===t?1:0); x.push(a.vesp?1:0, a.ferias?1:0); for (let b=0;b<8;b++) if (b!==3) x.push(a.b===b?1:0); for (let r=1;r<R;r++) x.push(a.r===r?1:0); if (useRain) x.push(a.rf); return x; };
+        const X = rows.map(vec), Y = rows.map(a=>a.y), off = rows.map(a=>Math.log(a.m));
+        const fit = fitGLM(X, Y, { offset: off, standardize: false, ridge: 0.01 });
+        const names = ['sexta','sábado','domingo','feriado','véspera de feriado','férias escolares'].concat(BLOCOS.filter((_,b)=>b!==3)).concat(Array.from({length:R-1},(_,r)=>'região '+(r+2))).concat(useRain?['chuva na faixa horária']:[]);
+        const fatores = names.map((nm,j) => { const b = fit.beta[j+1], se = fit.se ? fit.se[j+1] : null; return { nome:nm, rr:Math.exp(b), lo: se!=null?Math.exp(b-1.96*se):null, hi: se!=null?Math.exp(b+1.96*se):null }; });
+        const slots = rows.reduce((a,r)=>a+r.m,0), eventos = Y.reduce((a,b)=>a+b,0);
+        return { fit, fatores, useRain, R, vec, slots, eventos, desde: d0, meanRate: eventos/slots,
+          rateFor(d, b, r, pRain) { const di = dayInfo(d), base = { tipo:di.tipo, vesp:di.vesp, ferias:di.ferias, b, r:r||0, rf:0 };
+            if (!useRain) return fit.predict(vec(base));
+            const dry = fit.predict(vec(base)), wet = fit.predict(vec(Object.assign({}, base, { rf:1 }))); return (1-pRain)*dry + pRain*wet; } };
+      }
+
+      /* ---------- ST-DBSCAN ---------- */
+      function stdbscan(cells, active, ev, R, epsT, minPts) {
+        epsT = epsT || 30; minPts = minPts || 4;
+        const E = []; for (let i=0;i<ev.length;i+=3) if (active[ev[i]]) E.push(i/3);
+        const cellEv = new Map(); E.forEach(e => { const c = ev[e*3]; if (!cellEv.has(c)) cellEv.set(c, []); cellEv.get(c).push(e); });
+        cellEv.forEach(list => list.sort((a,b) => ev[a*3+1]-ev[b*3+1]));
+        const cellDays = new Map(); cellEv.forEach((list,c) => cellDays.set(c, Int32Array.from(list.map(e => ev[e*3+1]))));
+        const cs = [...cellEv.keys()], lat0 = cells[cs[0]] ? cells[cs[0]].la*Math.PI/180 : 0, dLat = R/111320, dLng = R/(111320*Math.cos(lat0)), G = new Map();
+        cs.forEach(c => { const k = Math.floor(cells[c].la/dLat)+':'+Math.floor(cells[c].lo/dLng); if (!G.has(k)) G.set(k, []); G.get(k).push(c); });
+        const nbCells = new Map();
+        cs.forEach(c => { const a = cells[c], y0 = Math.floor(a.la/dLat), x0 = Math.floor(a.lo/dLng), out = [];
+          for (let y=-1;y<=1;y++) for (let x=-1;x<=1;x++) (G.get((y0+y)+':'+(x0+x))||[]).forEach(o => { const b = cells[o]; if (Math.hypot((a.la-b.la)*111320,(a.lo-b.lo)*111320*Math.cos(lat0)) <= R) out.push(o); });
+          nbCells.set(c, out); });
+        const label = new Int32Array(ev.length/3).fill(-1);   // -1 não visitado, 0 ruído, k>0 grupo
+        const region = e => { const c = ev[e*3], d = ev[e*3+1], out = [];
+          for (const o of nbCells.get(c)) { const days = cellDays.get(o), list = cellEv.get(o); for (let i=lowerBound(days, d-epsT); i<days.length && days[i] <= d+epsT; i++) out.push(list[i]); }
+          return out; };
+        let k = 0; const info = [null];
+        for (const e of E) {
+          if (label[e] !== -1) continue;
+          const nb = region(e); if (nb.length < minPts) { label[e] = 0; continue; }
+          k++; const inf = { first: Infinity, last: -Infinity, n: 0 }; info.push(inf);
+          const queue = [e]; label[e] = k;
+          while (queue.length) {
+            const q = queue.pop(); const d = ev[q*3+1]; inf.first = Math.min(inf.first, d); inf.last = Math.max(inf.last, d); inf.n++;
+            const nq = region(q); if (nq.length < minPts) continue;
+            for (const o of nq) { if (label[o] <= 0) { if (label[o] === -1) queue.push(o); else { const dd = ev[o*3+1]; inf.first=Math.min(inf.first,dd); inf.last=Math.max(inf.last,dd); inf.n++; } label[o] = k; } }
+          }
+        }
+        // dias dos acidentes de cada célula que pertencem a algum grupo espaço-temporal (não ruído)
+        const cellDaysIn = new Map(); E.forEach(e => { if (label[e] > 0) { const c = ev[e*3]; if (!cellDaysIn.has(c)) cellDaysIn.set(c, []); cellDaysIn.get(c).push(ev[e*3+1]); } });
+        cellDaysIn.forEach(a => a.sort((x,y)=>x-y));
+        return { info, cellDaysIn, grupos: k };
+      }
+      /** Situação de um ponto (conjunto de células) segundo os grupos espaço-temporais. */
+      /**
+       * Situação do ponto pela sua própria atividade agrupada (acidentes que fazem parte de um
+       * aglomerado espaço-temporal): ativo (último ≤ 45 dias), emergente (ativo e sem atividade
+       * agrupada entre 4 e 12 meses atrás), em queda (46–180 dias), controlado (> 180 dias),
+       * esporádico (nenhum acidente em aglomerado).
+       */
+      function stStatus(ST, cellIdx, ref) {
+        const days = []; cellIdx.forEach(c => { const a = ST.cellDaysIn.get(c); if (a) days.push(...a); });
+        if (!days.length) return 'esporadico';
+        const last = Math.max(...days), age = ref - last;
+        if (age <= 45) { const antes = days.some(d => ref - d > 120 && ref - d <= 365); return antes ? 'ativo' : 'emergente'; }
+        return age <= 180 ? 'queda' : 'controlado';
+      }
+
+      return { TIPOS, BLOCOS, dayInfo, dateStr, holidays, fitGLM, fitGBM, trainWhere, cellPredictions, regions, rainSets, trainWhen, stdbscan, stStatus, FEAT_NAMES };
+    })();
+  </script>
   <script>
     'use strict';
     const $ = id => document.getElementById(id);
@@ -289,6 +674,7 @@
     let RESULT = null, INC = [], PRED = [], ROUTE = null, CURRENT = null, BACKTEST = null;
     let ALERTS = {alertas:[], congestionamentos:[], fontes:[]}, ROADS = {}, G_HOURS = null, G_DAYS = null;
     let MODE = 'pred', REPR = 'cluster', tab = 'trecho', busy = 0;
+    const ML = { W:null, modelo:'rule', cellPred:null, reg:null, when:null, whenRain:null, rain:null, clima:null, climaStatus:'', ST:null, prev7:null };
     const GPS = {watch:null, pos:null, marker:null, visited:new Set()};
 
     /* ---------- utilidades ---------- */
@@ -409,10 +795,94 @@
         if (b && b.isValid()) map.fitBounds(b.pad(0.05), {padding:[30,30], maxZoom:14});
         $('viewbar').style.display = 'flex';
         calibNotice();
-        analyze(true);
+        RESULT.cells.forEach((c,i) => c.idx = i);
+        retrain(true);
         loadAlerts();
       }).catch(err => { $('btnGerar').disabled=false; loading(false); alert('Falha ao calcular: '+(err&&err.message||err)); });
     }
+    /* ---------- aprendizagem de máquina: treino, escolha do modelo e clima ---------- */
+    function activeMask() { const m = new Uint8Array(RESULT.cells.length), onlyMalha = $('chkMalha').checked && calibrado(); RESULT.cells.forEach((c,i) => { m[i] = onlyMalha ? (c.mr === 1 ? 1 : 0) : 1; }); return m; }
+    function retrain(withClima) {
+      if (!RESULT) return;
+      loading(true,'Treinando os modelos preditivos e validando com o histórico…');
+      setTimeout(() => {
+        try { trainAll(); } catch (e) { console.error(e); ML.W = { ok:false, motivo:'Falha no treino: '+e.message }; ML.cellPred = null; }
+        loading(false);
+        analyze(true);
+        if (withClima) loadClima(); else refitRain();
+      }, 30);
+    }
+    function trainAll() {
+      const cells = RESULT.cells, act = activeMask(), ev = RESULT.ev || [];
+      ML.W = RESULT.temData ? MLX.trainWhere(cells, act, ev, RESULT.diaRef, { N:Number($('selectPontos').value), pesos:PESOS, recency:$('chkRecente').checked })
+                            : { ok:false, motivo:'A base não informa a data dos acidentes.' };
+      ML.reg = MLX.regions(cells, act, 6);
+      ML.when = RESULT.temData ? MLX.trainWhen(cells, act, ev, RESULT.diaRef, ML.reg, null) : null;
+      ML.ST = RESULT.temData ? MLX.stdbscan(cells, act, ev, 1000, 30, 4) : null;
+      chooseModel();
+    }
+    function chooseModel() {
+      const s = $('selModelo').value;
+      ML.modelo = !ML.W || !ML.W.ok ? 'rule' : s === 'auto' ? ML.W.melhor : s;
+      ML.cellPred = ML.W && ML.W.ok && ML.modelo !== 'rule' ? MLX.cellPredictions(RESULT.cells, ML.W, ML.modelo) : null;
+    }
+    function nomeModelo(id) { return ({rule:'Regra w₂₀₂₆ (kernel)', nb:'Binomial Negativa', gbm:'Gradient Boosting'})[id] || id; }
+    function hojeDia() { return Math.floor((Date.now() - new Date().getTimezoneOffset()*60000) / 864e5); }
+    function dayFromStr(s) { const m = String(s).match(/(\d{4})-(\d{2})-(\d{2})/); return m ? Date.UTC(+m[1], m[2]-1, +m[3]) / 864e5 : null; }
+    function loadClima() {
+      ML.clima = null; ML.whenRain = null; ML.rain = null; ML.prev7 = null;
+      if (!RESULT.temData || !ML.reg || !ML.reg.centers.length || !ML.when) { ML.climaStatus = 'Sem dados de data/hora suficientes para testar o clima.'; return; }
+      const fim = Math.min(RESULT.diaRef - 1, hojeDia() - 6), inicio = Math.max(ML.when.desde, fim - 1095);
+      if (fim - inicio < 60) { ML.climaStatus = 'Período com histórico de clima curto demais para o teste.'; return; }
+      ML.climaStatus = 'Buscando o histórico de chuva (Open-Meteo)…';
+      run('analisarClima', { pontos: ML.reg.centers.map(z => ({lat:+z.la.toFixed(3), lng:+z.lo.toFixed(3)})), inicio: MLX.dateStr(inicio), fim: MLX.dateStr(fim) }).then(res => {
+        ML.clima = res;
+        if (!res || !res.ok) { ML.climaStatus = 'Clima indisponível: '+((res && res.motivo) || 'sem resposta')+'. A previsão segue sem chuva.'; }
+        refitRain();
+      }).catch(err => { ML.climaStatus = 'Clima indisponível: '+(err && err.message || err)+'.'; refitRain(); });
+    }
+    function refitRain() {
+      ML.whenRain = null;
+      if (ML.clima && ML.clima.ok) {
+        const sd = dayFromStr(ML.clima.inicio);
+        ML.rain = MLX.rainSets(ML.clima, sd);
+        try { ML.whenRain = MLX.trainWhen(RESULT.cells, activeMask(), RESULT.ev, RESULT.diaRef, ML.reg, ML.rain, sd, sd); } catch (e) { console.error(e); }
+        ML.climaStatus = ML.whenRain ? '' : 'Poucos acidentes com hora no período do clima para testar o efeito da chuva.';
+      }
+      ML.prev7 = forecast7();
+      renderInsight(); if ($('panel').classList.contains('open')) renderPanel();
+    }
+    function rainFactor() { if (!ML.whenRain) return null; return ML.whenRain.fatores.find(f => /chuva/.test(f.nome)) || null; }
+    function rainSignificant() { const f = rainFactor(); return !!(f && f.lo != null && (f.lo > 1 || f.hi < 1)); }
+    /** Risco por faixa de 3 h nos próximos 7 dias (calendário + chuva prevista, se a chuva se mostrou relevante). */
+    function forecast7() {
+      if (!RESULT || RESULT.referenciaAjustada) return null;
+      const useRain = rainSignificant(), model = useRain ? ML.whenRain : ML.when;
+      if (!model) return null;
+      const R = model.R, prev = ML.clima && ML.clima.ok ? ML.clima.pontos.map(p => p.previsao) : [];
+      const base = model.meanRate * R, d0 = hojeDia(), dias = [];
+      for (let d=d0; d<d0+7; d++) {
+        const di = MLX.dayInfo(d), blocos = [];
+        for (let b=0;b<8;b++) {
+          let tot = 0, pmax = 0;
+          for (let r=0;r<R;r++) {
+            let p = 0; const pv = prev[r];
+            if (useRain && pv && pv.inicio) { const s = dayFromStr(pv.inicio); for (let h=0;h<3;h++) { const i=(d-s)*24+b*3+h; const pr = pv.prob && pv.prob[i]!=null ? pv.prob[i]/100 : (pv.mm[i] >= 0.5 ? 1 : 0); if (pr > p) p = pr; } }
+            pmax = Math.max(pmax, p);
+            tot += model.rateFor(d, b, r, p);
+          }
+          blocos.push({ b, idx: tot/base, chuva: pmax });
+        }
+        dias.push({ d, di, blocos, max: Math.max(...blocos.map(x=>x.idx)) });
+      }
+      const slots = []; dias.forEach(x => x.blocos.forEach(y => slots.push({ d:x.d, di:x.di, b:y.b, idx:y.idx, chuva:y.chuva })));
+      slots.sort((a,b)=>b.idx-a.idx);
+      return { dias, top: slots.slice(0,3), useRain };
+    }
+    function diaTxt(d) { const dt = new Date(d*864e5); return ['dom','seg','ter','qua','qui','sex','sáb'][dt.getUTCDay()]+' '+String(dt.getUTCDate()).padStart(2,'0')+'/'+String(dt.getUTCMonth()+1).padStart(2,'0'); }
+    const ST_TXT = { ativo:['🔴','ativo'], emergente:['🟠','emergente'], queda:['🟡','em queda'], controlado:['🟢','controlado'], esporadico:['⚪','esporádico'] };
+    function stExplica(st) { return ({ ativo:'acidentes agrupados nos últimos 45 dias', emergente:'surgiu nos últimos 4 meses', queda:'último grupo há 46–180 dias', controlado:'sem grupo de acidentes há mais de 180 dias', esporadico:'acidentes isolados, sem aglomerado' })[st] || ''; }
+    function stChip(st) { const s = ST_TXT[st]; return s ? '<span class="st st-'+st+'">'+s[0]+' '+s[1]+'</span>' : ''; }
     function calibNotice() {
       const c = RESULT.calibracao;
       $('chkMalha').disabled = !calibrado();
@@ -472,17 +942,21 @@
     function topKeys(o) { return Object.keys(o).sort((a,b)=>o[b]-o[a]); }
     function toTime(s) { const m=String(s).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(+m[3],m[2]-1,+m[1]).getTime() : 0; }
     function aggregate(ms) {
-      const a={lat:0,lng:0,n:0,s:0,sn:0,r:[0,0,0,0,0],h:null,w:null,rd:{},ci:{},fr:{},sd:{},sf:{},km:null,ul:'',cells:ms.length,nm:0,dm:null};
+      const a={lat:0,lng:0,n:0,s:0,sn:0,r:[0,0,0,0,0],h:null,w:null,rd:{},ci:{},fr:{},sd:{},sf:{},km:null,kmBy:{},ul:'',cells:ms.length,nm:0,dm:null};
       ms.forEach(m => {
         a.lat+=m.la*m.n; a.lng+=m.lo*m.n; a.n+=m.n; a.s+=m.s; a.sn+=m.sn; for (let k=0;k<5;k++) a.r[k]+=(m.r[k]||0);
         if (m.h) { a.h=a.h||new Array(24).fill(0); m.h.forEach((v,k)=>a.h[k]+=v); }
         if (m.w) { a.w=a.w||new Array(7).fill(0); m.w.forEach((v,k)=>a.w[k]+=v); }
         inc(a.rd,m.rd,m.n); inc(a.ci,m.ci,m.n); inc(a.fr,m.fr,m.n); inc(a.sd,m.sd,m.n); inc(a.sf,m.sf,m.n);
         if (m.mr === 1) { a.nm += m.n; if (a.dm === null || m.dm < a.dm) a.dm = m.dm; }
-        if (m.km) a.km = a.km ? [Math.min(a.km[0],m.km[0]),Math.max(a.km[1],m.km[1])] : m.km.slice();
+        if (m.km) { const k = m.rd || '?', o = a.kmBy[k]; a.kmBy[k] = o ? [Math.min(o[0],m.km[0]),Math.max(o[1],m.km[1])] : m.km.slice(); }
         if (m.ul && (!a.ul || toTime(m.ul) > toTime(a.ul))) a.ul=m.ul;
       });
-      a.lat/=a.n; a.lng/=a.n; a.rodovias=topKeys(a.rd); a.cidades=topKeys(a.ci); a.fracoes=topKeys(a.fr); a.sede=topKeys(a.sd)[0]||''; a.fracMalha=topKeys(a.sf)[0]||'';
+      a.members = ms.map(m => m.idx);
+      if (ML.cellPred) { a.mlp = 0; ms.forEach(m => a.mlp += ML.cellPred[m.idx] || 0); }
+      a.lat/=a.n; a.lng/=a.n; a.rodovias=topKeys(a.rd);
+      // faixa de km só da rodovia principal do ponto
+      a.km = a.kmBy[a.rodovias[0] || '?'] || null; a.cidades=topKeys(a.ci); a.fracoes=topKeys(a.fr); a.sede=topKeys(a.sd)[0]||''; a.fracMalha=topKeys(a.sf)[0]||'';
       return a;
     }
     /** Peso de cada registro na predição: recência (w₂₀₂₆) × gravidade, conforme os marcadores. */
@@ -515,7 +989,11 @@
       return {dia:i, share:p[i]};
     }
     function peakHour(h) { if (!h || !h.some(Boolean)) return null; const m=Math.max(...h); return h.indexOf(m); }
-    function enrich(c) { c.janela = bestWindow(c.h); c.diaPrev = bestDay(c.w); c.trend = trendOf(c); c.e30 = expected30(c); c.pico = peakHour(c.h); }
+    function enrich(c) {
+      c.janela = bestWindow(c.h); c.diaPrev = bestDay(c.w); c.trend = trendOf(c); c.pico = peakHour(c.h);
+      c.e30 = ML.cellPred ? c.mlp : expected30(c);
+      c.st = ML.ST ? MLX.stStatus(ML.ST, c.members, RESULT.diaRef) : null;
+    }
 
     function calibrado() { return !!(RESULT && RESULT.calibracao && RESULT.calibracao.ok); }
     /** Registros considerados: todos, ou só os projetados sobre a malha do plano rodoviário. */
@@ -531,10 +1009,12 @@
       INC = clusterBy(cells, R, cells.map((_,i)=>i).sort((a,b)=>cells[b].n-cells[a].n));
       INC.forEach(enrich); INC.sort((a,b)=>b.n-a.n); INC.forEach((c,i) => { c.rank=i+1; c.id='i'+i; c.kind='inc'; });
       // Predição: kernel ponderado → picos de intensidade → tendência trimestral.
-      const lam = kde(cells, R, cellWeight);
+      // Com modelo de aprendizagem de máquina, o kernel espalha a previsão de 30 dias de cada trecho;
+      // na regra w₂₀₂₆, espalha o peso recente e aplica a tendência.
+      const lam = kde(cells, R, ML.cellPred ? (c => ML.cellPred[c.idx] || 0) : cellWeight);
       RESULT.lam = lam;
       PRED = clusterBy(cells, R, cells.map((_,i)=>i).sort((a,b)=>lam[b]-lam[a]));
-      PRED.forEach(c => { enrich(c); c.pred = lam[c.seed] * c.trend; });
+      PRED.forEach(c => { enrich(c); c.pred = lam[c.seed] * (ML.cellPred ? 1 : c.trend); });
       const mx = Math.max(...PRED.map(c=>c.pred), 1e-9);
       PRED.forEach(c => c.escore = 100*c.pred/mx);
       PRED.sort((a,b)=>b.pred-a.pred); PRED.forEach((c,i) => { c.rank=i+1; c.id='p'+i; c.kind='pred'; });
@@ -619,7 +1099,7 @@
         '<strong>Cidade:</strong> '+esc(c.cidades.slice(0,2).join(', ')||'N/D')+'<br>'+
         '<strong>Fração responsável:</strong> '+esc(c.fracoes[0]||'PMRv')+'<br>'+
         '<strong>Escore de Risco:</strong> '+(c.kind==='pred' ? fmt(c.escore,0)+'/100' : fmt(score(c),1))+'<br>'+
-        '<strong>Volume STV:</strong> '+fmt(c.n)+
+        '<strong>Volume STV:</strong> '+fmt(c.n)+(c.st ? '<br><strong>Situação:</strong> '+stChip(c.st) : '')+
         (c.kind==='pred' && c.janela ? '<br><strong>Janela prevista:</strong> '+winTxt(c)+(c.diaPrev?' · '+DIAS[c.diaPrev.dia]:'') : '')+
         (stop >= 0 ? '<br><strong>Parada da rota:</strong> nº '+(stop+1) : '')+
         '<div class="popup-note">'+(c.kind==='pred'?'Operação preventiva recomendada':'Patrulhamento preventivo orientado')+'</div></div>';
@@ -651,13 +1131,75 @@
           'Janela prevista: <b>'+winTxt(p0)+'</b>'+(p0.diaPrev?' · <b>'+DIAS[p0.diaPrev.dia]+'</b>':'')+
           (p0.e30!=null?'<br>≈ <b>'+fmt(p0.e30,1)+'</b> acidente(s) esperado(s)':'')+(tr!=null?' · tendência '+(tr>0?'↑ '+tr+'%':tr<0?'↓ '+(-tr)+'%':'estável'):'')+'</div></div>' : '')+
         (calibrado() ? '<div class="ins-block"><div class="ic">🛣</div><div><h5>Malha sob responsabilidade</h5>'+malhaResumo()+'</div></div>' : '')+
-        (BACKTEST ? '<div class="ins-block"><div class="ic">✅</div><div><h5>Acerto retroativo do modelo</h5>Os '+BACKTEST.k+' pontos previstos (sem os últimos 90 dias) concentraram <b>'+fmt(BACKTEST.pct*100,0)+'%</b> dos '+fmt(BACKTEST.tot)+' acidentes seguintes, em ~'+fmt(BACKTEST.areaPct*100,1)+'% da área.</div></div>' : '');
+        mlInsight()+
+        (!(ML.W && ML.W.ok) && BACKTEST ? '<div class="ins-block"><div class="ic">✅</div><div><h5>Acerto retroativo do modelo</h5>Os '+BACKTEST.k+' pontos previstos (sem os últimos 90 dias) concentraram <b>'+fmt(BACKTEST.pct*100,0)+'%</b> dos '+fmt(BACKTEST.tot)+' acidentes seguintes, em ~'+fmt(BACKTEST.areaPct*100,1)+'% da área.</div></div>' : '');
       box.style.display = 'block';
     }
     function malhaResumo() {
       const all = RESULT.cells.reduce((a,c)=>a+c.n,0), na = RESULT.cells.reduce((a,c)=>a+(c.mr===1?c.n:0),0), cal = RESULT.calibracao;
       return '<b>'+fmt(na)+'</b> de '+fmt(all)+' registros (<b>'+fmt(all?na/all*100:0,0)+'%</b>) estão sobre a malha do plano ('+fmt(cal.malhaKm,1)+' km calibrados; '+cal.ok+' de '+cal.trechos+' trechos).'+
         ($('chkMalha').checked ? ' A análise usa só esses registros.' : ' A análise inclui também os de fora da malha.');
+    }
+    function pct(x) { return x == null ? 'N/D' : fmt(x*100,0)+'%'; }
+    function mlInsight() {
+      let h = '';
+      if (ML.W && ML.W.ok) {
+        const s = ML.W.score, m = ML.modelo;
+        h += '<div class="ins-block"><div class="ic">🧠</div><div><h5>Modelo em uso: '+esc(nomeModelo(m))+($('selModelo').value==='auto'?' (automático)':'')+'</h5>'+
+          'Acerto retroativo nos '+$('selectPontos').value+' trechos principais: <b>'+pct(s[m].captura)+'</b>'+(m!=='rule'?' · regra w₂₀₂₆: '+pct(s.rule.captura):'')+
+          ' <a onclick="openPanel(\'modelo\')">ver placar</a></div></div>';
+      } else if (ML.W && !ML.W.ok) h += '<div class="ins-block"><div class="ic">🧠</div><div><h5>Aprendizagem de máquina</h5>'+esc(ML.W.motivo)+' Usando a regra w₂₀₂₆.</div></div>';
+      if (ML.prev7 && ML.prev7.top.length) {
+        const t0 = ML.prev7.top[0];
+        h += '<div class="ins-block pred"><div class="ic">📅</div><div><h5>Próximos 7 dias — maior risco</h5><b>'+diaTxt(t0.d)+', '+MLX.BLOCOS[t0.b]+'</b> ('+fmt(t0.idx,1)+'× a média'+(ML.prev7.useRain && t0.chuva>=.3?' · chuva '+fmt(t0.chuva*100,0)+'%':'')+')'+
+          (ML.prev7.top[1]?'<br>depois: '+ML.prev7.top.slice(1).map(x => diaTxt(x.d)+' '+MLX.BLOCOS[x.b]).join(' · '):'')+'</div></div>';
+      }
+      const f = rainFactor();
+      if (f) h += '<div class="ins-block"><div class="ic">🌧</div><div><h5>Clima</h5>'+(rainSignificant() ? 'Chuva '+(f.rr>1?'aumentou':'reduziu')+' o risco: <b>×'+fmt(f.rr,2)+'</b> (IC 95% '+fmt(f.lo,2)+'–'+fmt(f.hi,2)+'). Entra na previsão.' : 'Sem efeito comprovado da chuva nesta área (×'+fmt(f.rr,2)+', IC 95% '+fmt(f.lo,2)+'–'+fmt(f.hi,2)+'). Fica fora da previsão.')+'</div></div>';
+      else if (ML.climaStatus) h += '<div class="ins-block"><div class="ic">🌧</div><div><h5>Clima</h5>'+esc(ML.climaStatus)+'</div></div>';
+      return h;
+    }
+    /** Aba Modelo: placar da validação, o que foi aprendido, clima, próximos 7 dias e ST-DBSCAN. */
+    function modelHtml() {
+      if (!RESULT) return '<p class="muted">Gere a rota para treinar os modelos.</p>';
+      let h = '<h3>Modelo preditivo</h3>';
+      const W = ML.W;
+      if (!W || !W.ok) h += '<p class="muted">'+esc(W ? W.motivo : 'Sem treino.')+' A predição usa a regra w₂₀₂₆.</p>';
+      else {
+        h += '<div class="muted">Em uso: <b>'+esc(nomeModelo(ML.modelo))+'</b>'+($('selModelo').value==='auto'?' (escolhido automaticamente)':' (escolhido por você)')+'</div>'+
+          '<h4>Placar da validação retroativa</h4><table class="score"><tr><th>Modelo</th><th>Acerto top '+$('selectPontos').value+'</th><th>Erro de volume</th></tr>'+
+          ['gbm','nb','rule'].map(id => '<tr class="'+(id===ML.modelo?'win':'')+'"><td>'+(id===W.melhor?'🏆 ':'')+esc(W.score[id].nome)+'</td><td>'+pct(W.score[id].captura)+'</td><td>'+fmt(W.score[id].desvio,2)+'</td></tr>').join('')+'</table>'+
+          '<p class="muted" style="font-size:.68rem">Cada modelo foi treinado sem os últimos 30, 60 e 90 dias e testado neles ('+W.testes+' janelas). <b>Acerto</b>: parte dos acidentes seguintes que caiu nos trechos que ele apontou. <b>Erro de volume</b>: desvio de Poisson (quanto menor, mais perto do número real de acidentes). Unidade: trecho de 1 km da malha (ou área de ~1 km fora dela); '+fmt(W.order.length)+' trechos, '+W.K+' meses de treino.</p>'+
+          '<h4>O que o modelo aprendeu — onde</h4><p class="muted" style="font-size:.68rem">Peso de cada variável na Binomial Negativa (efeito padronizado; positivo aumenta o risco previsto).</p>'+
+          W.importancia.map(v => { const w = Math.min(100, Math.abs(v.coef)*80); return '<div class="fx'+(v.se && Math.abs(v.coef) > 1.96*v.se ? ' sig' : ' nsig')+'"><span>'+esc(v.nome)+'</span><div class="bar"><i style="left:'+(v.coef<0?50-w/2:50)+'%;width:'+(w/2)+'%"></i><u style="left:50%"></u></div><span>'+(v.coef>=0?'+':'')+fmt(v.coef,2)+'</span></div>'; }).join('');
+      }
+      const Q = rainSignificant() ? ML.whenRain : (ML.whenRain || ML.when);
+      if (Q) {
+        h += '<h4>O que o modelo aprendeu — quando</h4><p class="muted" style="font-size:.68rem">Risco relativo (×) com intervalo de 95%, comparado a seg–qui, 09h–12h, fora de feriado e férias'+(Q.useRain?', sem chuva':'')+'. Barra roxa forte = efeito comprovado.</p>'+
+          Q.fatores.filter(f => !/^região/.test(f.nome)).map(fxRow).join('');
+      }
+      h += '<h4>Clima (chuva)</h4>';
+      const f = rainFactor();
+      if (f) h += '<p>'+(rainSignificant() ? '✅ Nas faixas horárias com chuva (≥ 0,5 mm/h), o risco foi <b>×'+fmt(f.rr,2)+'</b> (IC 95% '+fmt(f.lo,2)+'–'+fmt(f.hi,2)+'), já descontados dia da semana, feriado, férias, horário e região. <b>A chuva entra na previsão.</b>' : '➖ Não houve efeito comprovado da chuva (×'+fmt(f.rr,2)+', IC 95% '+fmt(f.lo,2)+'–'+fmt(f.hi,2)+' inclui 1). <b>A chuva fica fora da previsão</b> desta área.')+'</p>'+
+        '<p class="muted" style="font-size:.68rem">Fonte: Open-Meteo, chuva hora a hora em '+ML.clima.pontos.length+' ponto(s) da área, de '+esc(ML.clima.inicio)+' a '+esc(ML.clima.fim)+'.</p>';
+      else h += '<p class="muted">'+esc(ML.climaStatus || 'Aguardando o histórico de chuva…')+'</p>';
+      if (ML.prev7) {
+        const cor = x => { const v = Math.max(0, Math.min(1, (x-0.5)/1.5)); return 'rgba(109,40,217,'+(0.08+0.8*v).toFixed(2)+')'; };
+        h += '<h4>Próximos 7 dias (risco × média)</h4><div class="grid7"><div></div>'+MLX.BLOCOS.map(b => '<div class="h">'+b.slice(0,3)+'</div>').join('')+
+          ML.prev7.dias.map(x => '<div class="d">'+diaTxt(x.d)+(x.di.tipo===4?' 🎉':'')+'</div>'+x.blocos.map(y => '<div title="'+MLX.BLOCOS[y.b]+': '+fmt(y.idx,2)+'×'+(ML.prev7.useRain?' · chuva '+fmt(y.chuva*100,0)+'%':'')+'" style="background:'+cor(y.idx)+';color:'+(y.idx>1.4?'#fff':'inherit')+'">'+fmt(y.idx,1)+(ML.prev7.useRain && y.chuva>=.5?'💧':'')+'</div>').join('')).join('')+'</div>'+
+          '<p class="muted" style="font-size:.68rem">Calendário (feriados, vésperas, férias)'+(ML.prev7.useRain?' e chuva prevista':'')+'. 🎉 feriado · 💧 chuva provável.</p>';
+      } else if (RESULT.referenciaAjustada) h += '<p class="muted">A base termina em '+esc(RESULT.referencia)+'; a previsão dos próximos dias fica disponível com dados recentes.</p>';
+      if (ML.ST) {
+        const cnt = {}; PRED.slice(0,30).forEach(c => cnt[c.st] = (cnt[c.st]||0)+1);
+        h += '<h4>ST-DBSCAN — situação dos 30 pontos previstos</h4><p>'+Object.keys(ST_TXT).filter(k => cnt[k]).map(k => stChip(k)+' '+cnt[k]).join(' &nbsp; ')+'</p>'+
+          '<p class="muted" style="font-size:.68rem">Grupos de acidentes a até 1 km e 30 dias uns dos outros (mínimo 4). Ativo: último grupo há até 45 dias · emergente: ativo e sem grupo entre 4 e 12 meses atrás · em queda: 46–180 dias · controlado: mais de 180 dias · esporádico: sem grupo. '+($('chkAtivos').checked?'A rota não inclui os controlados.':'')+'</p>';
+      }
+      return h;
+    }
+    function fxRow(f) {
+      const L = v => Math.max(0, Math.min(100, 50 + Math.log(v)/Math.log(4)*50));   // escala log de ×0,25 a ×4
+      const sig = f.lo != null && (f.lo > 1 || f.hi < 1);
+      return '<div class="fx '+(sig?'sig':'nsig')+'"><span>'+esc(f.nome)+'</span><div class="bar"><u style="left:50%"></u>'+(f.lo!=null?'<i style="left:'+L(f.lo)+'%;width:'+Math.max(1,L(f.hi)-L(f.lo))+'%"></i>':'')+'<b style="left:calc('+L(f.rr)+'% - 1px)"></b></div><span>×'+fmt(f.rr,2)+'</span></div>';
     }
     function focusC(c) { if (!c) return; map.setView([c.lat,c.lng], Math.max(map.getZoom(), 12)); openCard(c); }
 
@@ -684,8 +1226,10 @@
       if (!PRED.length) return;
       const N = Number($('selectPontos').value), maxKm = Number($('selectKm').value), origin = routeOrigin(), back = !!origin;
       const chosen = [], skipped = [];
+      const soAtivos = $('chkAtivos').checked && ML.ST;
       for (const c of PRED.slice(0, Math.max(N*5, 40))) {
         if (chosen.length >= N) break;
+        if (soAtivos && c.st === 'controlado') { skipped.push(c); continue; }
         const est = tourMeters(origin, chosen.concat([c]), back) * 1.3 / 1000; // fator de sinuosidade da via
         if (maxKm && est > maxKm) { skipped.push(c); continue; }
         chosen.push(c);
@@ -774,6 +1318,7 @@
       if (tab === 'rota') b.innerHTML = routeHtml();
       else if (tab === 'alertas') b.innerHTML = alertsHtml();
       else if (tab === 'rodovias') b.innerHTML = roadsHtml();
+      else if (tab === 'modelo') b.innerHTML = modelHtml();
       else b.innerHTML = cardHtml(CURRENT || (MODE==='incid'?INC[0]:PRED[0]));
     }
     function hoursHtml(h, win) {
@@ -791,7 +1336,7 @@
       const w = Number($('selJanela').value), jan = [30,60,90][w];
       const sede = c.sede || (RESULT.origemSede && RESULT.origemSede.nome) || '';
       const tr = RESULT.temData ? Math.round((c.trend-1)*100) : null;
-      return '<h3>'+(c.kind==='pred'?'Ponto Preditivo #':'Local de acidentes #')+c.rank+'</h3><div class="muted">'+(stopIdx>=0?'Parada nº '+(stopIdx+1)+' da rota · ':'')+esc(fmt(c.lat,5)+', '+fmt(c.lng,5))+'</div>'+
+      return '<h3>'+(c.kind==='pred'?'Ponto Preditivo #':'Local de acidentes #')+c.rank+'</h3>'+(c.st?'<div style="margin:2px 0 4px">'+stChip(c.st)+' <small class="muted">'+stExplica(c.st)+'</small></div>':'')+'<div class="muted">'+(stopIdx>=0?'Parada nº '+(stopIdx+1)+' da rota · ':'')+esc(fmt(c.lat,5)+', '+fmt(c.lng,5))+'</div>'+
         '<div class="pred-box"><b style="color:var(--purple)">🔮 Predição</b><br>'+
           'Janela prevista: <b>'+winTxt(c)+'</b>'+(c.diaPrev?' · dia mais provável: <b>'+DIAS[c.diaPrev.dia]+'</b>':'')+
           (c.e30!=null?'<br>Esperado em 30 dias: <b>≈ '+fmt(c.e30,1)+'</b> acidente(s)':'')+(tr!=null?' · tendência trimestral '+(tr>0?'↑ '+tr+'%':tr<0?'↓ '+(-tr)+'%':'estável'):'')+
@@ -851,7 +1396,7 @@
         '<h4>Paradas (ordem de deslocamento)</h4>'+
         (ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Início:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         ROUTE.stops.map((s,i) => { const leg = ROUTE.legs[ROUTE.origin?i:i-1];
-          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>P'+s.rank+' · '+esc(roadOf(s)||'Rodovia N/D')+'</b><br><small>'+esc(s.cidades[0]||'')+' · janela '+winTxt(s)+(s.diaPrev?' ('+DIAS[s.diaPrev.dia].slice(0,3)+')':'')+' · intensidade '+fmt(s.escore,0)+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
+          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>P'+s.rank+' · '+esc(roadOf(s)||'Rodovia N/D')+'</b> '+stChip(s.st)+'<br><small>'+esc(s.cidades[0]||'')+' · janela '+winTxt(s)+(s.diaPrev?' ('+DIAS[s.diaPrev.dia].slice(0,3)+')':'')+' · intensidade '+fmt(s.escore,0)+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
             '<div style="display:flex;flex-direction:column;gap:3px"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><button class="btn-sm ghost" type="button" onclick="openCard(ROUTE.stops['+i+'])">Cartão</button></div></div>'; }).join('')+
         (ROUTE.back&&ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Retorno:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         (ROUTE.avisos&&ROUTE.avisos.length?'<p class="muted"><small>'+esc(ROUTE.avisos.join(' '))+'</small></p>':'');
@@ -952,10 +1497,13 @@
     $('rangeRaio').addEventListener('input', onRadius);
     $('rangeRaio').addEventListener('change', () => { if (RESULT) { clearTimeout(tmr); analyze(true); } });
     $('selectTurno').addEventListener('change', e => { $('divCustomHora').hidden = e.target.value !== 'CUSTOM'; });
-    ['chkGravidade','chkRecente','selJanela','chkMalha'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) analyze(true); }));
+    ['chkGravidade'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) analyze(true); }));
+    ['chkRecente','selJanela','chkMalha'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) retrain(false); }));
+    $('selModelo').addEventListener('change', () => { if (RESULT && ML.W) { chooseModel(); analyze(true); } });
+    $('chkAtivos').addEventListener('change', () => { if (RESULT) buildRoute(); });
     ['selectPontos','selectKm','selectOrigem'].forEach(id => $(id).addEventListener('change', () => {
       if (id==='selectOrigem' && $(id).value==='GPS' && GPS.watch===null) toggleGps();
-      if (RESULT) { if (id==='selectPontos') BACKTEST = backtest(radius()); buildRoute(); renderInsight(); }
+      if (RESULT) { if (id==='selectPontos') { BACKTEST = backtest(radius()); retrain(false); return; } buildRoute(); renderInsight(); }
     }));
     document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
     document.querySelectorAll('[data-repr]').forEach(b => b.addEventListener('click', () => { setRepr(b.dataset.repr); if (RESULT) draw(); }));

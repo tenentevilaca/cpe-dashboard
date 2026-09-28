@@ -150,6 +150,10 @@ function calcularRotaAvancada(p) {
   const cells = Object.create(null), sedes = Object.create(null);
   const box = { s: 90, n: -90, w: 180, e: -180 };
   let total = 0, minDate = 0;
+  // Eventos individuais (célula, dia, hora) para o treino dos modelos no navegador.
+  const tzOff = new Date(ref).getTimezoneOffset() * 60000;
+  const dayOf = ms => Math.floor((ms - tzOff) / 864e5);
+  const evKey = [], evDay = [], evHour = [];
 
   table.rows.forEach(r => {
     let lat, lng;
@@ -177,12 +181,13 @@ function calcularRotaAvancada(p) {
 
     const k = lat.toFixed(3) + ',' + lng.toFixed(3);
     let c = cells[k];
-    if (!c) c = cells[k] = { la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0, 0, 0], h: null, w: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
+    if (!c) c = cells[k] = { key: k, la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0, 0, 0], h: null, w: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
     c.la += lat; c.lo += lng; c.n++;
     const sev = col.escore >= 0 ? number_(r[col.escore]) : null;
     if (sev !== null) { c.s += sev; c.sn++; }
     if (hour !== null) { if (!c.h) c.h = new Array(24).fill(0); c.h[hour]++; }
     const d = col.data >= 0 ? parseDate_(r[col.data]) : null;
+    if (d) { evKey.push(k); evDay.push(dayOf(d)); evHour.push(hour === null ? -1 : hour); }
     if (d) {
       const age = (ref - d) / 864e5;
       if (age <= 30) c.r[0]++;
@@ -219,6 +224,10 @@ function calcularRotaAvancada(p) {
     }
     return c;
   }).sort((a, b) => b.n - a.n).slice(0, CFG.MAX_CELLS);
+  const idx = {};
+  out.forEach((c, i) => { idx[c.key] = i; delete c.key; });
+  const ev = [];   // [índice da célula, dia (dias desde 1970, horário local), hora ou -1] em sequência
+  for (let i = 0; i < evKey.length; i++) { const ci = idx[evKey[i]]; if (ci !== undefined) ev.push(ci, evDay[i], evHour[i]); }
 
   // Origem sugerida: sede da fração filtrada (ou o município escolhido).
   let sedeNome = '';
@@ -234,12 +243,62 @@ function calcularRotaAvancada(p) {
     referencia: Utilities.formatDate(new Date(ref), tz, 'dd/MM/yyyy'),
     referenciaAjustada: refAjustada,
     diasBase: minDate ? Math.max(1, Math.round((ref - minDate) / 864e5)) : null,
+    ev: ev,
+    diaRef: dayOf(ref),
     temHora: col.hora >= 0, temData: col.data >= 0, temEscore: col.escore >= 0,
     origemSede: origemSede,
     malha: malha,
     calibracao: lin.info,
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
+}
+
+/* ======================================================================= */
+/*  Clima (Open-Meteo: gratuito, sem cadastro, uso não comercial)           */
+/* ======================================================================= */
+
+/**
+ * Chuva horária histórica e previsão dos próximos 7 dias para até 6 pontos da área.
+ * req = { pontos: [{lat,lng}], inicio: 'aaaa-mm-dd', fim: 'aaaa-mm-dd' }
+ * Retorno por ponto: horas com chuva (índice da hora desde o início, mm×10) e previsão horária.
+ */
+function analisarClima(req) {
+  req = req || {};
+  const pts = (req.pontos || []).slice(0, 6);
+  if (!pts.length || !req.inicio || !req.fim) return { ok: false, motivo: 'Parâmetros ausentes' };
+  const cacheKey = 'clima_' + digest_(JSON.stringify(req));
+  const hit = cacheGet_(cacheKey);
+  if (hit) return hit;
+  const tz = encodeURIComponent('America/Sao_Paulo');
+  const reqs = [];
+  pts.forEach(p => {
+    const ll = 'latitude=' + Number(p.lat).toFixed(3) + '&longitude=' + Number(p.lng).toFixed(3);
+    reqs.push({ url: 'https://archive-api.open-meteo.com/v1/archive?' + ll + '&start_date=' + req.inicio + '&end_date=' + req.fim + '&hourly=precipitation&timezone=' + tz, muteHttpExceptions: true });
+    reqs.push({ url: 'https://api.open-meteo.com/v1/forecast?' + ll + '&hourly=precipitation,precipitation_probability&forecast_days=7&timezone=' + tz, muteHttpExceptions: true });
+  });
+  let res;
+  try { res = UrlFetchApp.fetchAll(reqs); }
+  catch (e) { return { ok: false, motivo: 'Open-Meteo indisponível: ' + (e.message || e) }; }
+  const out = { ok: true, inicio: req.inicio, fim: req.fim, pontos: [] };
+  for (let i = 0; i < pts.length; i++) {
+    const hist = safeJson_(res[2 * i]), prev = safeJson_(res[2 * i + 1]);
+    const item = { lat: pts[i].lat, lng: pts[i].lng, chuva: [], horas: 0, previsao: null };
+    if (hist && hist.hourly && hist.hourly.precipitation) {
+      const pr = hist.hourly.precipitation;
+      item.horas = pr.length;
+      for (let h = 0; h < pr.length; h++) if (pr[h] >= 0.1) item.chuva.push(h, Math.round(pr[h] * 10));
+      item.inicioHist = hist.hourly.time && hist.hourly.time[0];
+    } else item.erro = (hist && hist.reason) || 'sem histórico';
+    if (prev && prev.hourly) item.previsao = { inicio: prev.hourly.time && prev.hourly.time[0], mm: prev.hourly.precipitation || [], prob: prev.hourly.precipitation_probability || [] };
+    out.pontos.push(item);
+  }
+  if (!out.pontos.some(p => p.horas)) return { ok: false, motivo: out.pontos.map(p => p.erro).filter(Boolean)[0] || 'sem dados' };
+  cacheSet_(cacheKey, out, 21600);
+  return out;
+}
+function safeJson_(resp) {
+  try { return resp.getResponseCode() === 200 ? JSON.parse(resp.getContentText()) : JSON.parse(resp.getContentText() || 'null'); }
+  catch (e) { return null; }
 }
 
 /**
