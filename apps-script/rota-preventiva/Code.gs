@@ -15,11 +15,18 @@
  * ("#######", "#N/A", "#REF!") nunca aparecem.
  */
 
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Rota Preventiva | Estado-Maior CPE / PMRv')
+function doGet(e) {
+  // ?pagina=tutorial abre o manual (arquivo Tutorial.html); sem parâmetro, o aplicativo.
+  const tutorial = e && e.parameter && String(e.parameter.pagina || '').toLowerCase() === 'tutorial';
+  return HtmlService.createHtmlOutputFromFile(tutorial ? 'Tutorial' : 'Index')
+    .setTitle(tutorial ? 'Manual da Rota Preventiva' : 'Rota Preventiva | Estado-Maior CPE / PMRv')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** Endereço público do aplicativo (usado pelos links entre o app e o tutorial). */
+function getUrlApp() {
+  return ScriptApp.getService().getUrl();
 }
 
 const CFG = {

@@ -16,6 +16,7 @@
     .brand{padding:14px 12px 10px}.brand img{display:block;width:100%;height:auto;filter:drop-shadow(0 3px 6px #000a)}
     .brand-caption{margin-top:8px;text-align:center;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#d9c889;font-weight:800}
     .menu-nav{display:grid;gap:6px;padding:8px 10px}.menu-btn{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#c5ced9;font-size:.82rem;font-weight:650;cursor:pointer}.menu-btn.active{background:var(--gold);color:#111827}.menu-btn .icon{width:17px;text-align:center}
+    .menu-link{text-decoration:none;margin-top:10px;border:1px solid #384154}.menu-link[hidden]{display:none}
     .main-wrapper{min-width:0;flex:1;height:100%;display:flex;flex-direction:column}
     /* Faixa superior: título + régua de densidade espacial */
     .header-cpe{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 20px;background:var(--black);color:#fff;box-shadow:0 3px 9px #0003;z-index:500;flex-wrap:wrap}
@@ -142,6 +143,7 @@
       <button class="menu-btn" type="button" data-mode="rota"><span class="icon">🧭</span><span class="label">Rotas preditivas</span></button>
       <button class="menu-btn" type="button" data-tab="rodovias"><span class="icon">🛣</span><span class="label">Rodovias e km</span></button>
       <button class="menu-btn" type="button" data-tab="alertas"><span class="icon">⚠</span><span class="label">Alertas na via</span></button>
+      <a class="menu-btn menu-link" id="lnkTutorial" href="#" target="_blank" rel="noopener" hidden><span class="icon">📘</span><span class="label">Tutorial</span></a>
     </nav>
   </aside>
 
@@ -929,6 +931,7 @@
       $('selectTurno').querySelector('option[value="AUTO"]').textContent = 'Automático — agora: ' + turnoAtual()[1];
       $('rangeRaio').value = metersToSlider(1000); $('lblRaio').textContent = km(radius());
       if (initMap()) loadFilters(); else $('loadingOverlay').style.display='none';
+      run('getUrlApp').then(u => { if (u) { $('lnkTutorial').href = u + '?pagina=tutorial'; $('lnkTutorial').hidden = false; } }).catch(() => {});
     });
   </script>
 </body>

@@ -4,7 +4,9 @@ App web da Rota Preventiva / Policiamento Preditivo do Estado-Maior do CPE / PMR
 
 ## Instalação
 1. Na planilha: **Extensões ▸ Apps Script**.
-2. Substitua o conteúdo de `Code.gs` e `Index.html` pelos arquivos desta pasta.
+2. Substitua o conteúdo de `Code.gs` e `Index.html` pelos arquivos desta pasta e crie o arquivo HTML
+   `Tutorial` com o conteúdo de `Tutorial.html` (o manual, aberto pelo botão 📘 Tutorial do app ou
+   pelo endereço do app com `?pagina=tutorial`).
 3. Execute uma vez a função **`diagnosticarPlanilha`** e autorize os acessos pedidos
    (planilha, cache, serviço Maps do Google e busca externa para o feed do Waze).
 4. **Implantar ▸ Gerenciar implantações ▸ Editar ▸ Nova versão ▸ Implantar**
