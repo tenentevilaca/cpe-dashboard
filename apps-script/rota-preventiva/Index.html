@@ -102,6 +102,9 @@
     .leaflet-popup-content{margin:11px 13px}.popup-card{min-width:210px;font-size:12px;line-height:1.55}.popup-card h4{margin:0 0 5px;color:var(--navy);font-size:14px}.popup-card strong{color:#354258}.popup-note{margin-top:6px;padding-top:5px;border-top:1px solid #ddd;color:#9b2424;font-weight:750}
     .rank-icon{background:var(--red);color:#fff;border:2px solid #fff;border-radius:50%;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
     .pred-icon{background:var(--purple);color:#fff;border:2px solid #fff;border-radius:50%;font:800 10px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
+    .post-icon{background:#c6ad62;color:#111827;border:2px solid #111827;border-radius:50%;font:900 12px/22px Arial,sans-serif;text-align:center;box-shadow:0 2px 6px #0008}
+    .post-card{padding:8px 10px;border:1px solid #e5d9b6;background:#fbf8ef;border-radius:8px;margin:6px 0}
+    .post-card h5{margin:0 0 3px;font-size:.82rem;color:var(--navy)}
     .stop-icon{background:var(--blue);color:#fff;border:2px solid #fff;border-radius:6px;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
     .alert-icon{font-size:18px;line-height:22px;text-align:center;filter:drop-shadow(0 1px 2px #0008)}
     .gps-icon{background:#2563eb;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px #2563eb44}
@@ -235,6 +238,11 @@
       </div>
       <div class="form-group"><label for="selModelo">Modelo preditivo</label>
         <select id="selModelo"><option value="auto" selected>Automático (o que mais acertou)</option><option value="gbm">Gradient Boosting</option><option value="nb">Binomial Negativa</option><option value="rule">Regra w₂₀₂₆ (kernel)</option></select></div>
+      <div class="form-group"><label for="selEstrategia">Estratégia da operação</label>
+        <select id="selEstrategia"><option value="postos" selected>Postos de operação (recomendado)</option><option value="pontos">Percorrer os pontos previstos</option></select></div>
+      <div class="form-group"><label for="selPostos">Postos · alcance</label>
+        <div class="time-range"><select id="selPostos" aria-label="Quantidade de postos"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>8</option></select>
+        <select id="selAlcance" aria-label="Alcance de cada posto"><option value="2000">2 km</option><option value="3000">3 km</option><option value="5000" selected>5 km</option><option value="8000">8 km</option><option value="10000">10 km</option><option value="15000">15 km</option></select></div></div>
       <div class="form-group"><label for="selectOrigem">Início da rota</label>
         <select id="selectOrigem"><option value="SEDE">Sede da fração</option><option value="GPS">Minha localização (GPS)</option><option value="TOPO">Ponto mais crítico</option></select></div>
       <div class="form-group"><label for="selectPontos">Pontos na rota</label>
@@ -653,7 +661,156 @@
         return age <= 180 ? 'queda' : 'controlado';
       }
 
-      return { TIPOS, BLOCOS, dayInfo, dateStr, holidays, fitGLM, fitGBM, trainWhere, cellPredictions, regions, rainSets, trainWhen, stdbscan, stStatus, FEAT_NAMES };
+      return { unitKey, TIPOS, BLOCOS, dayInfo, dateStr, holidays, fitGLM, fitGBM, trainWhere, cellPredictions, regions, rainSets, trainWhen, stdbscan, stStatus, FEAT_NAMES };
+    })();
+  </script>
+  <script>
+    /* =====================================================================
+     * Postos de operação: onde posicionar a equipe para cobrir o máximo de
+     * acidentes previstos com poucas posições (problema de localização com
+     * cobertura máxima, MCLP, resolvido de forma gulosa).
+     *  - Rede viária: traçados calibrados do plano rodoviário; entroncamentos
+     *    detectados onde traçados de rodovias diferentes se cruzam ou se tocam.
+     *  - Distância: pela rodovia quando os dois pontos estão na malha; fora dela,
+     *    linha reta × 1,3.
+     *  - Cobertura: peso 1 no posto, caindo até 0,5 no limite do alcance, zero além.
+     * ===================================================================== */
+    const POSTOS = (() => {
+      const R2D = Math.PI / 180;
+      function hav(a, b) { const dLa=(b[0]-a[0])*R2D, dLo=(b[1]-a[1])*R2D; const x=Math.sin(dLa/2)**2+Math.cos(a[0]*R2D)*Math.cos(b[0]*R2D)*Math.sin(dLo/2)**2; return 2*6371000*Math.asin(Math.sqrt(x)); }
+      function proj(p, a, b) {
+        const cos = Math.cos(a[0]*R2D), bx=(b[1]-a[1])*111320*cos, by=(b[0]-a[0])*111320, px=(p[1]-a[1])*111320*cos, py=(p[0]-a[0])*111320;
+        const L2 = bx*bx+by*by, t = L2 ? Math.max(0, Math.min(1, (px*bx+py*by)/L2)) : 0, dx = px-t*bx, dy = py-t*by;
+        return { t, d: Math.sqrt(dx*dx+dy*dy) };
+      }
+
+      /** Rede viária a partir dos traçados: nós nas pontas e nos entroncamentos, arestas pelos trechos. */
+      function buildNet(geo) {
+        const segs = (geo || []).filter(s => s.pts && s.pts.length > 1).map(s => {
+          const cum = [0]; for (let i=1;i<s.pts.length;i++) cum.push(cum[i-1] + hav(s.pts[i-1], s.pts[i]));
+          return { rod: s.rod, ini: s.ini, fim: s.fim, fr: s.fr, pts: s.pts, cum, len: cum[cum.length-1], marks: [] };
+        });
+        if (!segs.length) return null;
+        const G = new Map(), gs = 0.002;   // grade de ~200 m para achar vértices próximos
+        segs.forEach((s,si) => s.pts.forEach((p,i) => { const k = Math.floor(p[0]/gs)+':'+Math.floor(p[1]/gs); if (!G.has(k)) G.set(k, []); G.get(k).push([si,i]); }));
+        const raw = [];   // marcas: {si, along, lat, lng, kind}
+        segs.forEach((s,si) => { raw.push({ si, along:0, p:s.pts[0], kind:'ponta' }); raw.push({ si, along:s.len, p:s.pts[s.pts.length-1], kind:'ponta' }); });
+        // cruzamentos/encontros entre rodovias diferentes (vértices a menos de 80 m)
+        segs.forEach((s,si) => s.pts.forEach((p,i) => {
+          const y0 = Math.floor(p[0]/gs), x0 = Math.floor(p[1]/gs);
+          for (let y=-1;y<=1;y++) for (let x=-1;x<=1;x++) (G.get((y0+y)+':'+(x0+x))||[]).forEach(([sj,j]) => {
+            if (sj <= si || segs[sj].rod === s.rod) return;
+            if (hav(p, segs[sj].pts[j]) < 80) { raw.push({ si, along:s.cum[i], p, kind:'entroncamento' }); raw.push({ si:sj, along:segs[sj].cum[j], p:segs[sj].pts[j], kind:'entroncamento' }); }
+          });
+        }));
+        // une marcas próximas (< 250 m) num mesmo nó
+        const nodes = [];
+        raw.forEach(m => {
+          let n = nodes.find(n => hav(n.p, m.p) < 250);
+          if (!n) { n = { id: nodes.length, p: m.p, kind: m.kind, rods: new Set(), fr: new Set(), sum:[0,0], k:0 }; nodes.push(n); }
+          if (m.kind === 'entroncamento') n.kind = 'entroncamento';
+          n.rods.add(segs[m.si].rod); if (segs[m.si].fr) n.fr.add(segs[m.si].fr);
+          n.sum[0] += m.p[0]; n.sum[1] += m.p[1]; n.k++;
+          m.node = n.id; segs[m.si].marks.push({ along: m.along, node: n.id });
+        });
+        nodes.forEach(n => { n.p = [n.sum[0]/n.k, n.sum[1]/n.k]; if (n.rods.size >= 2) n.kind = 'entroncamento'; });
+        // arestas ao longo de cada trecho
+        const adj = nodes.map(() => []);
+        segs.forEach(s => {
+          const seen = new Map(); s.marks.forEach(m => { if (!seen.has(m.node) || Math.abs(seen.get(m.node) - m.along) > 0) seen.set(m.node, m.along); });
+          s.marks = [...seen.entries()].map(([node, along]) => ({ node, along })).sort((a,b) => a.along-b.along);
+          for (let i=0;i+1<s.marks.length;i++) { const a = s.marks[i], b = s.marks[i+1], w = b.along - a.along; if (a.node !== b.node) { adj[a.node].push([b.node, w]); adj[b.node].push([a.node, w]); } }
+        });
+        // menores caminhos entre todos os nós (Dijkstra a partir de cada nó)
+        const N = nodes.length, D = Array.from({length:N}, () => new Float64Array(N).fill(Infinity));
+        for (let s=0;s<N;s++) {
+          const dist = D[s]; dist[s] = 0; const done = new Uint8Array(N);
+          for (;;) { let u=-1, best=Infinity; for (let i=0;i<N;i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; } if (u < 0) break; done[u] = 1;
+            for (const [v,w] of adj[u]) if (dist[u]+w < dist[v]) dist[v] = dist[u]+w; }
+        }
+        return { segs, nodes, D };
+      }
+      /** Encaixa um ponto na malha (até 300 m): trecho e posição ao longo dele. */
+      function snap(net, p) {
+        if (!net) return null;
+        let best = null;
+        net.segs.forEach((s,si) => {
+          for (let i=0;i+1<s.pts.length;i++) {
+            const a = s.pts[i], b = s.pts[i+1];
+            if (Math.abs(p[0]-a[0]) > 0.01 && Math.abs(p[0]-b[0]) > 0.01) continue;
+            const r = proj(p, a, b); if (r.d <= 300 && (!best || r.d < best.d)) best = { si, along: s.cum[i] + r.t*(s.cum[i+1]-s.cum[i]), d: r.d };
+          }
+        });
+        return best;
+      }
+      function netDist(net, a, b, pa, pb) {
+        if (!a || !b) return hav(pa, pb) * 1.3;
+        if (a.si === b.si) return Math.abs(a.along - b.along) + a.d + b.d;
+        const ends = s => { const sg = net.segs[s.si], m = sg.marks; let lo = null, hi = null; for (const k of m) { if (k.along <= s.along) lo = k; if (k.along >= s.along && !hi) hi = k; } return [lo, hi].filter(Boolean); };
+        let best = Infinity;
+        for (const u of ends(a)) for (const v of ends(b)) { const d = Math.abs(a.along-u.along) + net.D[u.node][v.node] + Math.abs(v.along-b.along); if (d < best) best = d; }
+        return Math.min(best + a.d + b.d, isFinite(best) ? Infinity : hav(pa, pb) * 1.3);
+      }
+      function kmAt(seg, along) { return seg.ini + (seg.fim - seg.ini) * (seg.len ? along/seg.len : 0); }
+
+      /**
+       * demand: [{id, lat, lng, v (acidentes previstos em 30 dias), ...}]
+       * opts: { geo, K (nº de postos), alcance (m) }
+       */
+      function plan(demand, opts) {
+        const A = opts.alcance || 5000, K = opts.K || 4;
+        const D0 = demand.filter(d => d.v > 0).sort((a,b) => b.v-a.v).slice(0, 400);
+        const total = D0.reduce((s,d) => s + d.v, 0);
+        if (!D0.length || !total) return { postos: [], total: 0, coberto: 0 };
+        const net = buildNet(opts.geo);
+        D0.forEach(d => d.sn = snap(net, [d.lat, d.lng]));
+        // candidatos: trechos críticos, entroncamentos, pontos a cada 1,5 km da malha e pontos entre pares de críticos
+        const cand = [];
+        D0.slice(0, 150).forEach(d => cand.push({ lat:d.lat, lng:d.lng, sn:d.sn, tipo:'critico', ref:d }));
+        if (net) {
+          net.nodes.forEach(n => { if (n.kind === 'entroncamento') cand.push({ lat:n.p[0], lng:n.p[1], sn: snap(net, n.p), tipo:'entroncamento', rods:[...n.rods] }); });
+          let la0=90,la1=-90,lo0=180,lo1=-180; D0.forEach(d => { la0=Math.min(la0,d.lat); la1=Math.max(la1,d.lat); lo0=Math.min(lo0,d.lng); lo1=Math.max(lo1,d.lng); });
+          net.segs.forEach((s,si) => { for (let a=750; a<s.len; a+=1500) {
+            let i = 0; while (i+1 < s.cum.length && s.cum[i+1] < a) i++;
+            const t = s.cum[i+1] > s.cum[i] ? (a - s.cum[i])/(s.cum[i+1]-s.cum[i]) : 0, p = [s.pts[i][0]+(s.pts[i+1][0]-s.pts[i][0])*t, s.pts[i][1]+(s.pts[i+1][1]-s.pts[i][1])*t];
+            if (p[0] < la0-0.05 || p[0] > la1+0.05 || p[1] < lo0-0.05 || p[1] > lo1+0.05) continue;
+            cand.push({ lat:p[0], lng:p[1], sn:{ si, along:a, d:0 }, tipo:'trecho' }); } });
+        }
+        const top = net ? [] : D0.slice(0, 40);   // sem malha: pontos entre pares de trechos críticos próximos
+        for (let i=0;i<top.length;i++) for (let j=i+1;j<top.length;j++) {
+          const d = hav([top[i].lat,top[i].lng],[top[j].lat,top[j].lng]);
+          if (d > 600 && d < A*1.6) { const w = top[i].v + top[j].v, m = [(top[i].lat*top[i].v+top[j].lat*top[j].v)/w, (top[i].lng*top[i].v+top[j].lng*top[j].v)/w]; cand.push({ lat:m[0], lng:m[1], sn: snap(net, m), tipo:'entre' }); }
+        }
+        // havendo malha, o posto precisa estar sobre a rodovia
+        const C = (net ? cand.filter(c => c.sn) : cand).slice(0, 900);
+        // cobertura de cada candidato
+        const w = d => d <= A ? 1 - 0.5*(d/A) : 0;
+        C.forEach(c => { c.cov = []; D0.forEach((d,j) => { const dist = netDist(net, c.sn, d.sn, [c.lat,c.lng], [d.lat,d.lng]); const ww = w(dist); if (ww > 0) c.cov.push([j, ww, dist]); }); });
+        // escolha gulosa
+        const cur = new Float64Array(D0.length), postos = [];
+        for (let k=0; k<K; k++) {
+          let best = null, bg = 0;
+          C.forEach(c => { if (c.usado) return; let g = 0; for (const [j,ww] of c.cov) if (ww > cur[j]) g += (ww - cur[j]) * D0[j].v; if (g > bg + 1e-9) { bg = g; best = c; } });
+          if (!best || bg < total * 0.01) break;
+          best.usado = true; best.ganho = bg;
+          for (const [j,ww] of best.cov) if (ww > cur[j]) cur[j] = ww;
+          postos.push(best);
+        }
+        // atribui cada trecho previsto ao posto mais próximo que o cobre
+        postos.forEach(p => { p.cobre = []; p.valor = 0; });
+        D0.forEach((d,j) => {
+          let bp = null, bw = 0, bd = 0; postos.forEach(p => { const e = p.cov.find(x => x[0] === j); if (e && e[1] > bw) { bw = e[1]; bp = p; bd = e[2]; } });
+          if (bp) { bp.cobre.push({ d, dist: bd }); bp.valor += d.v * bw; }
+        });
+        postos.forEach(p => {
+          p.cobre.sort((a,b) => b.d.v - a.d.v);
+          if (net && p.sn) { const s = net.segs[p.sn.si]; p.rod = s.rod; p.km = kmAt(s, p.sn.along); p.fr = s.fr; }
+          if (p.tipo === 'critico' && p.ref && !p.rod) { p.rod = p.ref.rod; p.km = p.ref.km; }
+        });
+        const coberto = D0.reduce((s,d,j) => s + d.v * (cur[j] > 0 ? 1 : 0), 0);
+        return { postos, total, coberto, alcance: A, rede: !!net, entroncamentos: net ? net.nodes.filter(n => n.kind === 'entroncamento').length : 0 };
+      }
+      return { plan, buildNet, snap };
     })();
   </script>
   <script>
@@ -674,6 +831,7 @@
     let RESULT = null, INC = [], PRED = [], ROUTE = null, CURRENT = null, BACKTEST = null;
     let ALERTS = {alertas:[], congestionamentos:[], fontes:[]}, ROADS = {}, G_HOURS = null, G_DAYS = null;
     let MODE = 'pred', REPR = 'cluster', tab = 'trecho', busy = 0;
+    let PLAN = null;
     const ML = { W:null, modelo:'rule', cellPred:null, reg:null, when:null, whenRain:null, rain:null, clima:null, climaStatus:'', ST:null, prev7:null };
     const GPS = {watch:null, pos:null, marker:null, visited:new Set()};
 
@@ -717,7 +875,7 @@
       if (MODE === 'incid') d.innerHTML = '<b>Locais de acidentes (histórico)</b>' + (REPR==='kernel' ? '<div class="grad" style="background:'+grad(GRAD_INC)+'"></div><span class="muted">baixa → alta densidade (kernel)</span>' :
         '<br><i style="background:#7f1d1d"></i>Top 10%<br><i style="background:#dc2626"></i>Alto<br><i style="background:#f97316"></i>Médio<br><i style="background:#facc15"></i>Baixo');
       else if (MODE === 'pred') d.innerHTML = '<b>Predição — necessidade preventiva</b>' + (REPR==='kernel' ? '<div class="grad" style="background:'+grad(GRAD_PRED)+'"></div><span class="muted">baixa → alta intensidade prevista</span>' :
-        '<br><i style="background:#3b0764"></i>Crítico (top 10%)<br><i style="background:#7c3aed"></i>Alto<br><i style="background:#a78bfa"></i>Médio<br><i style="background:#ddd6fe"></i>Baixo') + '<br><span style="color:#1d4ed8">▬</span> Rota preditiva';
+        '<br><i style="background:#3b0764"></i>Crítico (top 10%)<br><i style="background:#7c3aed"></i>Alto<br><i style="background:#a78bfa"></i>Médio<br><i style="background:#ddd6fe"></i>Baixo') + '<br><span style="color:#1d4ed8">▬</span> Rota preditiva'+(estrategia()==='postos'?'<br><span class="post-icon" style="display:inline-block;width:26px;line-height:16px;font-size:9px">★1</span> Posto de operação (círculo = alcance)':'');
       else d.innerHTML = '<b>Rotas preditivas</b><br><span style="color:#1d4ed8">▬</span> Rota viária<br><span class="stop-icon" style="display:inline-block;width:18px;line-height:14px;font-size:9px">1</span> Parada (ponto previsto)';
     }
 
@@ -1019,6 +1177,7 @@
       PRED.forEach(c => c.escore = 100*c.pred/mx);
       PRED.sort((a,b)=>b.pred-a.pred); PRED.forEach((c,i) => { c.rank=i+1; c.id='p'+i; c.kind='pred'; });
       BACKTEST = backtest(R);
+      if (withRoute || !PLAN) planPosts();
       draw();
       if (withRoute) buildRoute(); else if (ROUTE) drawRoute();
       identifyRoads();
@@ -1060,16 +1219,18 @@
         const w = isPred ? Array.from(RESULT.lam) : cells.map(c=>c.n);
         const sorted = w.filter(x => x > 0).sort((a,b)=>a-b), max = sorted[Math.floor(sorted.length*.9)] || sorted[sorted.length-1] || 1;
         HEAT = L.heatLayer(cells.map((c,i)=>[c.la,c.lo,w[i]]), heatOpts(isPred?GRAD_PRED:GRAD_INC, max)).addTo(map);
-        (isPred ? PRED : INC).slice(0,10).forEach(c => marker(c, isPred));   // os 10 principais continuam clicáveis
+        if (isPred && estrategia() === 'postos' && PLAN && PLAN.postos.length) drawPosts();
+        else (isPred ? PRED : INC).slice(0,10).forEach(c => marker(c, isPred));   // os 10 principais continuam clicáveis
         return;
       }
-      const list = isPred ? PRED : INC, R = radius(), n = list.length;
+      const list = isPred ? PRED : INC, R = radius(), n = list.length, discreto = isPred && estrategia() === 'postos' && PLAN && PLAN.postos.length;
       list.slice(0, 1500).forEach((c,i) => {
         const col = isPred ? colorPred(i,n) : colorInc(i,n);
-        L.circle([c.lat,c.lng], {radius:R, color:col, weight:i<10?2:1, fillColor:col, fillOpacity:i<10?.45:.25})
+        L.circle([c.lat,c.lng], {radius:R, color:col, weight:discreto?1:(i<10?2:1), fillColor:col, fillOpacity:discreto?.18:(i<10?.45:.25), opacity:discreto?.5:1})
           .bindPopup(() => popupHtml(c)).on('click', () => openCard(c)).addTo(L_view);
-        if (i < 10) marker(c, isPred);
+        if (i < 10 && !discreto) marker(c, isPred);
       });
+      if (discreto) drawPosts();
     }
     function marker(c, isPred) {
       L.marker([c.lat,c.lng], {zIndexOffset:500, icon:L.divIcon({className:isPred?'pred-icon':'rank-icon', html:(isPred?'P':'')+c.rank, iconSize:[24,24]})})
@@ -1091,7 +1252,13 @@
       if (!$('chkGravidade').checked) return base;
       return (c.sn ? c.s/c.sn : 1) * Math.log(1+base) * 10;
     }
+    function postoResumo(p) {
+      return '<b>'+esc(p.nome)+'</b> · '+esc(p.cidades[0]||'')+'<br><small>'+esc(tipoPosto(p))+'</small><br>'+
+        'Cobre <b>≈ '+fmt(p.valor,1)+'</b> acidentes previstos em 30 dias (<b>'+fmt(100*p.valor/(PLAN.total||1),0)+'%</b> da área) a até '+km(PLAN.alcance)+' pela rodovia<br>'+
+        'Horário ideal: <b>'+winTxt(p)+'</b>'+(p.diaPrev?' · '+DIAS[p.diaPrev.dia]:'')+' · permanência sugerida: <b>'+minTxt(p.tempoMin)+'</b> do turno de '+PLAN.turnoH+' h';
+    }
     function popupHtml(c) {
+      if (c.kind === 'posto') return '<div class="popup-card"><h4>★ Posto de operação '+c.rank+'</h4>'+postoResumo(c)+(c.st?'<br>'+stChip(c.st):'')+'<div class="popup-note">Clique para ver os trechos cobertos</div></div>';
       const stop = ROUTE ? ROUTE.stops.findIndex(s => s.id===c.id) : -1;
       return '<div class="popup-card"><h4>'+(c.kind==='pred'?'Ponto Preditivo #':'Local de acidentes #')+c.rank+'</h4>'+
         '<strong>Rodovia:</strong> '+esc(roadOf(c)||'N/D')+(c.km?' · '+kmTxt(c):'')+'<br>'+
@@ -1143,6 +1310,11 @@
     function pct(x) { return x == null ? 'N/D' : fmt(x*100,0)+'%'; }
     function mlInsight() {
       let h = '';
+      if (PLAN && PLAN.postos.length && estrategia() === 'postos') {
+        const p0 = PLAN.postos[0];
+        h += '<div class="ins-block"><div class="ic">🎯</div><div><h5>Postos de operação</h5><b>'+PLAN.postos.length+' postos</b> cobrem <b>'+fmt(100*PLAN.coberto/(PLAN.total||1),0)+'%</b> dos acidentes previstos a até '+km(PLAN.alcance)+'.<br>'+
+          '<a onclick="focusC(PLAN.postos[0])">★1 '+esc(p0.nome)+'</a> · '+esc(p0.cidades[0]||'')+' · '+winTxt(p0)+' · '+minTxt(p0.tempoMin)+'</div></div>';
+      }
       if (ML.W && ML.W.ok) {
         const s = ML.W.score, m = ML.modelo;
         h += '<div class="ins-block"><div class="ic">🧠</div><div><h5>Modelo em uso: '+esc(nomeModelo(m))+($('selModelo').value==='auto'?' (automático)':'')+'</h5>'+
@@ -1222,14 +1394,69 @@
       if (back && origin && prev) d += hav(prev,[origin.lat,origin.lng]);
       return d;
     }
+    /* ---------- postos de operação (cobertura máxima) ---------- */
+    function estrategia() { return $('selEstrategia').value; }
+    /** Demanda: acidentes previstos em 30 dias por trecho de 1 km (modelo em uso). */
+    function demandUnits() {
+      const out = [];
+      if (ML.W && ML.W.ok) {
+        const p = ML.W.prev[ML.modelo];
+        ML.W.order.forEach((u, r) => { const U = ML.W.units[u]; out.push({ id:'u'+u, lat:U.lat, lng:U.lng, v:p[r], cells:U.cells }); });
+      } else {
+        const m = new Map(), act = activeMask();
+        RESULT.cells.forEach((c, i) => { if (!act[i]) return; const k = MLX.unitKey(c); let d = m.get(k);
+          if (!d) m.set(k, d = { id:k, lat:0, lng:0, w:0, v:0, cells:[] });
+          const v = RESULT.temData ? (expected30(c) || 0) * trendOf(c) : c.n; d.v += v; d.lat += c.la*c.n; d.lng += c.lo*c.n; d.w += c.n; d.cells.push(i); });
+        m.forEach(d => { d.lat /= d.w; d.lng /= d.w; out.push(d); });
+      }
+      out.forEach(d => { const c = RESULT.cells[d.cells[0]]; d.rod = c && c.rd; d.km = c && c.km ? c.km[0] : null; });
+      return out;
+    }
+    function planPosts() {
+      PLAN = null;
+      if (!RESULT || !RESULT.cells || !RESULT.cells.length) return;
+      const dem = demandUnits();
+      try { PLAN = POSTOS.plan(dem, { geo: RESULT.malhaGeo || [], K: Number($('selPostos').value), alcance: Number($('selAlcance').value) }); }
+      catch (e) { console.error(e); PLAN = null; return; }
+      const tw = timeWindow(), turnoH = tw.start == null ? 6 : ((tw.end - tw.start + 24) % 24 || 24);
+      const soma = PLAN.postos.reduce((s,p) => s + p.valor, 0) || 1;
+      PLAN.turnoH = turnoH;
+      PLAN.postos.sort((a,b) => b.valor - a.valor);
+      PLAN.postos.forEach((p, i) => {
+        const cells = []; p.cobre.forEach(c => cells.push(...c.d.cells));
+        const h = new Array(24).fill(0), w = new Array(7).fill(0), ci = {};
+        cells.forEach(k => { const c = RESULT.cells[k]; if (!c) return; if (c.h) c.h.forEach((v,j)=>h[j]+=v); if (c.w) c.w.forEach((v,j)=>w[j]+=v); if (c.ci) ci[c.ci] = (ci[c.ci]||0) + c.n; });
+        Object.assign(p, {
+          id:'o'+i, rank:i+1, kind:'posto', members:cells,
+          janela: h.some(Boolean) ? bestWindow(h) : null, diaPrev: w.some(Boolean) ? bestDay(w) : null, h,
+          cidades: topKeys(ci), rodovias: p.rod ? [p.rod] : [], fracoes: p.fr ? [p.fr] : [],
+          km: p.km != null ? [p.km, p.km] : null, e30: p.valor, escore: 100*p.valor/(PLAN.total||1), n: cells.reduce((s,k)=>s+(RESULT.cells[k]?RESULT.cells[k].n:0),0),
+          st: ML.ST ? MLX.stStatus(ML.ST, cells, RESULT.diaRef) : null,
+          tempoMin: Math.max(15, Math.round(turnoH*60*p.valor/soma/15)*15),
+          nome: p.tipo === 'entroncamento' ? 'Entroncamento ' + (p.rods || [p.rod]).join(' × ') : (p.rod ? p.rod + (p.km != null ? ' km ' + fmt(p.km,1) : '') : 'Ponto '+(i+1))
+        });
+      });
+    }
+    function tipoPosto(p) { return ({ entroncamento:'entroncamento — alcança mais de uma rodovia', critico:'sobre um trecho crítico', trecho:'entre trechos críticos da mesma rodovia', entre:'entre trechos críticos próximos' })[p.tipo] || ''; }
+    function drawPosts() {
+      if (!PLAN || !PLAN.postos.length) return;
+      PLAN.postos.forEach(p => {
+        L.circle([p.lat,p.lng], {radius:PLAN.alcance, color:'#8a7440', weight:1.5, dashArray:'6 6', fill:true, fillOpacity:.05, interactive:false}).addTo(L_view);
+        p.cobre.slice(0, 8).forEach(c => L.polyline([[p.lat,p.lng],[c.d.lat,c.d.lng]], {color:'#8a7440', weight:1.5, opacity:.7, dashArray:'2 5', interactive:false}).addTo(L_view));
+        L.marker([p.lat,p.lng], {zIndexOffset:900, icon:L.divIcon({className:'post-icon', html:'★'+p.rank, iconSize:[34,26]})})
+          .bindPopup(() => popupHtml(p)).on('click', () => openCard(p)).addTo(L_view);
+      });
+    }
     function buildRoute() {
       if (!PRED.length) return;
       const N = Number($('selectPontos').value), maxKm = Number($('selectKm').value), origin = routeOrigin(), back = !!origin;
       const chosen = [], skipped = [];
       const soAtivos = $('chkAtivos').checked && ML.ST;
-      for (const c of PRED.slice(0, Math.max(N*5, 40))) {
-        if (chosen.length >= N) break;
-        if (soAtivos && c.st === 'controlado') { skipped.push(c); continue; }
+      const usarPostos = estrategia() === 'postos' && PLAN && PLAN.postos.length;
+      const fila = usarPostos ? PLAN.postos : PRED.slice(0, Math.max(N*5, 40));
+      for (const c of fila) {
+        if (!usarPostos && chosen.length >= N) break;
+        if (!usarPostos && soAtivos && c.st === 'controlado') { skipped.push(c); continue; }
         const est = tourMeters(origin, chosen.concat([c]), back) * 1.3 / 1000; // fator de sinuosidade da via
         if (maxKm && est > maxKm) { skipped.push(c); continue; }
         chosen.push(c);
@@ -1331,6 +1558,7 @@
     }
     function cardHtml(c) {
       if (!c) return '<p class="muted">Gere a rota e clique em um ponto para ver o cartão do trecho.</p>';
+      if (c.kind === 'posto') return postoCard(c);
       const stopIdx = ROUTE ? ROUTE.stops.findIndex(s => s.id===c.id) : -1;
       const near = alertsNear(c.lat, c.lng, 5000), segs = planoFor(c);
       const w = Number($('selJanela').value), jan = [30,60,90][w];
@@ -1381,11 +1609,23 @@
         map.fitBounds(L_access.getBounds().pad(0.1));
       }).catch(err => { loading(false); $('accessBox').innerHTML='<p class="muted">'+esc(err&&err.message||err)+'</p>'; });
     }
+    function postoCard(p) {
+      return '<h3>★ Posto de operação '+p.rank+'</h3>'+(p.st?'<div style="margin:2px 0 4px">'+stChip(p.st)+'</div>':'')+
+        '<div class="post-card">'+postoResumo(p)+'</div>'+
+        '<h4>Por que aqui</h4><p style="font-size:.74rem">Entre todos os pontos da malha'+(PLAN.rede?' (incluindo '+PLAN.entroncamentos+' entroncamento(s) detectado(s))':'')+', o conjunto de postos foi escolhido para alcançar o máximo de acidentes previstos a até '+km(PLAN.alcance)+' pela rodovia, sem que dois postos disputem os mesmos trechos. Acidentes mais perto do posto contam mais.'+(p.tipo==='entroncamento'?' Por ser um entroncamento, este posto intercepta o fluxo que segue para trechos críticos de mais de uma rodovia.':'')+'</p>'+
+        '<h4>Trechos cobertos</h4>'+p.cobre.slice(0,10).map(c => { const cell = RESULT.cells[c.d.cells[0]] || {}; return '<div class="seg"><b>'+esc(cell.rd||'')+(cell.km?' km '+fmt(cell.km[0],1):'')+'</b> '+esc(cell.ci||'')+'<br><small>≈ '+fmt(c.d.v,1)+' acidentes previstos · '+km(c.dist)+' do posto</small></div>'; }).join('')+
+        (p.cobre.length>10?'<p class="muted">+ '+(p.cobre.length-10)+' trecho(s)</p>':'')+
+        '<h4>Horário dos acidentes cobertos</h4>'+hoursHtml(p.h, p.janela)+
+        '<div class="btn-row"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(p)+'">Waze</a><a class="btn-sm gm" target="_blank" rel="noopener" href="'+gmapsUrl(p)+'">Google Maps</a><button class="btn-sm ghost" type="button" onclick="map.setView(['+p.lat+','+p.lng+'],13)">Centralizar</button></div>';
+    }
     function routeHtml() {
       if (!ROUTE) return '<p class="muted">Gere a rota preventiva para ver as paradas.</p>';
       const next = nextStop(), links = mapsLinks();
       const nearRoute = ROUTE.path ? ALERTS.alertas.filter(a => ROUTE.path.some((p,k) => k%4===0 && hav(p,[a.lat,a.lng]) < 2000)) : [];
-      return '<h3>Rota preditiva</h3><div class="muted">'+ROUTE.stops.length+' pontos previstos'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+
+      const porPostos = ROUTE.stops.length && ROUTE.stops[0].kind === 'posto';
+      return '<h3>'+(porPostos?'Rota pelos postos de operação':'Rota preditiva')+'</h3>'+
+        (porPostos?'<p style="font-size:.74rem">'+PLAN.postos.length+' postos cobrem <b>'+fmt(100*PLAN.coberto/(PLAN.total||1),0)+'%</b> dos acidentes previstos a até '+km(PLAN.alcance)+'. Permanência sugerida proporcional ao que cada posto cobre, num turno de '+PLAN.turnoH+' h.</p>':'')+
+        '<div class="muted">'+ROUTE.stops.length+(porPostos?' postos':' pontos previstos')+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+
         '<p class="muted" style="font-size:.7rem">Paradas = pontos de maior intensidade prevista (kernel ponderado por recência'+($('chkGravidade').checked?', gravidade':'')+' e tendência), limitados a '+$('selectPontos').value+' pontos'+(Number($('selectKm').value)?' e '+$('selectKm').value+' km':'')+'.</p>'+
         (ROUTE.skipped?'<p class="muted">'+ROUTE.skipped+' ponto(s) previsto(s) ficaram fora por excederem a extensão máxima.</p>':'')+
         (next?'<div class="alert-item"><b>Próxima parada: nº '+(next.i+1)+'</b> — '+km(next.d)+' · <a target="_blank" rel="noopener" href="'+wazeUrl(next.s)+'">Waze</a></div>':'')+
@@ -1396,7 +1636,7 @@
         '<h4>Paradas (ordem de deslocamento)</h4>'+
         (ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Início:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         ROUTE.stops.map((s,i) => { const leg = ROUTE.legs[ROUTE.origin?i:i-1];
-          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>P'+s.rank+' · '+esc(roadOf(s)||'Rodovia N/D')+'</b> '+stChip(s.st)+'<br><small>'+esc(s.cidades[0]||'')+' · janela '+winTxt(s)+(s.diaPrev?' ('+DIAS[s.diaPrev.dia].slice(0,3)+')':'')+' · intensidade '+fmt(s.escore,0)+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
+          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>'+(s.kind==='posto'?'★'+s.rank+' · '+esc(s.nome):'P'+s.rank+' · '+esc(roadOf(s)||'Rodovia N/D'))+'</b> '+stChip(s.st)+(s.kind==='posto'?'<br><small>permanência '+minTxt(s.tempoMin)+'</small>':'')+'<br><small>'+esc(s.cidades[0]||'')+' · janela '+winTxt(s)+(s.diaPrev?' ('+DIAS[s.diaPrev.dia].slice(0,3)+')':'')+' · intensidade '+fmt(s.escore,0)+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
             '<div style="display:flex;flex-direction:column;gap:3px"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><button class="btn-sm ghost" type="button" onclick="openCard(ROUTE.stops['+i+'])">Cartão</button></div></div>'; }).join('')+
         (ROUTE.back&&ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Retorno:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         (ROUTE.avisos&&ROUTE.avisos.length?'<p class="muted"><small>'+esc(ROUTE.avisos.join(' '))+'</small></p>':'');
@@ -1501,6 +1741,7 @@
     ['chkRecente','selJanela','chkMalha'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) retrain(false); }));
     $('selModelo').addEventListener('change', () => { if (RESULT && ML.W) { chooseModel(); analyze(true); } });
     $('chkAtivos').addEventListener('change', () => { if (RESULT) buildRoute(); });
+    ['selEstrategia','selPostos','selAlcance'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) { planPosts(); draw(); buildRoute(); renderInsight(); if ($('panel').classList.contains('open')) renderPanel(); } }));
     ['selectPontos','selectKm','selectOrigem'].forEach(id => $(id).addEventListener('change', () => {
       if (id==='selectOrigem' && $(id).value==='GPS' && GPS.watch===null) toggleGps();
       if (RESULT) { if (id==='selectPontos') { BACKTEST = backtest(radius()); retrain(false); return; } buildRoute(); renderInsight(); }

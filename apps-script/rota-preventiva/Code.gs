@@ -249,6 +249,7 @@ function calcularRotaAvancada(p) {
     origemSede: origemSede,
     malha: malha,
     calibracao: lin.info,
+    malhaGeo: malhaGeo_(lin, total ? box : null),
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
 }
@@ -519,6 +520,19 @@ function linearRef_(ss, ctx) {
     return { rod: s.rod, km: round_(km, 1), fr: s.fr, dist: Math.round(best.d) };
   };
   return { segs: segs, match: match, info: info };
+}
+/** Traçados calibrados da malha perto da área (para a rede viária dos postos de operação). */
+function malhaGeo_(lin, box) {
+  if (!lin || !lin.segs || !lin.segs.length || !box) return [];
+  const pad = 0.2, out = [];
+  lin.segs.forEach(s => {
+    const inside = s.pts.some(p => p[0] >= box.s - pad && p[0] <= box.n + pad && p[1] >= box.w - pad && p[1] <= box.e + pad);
+    if (!inside) return;
+    const step = Math.max(1, Math.ceil(s.pts.length / 300));
+    const pts = s.pts.filter((_, i) => i % step === 0 || i === s.pts.length - 1).map(p => [round_(p[0], 5), round_(p[1], 5)]);
+    out.push({ rod: s.rod, ini: s.ini, fim: s.fim, fr: s.fr, pts: pts });
+  });
+  return out.slice(0, 400);
 }
 function distM_(a, b) {
   const cos = Math.cos(a[0] * Math.PI / 180), dy = (b[0] - a[0]) * 111320, dx = (b[1] - a[1]) * 111320 * cos;

@@ -40,6 +40,11 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
 - Rodovias: identificadas por geocodificação reversa (cache na aba oculta `_CACHE_RODOVIAS`);
   comparação incidência × predição por rodovia; perfil por km quando a base tiver rodovia e km;
   trechos e km do PLANO_RODOVIARIO.
+- **Postos de operação** (visão Predição, padrão da rota): problema de cobertura máxima (MCLP) sobre a rede
+  viária montada com os trechos calibrados do plano rodoviário (com entroncamentos detectados). Escolhe de 2 a 8
+  postos que alcançam o máximo de acidentes previstos a até 2–15 km **pela rodovia**, sem sobreposição; cada posto
+  tem horário ideal e permanência sugerida proporcional ao que cobre. A rota passa pelos postos
+  (ou pelos pontos previstos, na estratégia “Percorrer os pontos previstos”).
 - Cartão do trecho, rotas de acesso com alternativas, alertas (aba BLOQUEIOS / Waze for Cities) e GPS.
 
 ## Aprendizagem de máquina (sem custo, no navegador)
