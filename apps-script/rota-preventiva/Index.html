@@ -59,7 +59,7 @@
     .map-wrap{position:relative;flex:1;min-height:0}#map{position:absolute;inset:0;background:#e8e5db}
     .insight{position:absolute;top:10px;left:56px;width:360px;max-width:calc(100% - 70px);z-index:445;background:#fff;border-radius:10px;box-shadow:0 6px 24px #0003;font-size:.74rem;line-height:1.45;display:none;overflow:hidden}
     .insight header{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--navy);color:#fff;font-weight:800;font-size:.72rem;cursor:pointer}
-    .insight .body{padding:8px 11px;max-height:calc(100vh - 470px);min-height:120px;overflow-y:auto}.insight.min .body{display:none}
+    .insight .body{padding:8px 11px;max-height:calc(100vh - 470px);overflow-y:auto}.insight.min .body{display:none}
     .ins-block{display:grid;grid-template-columns:22px 1fr;gap:6px;padding:5px 0;border-bottom:1px dashed var(--line)}.ins-block:last-child{border-bottom:0}
     .ins-block .ic{font-size:1rem;line-height:1.2}.ins-block h5{margin:0;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
     .ins-block a{color:var(--navy);font-weight:800;text-decoration:none;cursor:pointer}.ins-block.pred h5{color:var(--purple)}.ins-block.inc h5{color:#b91c1c}
@@ -98,7 +98,7 @@
     .kmprof{width:100%;height:120px;border:1px solid var(--line);border-radius:6px;background:#fff}
     .muted{color:var(--muted)}
     .legend{background:#fff;padding:7px 9px;border-radius:8px;box-shadow:0 2px 8px #0003;font-size:.68rem;line-height:1.5}.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-    .legend .grad{height:9px;border-radius:4px;margin:3px 0}
+    .legend .grad{height:9px;border-radius:4px;margin:3px 0}.legend .lg-head{display:flex;justify-content:space-between;gap:10px;cursor:pointer;user-select:none}.legend.min .lg-body{display:none}.legend .lg-head span{color:var(--muted)}
     .leaflet-popup-content{margin:11px 13px}.popup-card{min-width:210px;font-size:12px;line-height:1.55}.popup-card h4{margin:0 0 5px;color:var(--navy);font-size:14px}.popup-card strong{color:#354258}.popup-note{margin-top:6px;padding-top:5px;border-top:1px solid #ddd;color:#9b2424;font-weight:750}
     .rank-icon{background:var(--red);color:#fff;border:2px solid #fff;border-radius:50%;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
     .pred-icon{background:var(--purple);color:#fff;border:2px solid #fff;border-radius:50%;font:800 10px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
@@ -134,7 +134,7 @@
     .stop-icon{background:var(--blue);color:#fff;border:2px solid #fff;border-radius:6px;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
     .alert-icon{font-size:18px;line-height:22px;text-align:center;filter:drop-shadow(0 1px 2px #0008)}
     .gps-icon{background:#2563eb;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px #2563eb44}
-    .fab{position:absolute;left:10px;bottom:150px;z-index:440;display:flex;flex-direction:column;gap:6px}
+    .fab{position:absolute;left:10px;top:92px;z-index:440;display:flex;flex-direction:column;gap:6px}.fab button{width:34px;height:34px;padding:0;font-size:.95rem}.fab .t{display:none}
     .fab button{padding:8px 11px;border-radius:8px;border:0;background:#fff;box-shadow:0 2px 8px #0003;font-weight:800;font-size:.72rem;cursor:pointer;color:var(--navy)}
     .fab button.on{background:#2563eb;color:#fff}
     /* Ampulheta */
@@ -185,7 +185,7 @@
       .insight{left:8px;right:8px;top:8px;width:auto;max-width:none;max-height:48%;overflow:auto}.insight .body{max-height:none}
       .legend{display:none}
       .leaflet-control-scale{margin-bottom:4px!important}
-      .fab{top:auto;bottom:18px;left:8px;flex-direction:row}
+      .fab{top:auto;bottom:18px;left:8px;flex-direction:row}.fab button{width:auto;height:auto;padding:8px 11px;font-size:.72rem}.fab .t{display:inline}
       .panel{left:0;right:0;bottom:0;top:auto;height:64%;width:auto;max-width:none;border-radius:14px 14px 0 0;z-index:1000}
       .panel.wide{width:auto;height:78%}
       .panel-tabs button{font-size:.68rem;padding:10px 2px}
@@ -300,8 +300,8 @@
         <div class="body" id="insightBody"></div>
       </section>
       <div class="fab">
-        <button type="button" id="btnGps" title="Mostrar minha posição e acompanhar a rota">📍 GPS</button>
-        <button type="button" id="btnPainel" title="Abrir painel">☰ Painel</button>
+        <button type="button" id="btnGps" title="GPS: mostrar minha posição e acompanhar a rota" aria-label="GPS">📍<span class="t"> GPS</span></button>
+        <button type="button" id="btnPainel" title="Abrir ou fechar o painel" aria-label="Painel">☰<span class="t"> Painel</span></button>
       </div>
       <aside class="panel" id="panel" aria-label="Informações">
         <div class="panel-tabs">
@@ -902,11 +902,40 @@
     function updateLegend() {
       const d = legendCtl && legendCtl.getContainer(); if (!d) return;
       const grad = g => 'linear-gradient(90deg,'+Object.values(g).join(',')+')';
+      legendBody(d);
       if (MODE === 'incid') d.innerHTML = '<b>Locais de acidentes (histórico)</b>' + (REPR==='kernel' ? '<div class="grad" style="background:'+grad(GRAD_INC)+'"></div><span class="muted">baixa → alta densidade (kernel)</span>' :
         '<br><i style="background:#7f1d1d"></i>Top 10%<br><i style="background:#dc2626"></i>Alto<br><i style="background:#f97316"></i>Médio<br><i style="background:#facc15"></i>Baixo');
       else if (MODE === 'pred') d.innerHTML = '<b>Predição — necessidade preventiva</b>' + (REPR==='kernel' ? '<div class="grad" style="background:'+grad(GRAD_PRED)+'"></div><span class="muted">baixa → alta intensidade prevista</span>' :
         '<br><i style="background:#3b0764"></i>Crítico (top 10%)<br><i style="background:#7c3aed"></i>Alto<br><i style="background:#a78bfa"></i>Médio<br><i style="background:#ddd6fe"></i>Baixo') + '<br><span style="color:#1d4ed8">▬</span> Rota preditiva'+(estrategia()==='postos'?'<br><span class="post-icon" style="display:inline-block;width:26px;line-height:16px;font-size:9px">★1</span> Posto de operação (círculo = alcance)':'');
       else d.innerHTML = '<b>Rotas preditivas</b><br><span style="color:#1d4ed8">▬</span> Rota viária<br><span class="stop-icon" style="display:inline-block;width:18px;line-height:14px;font-size:9px">1</span> Parada (ponto previsto)';
+      // título clicável: recolhe a legenda quando falta espaço no mapa
+      const html = d.innerHTML, k = html.indexOf('</b>');
+      d.innerHTML = '<div class="lg-head">'+html.slice(0, k+4)+'<span>'+(d.classList.contains('min')?'▸':'▾')+'</span></div><div class="lg-body">'+html.slice(k+4).replace(/^<br>/,'')+'</div>';
+      fitInsight();
+    }
+    let LEG_USER = null;   // null = automático; true/false = o usuário abriu/fechou
+    function legendBody(d) {
+      if (d.dataset.ok) return; d.dataset.ok = 1;
+      L.DomEvent.disableClickPropagation(d);
+      d.addEventListener('click', ev => { if (!ev.target.closest('.lg-head')) return; LEG_USER = d.classList.contains('min'); d.classList.toggle('min', !LEG_USER); updateLegend(); });
+    }
+    /** Síntese e legenda dividem a coluna esquerda do mapa sem se sobrepor. */
+    function fitInsight() {
+      const box = $('insight'), wrap = box && box.parentElement, lg = legendCtl && legendCtl.getContainer();
+      if (!box || !wrap) return;
+      const body = $('insightBody');
+      if (isPhone()) { box.style.maxHeight = ''; body.style.maxHeight = ''; return; }
+      const H = wrap.clientHeight, head = $('insightHead').offsetHeight || 30;
+      const legH = () => lg && lg.offsetParent ? lg.offsetHeight + 10 + 12 : 0;   // altura + margem inferior + folga
+      if (lg) lg.style.display = H < 250 ? 'none' : '';   // mapa muito baixo: legenda sai de cena até sobrar espaço
+      if (lg && H >= 250) {
+        if (LEG_USER === null) lg.classList.toggle('min', H - 10 - (lg.classList.remove('min'), legH()) < 230);
+        else lg.classList.toggle('min', !LEG_USER);
+        const s = lg.querySelector('.lg-head span'); if (s) s.textContent = lg.classList.contains('min') ? '▸' : '▾';
+      }
+      const avail = Math.max(head + 60, H - 10 - legH());
+      box.style.maxHeight = avail + 'px';
+      body.style.maxHeight = Math.max(60, avail - head) + 'px';
     }
 
     /* ---------- filtros em cascata (Cia → Pelotão → Grupamento → Município) ---------- */
@@ -980,7 +1009,7 @@
         GPLANO = res && res.planoGestor || null; VER_SISTEMA = false;
         if (!res || !res.cells || !res.cells.length) { clearMap(); alert('Nenhum registro encontrado para os filtros selecionados.'); return; }
         RESULT.janela = tw.label; RESULT.area = areaLabel();
-        const b = res.bounds ? L.latLngBounds(res.bounds) : null;
+        const b = robustBounds(res.cells) || (res.bounds ? L.latLngBounds(res.bounds) : null);
         if (b && b.isValid()) map.fitBounds(b.pad(0.05), {padding:[30,30], maxZoom:14});
         $('viewbar').style.display = 'flex';
         calibNotice();
@@ -990,6 +1019,12 @@
       }).catch(err => { $('btnGerar').disabled=false; loading(false); alert('Falha ao calcular: '+(err&&err.message||err)); });
     }
     /* ---------- aprendizagem de máquina: treino, escolha do modelo e clima ---------- */
+    function robustBounds(cells) {
+      if (!cells || !cells.length) return null;
+      const q = (a, p) => a[Math.min(a.length-1, Math.max(0, Math.round(p*(a.length-1))))];
+      const la = cells.map(c => c.la).sort((a,b)=>a-b), lo = cells.map(c => c.lo).sort((a,b)=>a-b), p = cells.length > 200 ? 0.005 : 0;
+      return L.latLngBounds([q(la,p), q(lo,p)], [q(la,1-p), q(lo,1-p)]);
+    }
     function activeMask() { const m = new Uint8Array(RESULT.cells.length), onlyMalha = $('chkMalha').checked && calibrado(); RESULT.cells.forEach((c,i) => { m[i] = onlyMalha ? (c.mr === 1 ? 1 : 0) : 1; }); return m; }
     function retrain(withClima) {
       if (!RESULT) return;
@@ -1335,7 +1370,7 @@
         (calibrado() ? '<div class="ins-block"><div class="ic">🛣</div><div><h5>Malha sob responsabilidade</h5>'+malhaResumo()+'</div></div>' : '')+
         mlInsight()+
         (!(ML.W && ML.W.ok) && BACKTEST ? '<div class="ins-block"><div class="ic">✅</div><div><h5>Acerto retroativo do modelo</h5>Os '+BACKTEST.k+' pontos previstos (sem os últimos 90 dias) concentraram <b>'+fmt(BACKTEST.pct*100,0)+'%</b> dos '+fmt(BACKTEST.tot)+' acidentes seguintes, em ~'+fmt(BACKTEST.areaPct*100,1)+'% da área.</div></div>' : '');
-      box.style.display = 'block';
+      box.style.display = 'block'; fitInsight();
     }
     function malhaResumo() {
       const all = RESULT.cells.reduce((a,c)=>a+c.n,0), na = RESULT.cells.reduce((a,c)=>a+(c.mr===1?c.n:0),0), cal = RESULT.calibracao;
@@ -2141,11 +2176,12 @@
     $('btnFecharFiltros').addEventListener('click', () => toggleFiltros(false));
     $('btnPainel').addEventListener('click', () => $('panel').classList.contains('open') ? $('panel').classList.remove('open') : openPanel());
     $('btnFechar').addEventListener('click', () => $('panel').classList.remove('open'));
-    $('insightHead').addEventListener('click', () => $('insight').classList.toggle('min'));
+    $('insightHead').addEventListener('click', () => { $('insight').classList.toggle('min'); fitInsight(); });
     window.addEventListener('load', () => {
       buildTicks(); fillHours();
       $('brandMini').src = document.querySelector('.brand img').src;
       window.addEventListener('resize', () => map && map.invalidateSize());
+      if (window.ResizeObserver) new ResizeObserver(() => fitInsight()).observe($('insight').parentElement);
       $('selectTurno').querySelector('option[value="AUTO"]').textContent = 'Automático — agora: ' + turnoAtual()[1];
       $('rangeRaio').value = metersToSlider(1000); $('lblRaio').textContent = km(radius());
       if (initMap()) loadFilters(); else $('loadingOverlay').style.display='none';
