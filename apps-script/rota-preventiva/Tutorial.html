@@ -102,7 +102,11 @@
     .layout{grid-template-columns:1fr;gap:10px}
     nav.toc{position:static;max-height:none;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--surface)}
     nav.toc ol{grid-template-columns:1fr 1fr}
-    .band-inner{grid-template-columns:1fr}
+    .band-inner{grid-template-columns:auto 1fr;gap:14px}
+    .shield{width:52px}
+    .band{padding-block:24px 22px}
+    .lead{font-size:.95rem}
+    .flow{font-size:.78rem}
   }
   @media (max-width:480px){ nav.toc ol{grid-template-columns:1fr} body{font-size:16px} }
 </style>
@@ -217,7 +221,15 @@
           <tr><td>Painel lateral</td><td>Abas <b>Cartão</b>, <b>Rota</b>, <b>Rodovias</b> e <b>Alertas</b>.</td></tr>
         </tbody>
       </table></div>
-      <p>Enquanto o aplicativo consulta a planilha ou calcula uma rota, a tela mostra a <b>ampulheta</b> com a mensagem do que está sendo feito. No celular, o botão <span class="ui">⚙ Filtros</span> abre e fecha o painel de filtros, que se recolhe sozinho ao gerar a rota.</p>
+      <p>Enquanto o aplicativo consulta a planilha ou calcula uma rota, a tela mostra a <b>ampulheta</b> com a mensagem do que está sendo feito. </p>
+      <h3>No celular</h3>
+      <ul>
+        <li>O menu fica <b>embaixo</b>, em abas: Acidentes, Predição, Rotas, Rodovias, Alertas e Tutorial.</li>
+        <li>Os <b>filtros abrem em tela cheia</b> na primeira vez. Depois de gerar a rota, eles se fecham e o mapa ocupa a tela; para voltar a eles, toque em <span class="ui">⚙ Filtros</span>.</li>
+        <li>O zoom é por <b>gesto de pinça</b>. A síntese começa recolhida: toque no título dela para abrir.</li>
+        <li>Cartão, Rota, Rodovias e Alertas abrem numa <b>gaveta que sobe de baixo</b>; o ✕ fecha.</li>
+      </ul>
+      <p>
     </section>
 
     <section id="filtros">
