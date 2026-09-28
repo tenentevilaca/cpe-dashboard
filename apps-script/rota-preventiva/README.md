@@ -45,6 +45,14 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
   postos que alcançam o máximo de acidentes previstos a até 2–15 km **pela rodovia**, sem sobreposição; cada posto
   tem horário ideal e permanência sugerida proporcional ao que cobre. A rota passa pelos postos
   (ou pelos pontos previstos, na estratégia “Percorrer os pontos previstos”).
+- **Gestão** (aba 🛡, acesso por senha): o administrador define a própria senha pelo menu da planilha
+  *Rota Preventiva ▸ Definir senha do administrador* (usuário `admin`) e autoriza gestores por área
+  (Cia/Pelotão/Grupamento), com senha provisória trocada no primeiro acesso. O gestor cria a rota da fração:
+  parte da sugestão do sistema, inclui pontos no mapa (clique, arraste, busca de endereço), define ponto base
+  × passagem, a operação e o horário (ex.: 13:00–14:00), e a vigência (um dia, uma semana, um mês, um ano ou
+  período, com dias da semana). Enquanto vigente, **a rota do gestor prevalece** sobre a do sistema para quem
+  gerar a rota daquela fração; sem plano, vale a do sistema. Dados nas abas ocultas `_GESTORES` (senhas com hash
+  e sal) e `_PLANOS_GESTOR`.
 - Cartão do trecho, rotas de acesso com alternativas, alertas (aba BLOQUEIOS / Waze for Cities) e GPS.
 
 ## Aprendizagem de máquina (sem custo, no navegador)

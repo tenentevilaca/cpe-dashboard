@@ -250,8 +250,15 @@ function calcularRotaAvancada(p) {
     malha: malha,
     calibracao: lin.info,
     malhaGeo: malhaGeo_(lin, total ? box : null),
+    planoGestor: planoGestorSeguro_(p),
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
+}
+
+/** Rota do gestor vigente hoje para a seleção (falha na leitura não impede a análise). */
+function planoGestorSeguro_(p) {
+  try { return planoDoDia({ cia: p.cia, pelotao: p.pelotao, grupamento: p.grupamento, cidade: p.cidade }); }
+  catch (e) { return null; }
 }
 
 /* ======================================================================= */
@@ -605,7 +612,7 @@ function calcularTrajeto(req) {
     else if (rest.length) { last = rest.pop(); df.setDestination(last.lat, last.lng); }
     else df.setDestination(o.lat, o.lng);
     rest.slice(0, CFG.MAX_WAYPOINTS).forEach(p => df.addWaypoint(p.lat, p.lng));
-    if (rest.length > 1) df.setOptimizeWaypoints(true);
+    if (rest.length > 1 && !req.manterOrdem) df.setOptimizeWaypoints(true);   // rota do gestor: ordem definida por ele
     const res = df.getDirections();
     if (!res || res.status !== 'OK' || !res.routes || !res.routes.length) return { ok: false, motivo: res && res.status };
     const route = res.routes[0];
@@ -1422,4 +1429,321 @@ function cacheGet_(name) {
     for (let i = 0; i < keys.length; i++) { if (got[keys[i]] == null) return null; json += got[keys[i]]; }
     return JSON.parse(json);
   } catch (e) { return null; }
+}
+
+/* ======================================================================= */
+/*  Gestão: gestores autorizados pelo administrador e rotas definidas por  */
+/*  eles. A rota do gestor vigente no dia prevalece sobre a do sistema.    */
+/* ======================================================================= */
+
+const GESTAO = {
+  GESTORES: '_GESTORES',          // aba oculta: usuário, nome, hash da senha, escopo
+  PLANOS: '_PLANOS_GESTOR',       // aba oculta: um plano (rota) por linha
+  SESSAO_S: 21600,                // sessão de 6 h
+  TENTATIVAS: 5,                  // tentativas de senha antes do bloqueio de 15 min
+  MAX_PONTOS: 25,
+  COLS_GESTORES: ['usuario', 'nome', 'salt', 'hash', 'cia', 'pelotao', 'grupamento', 'ativo', 'trocar_senha', 'criado_em', 'ultimo_acesso'],
+  COLS_PLANOS: ['id', 'titulo', 'cia', 'pelotao', 'grupamento', 'cidade', 'data_ini', 'data_fim', 'repeticao', 'dias_semana',
+                'pontos_json', 'orientacoes', 'autor', 'autor_nome', 'criado_em', 'atualizado_em', 'ativo']
+};
+
+/** Menu da planilha: só quem edita a planilha (o administrador) consegue usá-lo. */
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Rota Preventiva')
+    .addItem('Definir senha do administrador', 'definirSenhaAdmin')
+    .addToUi();
+}
+
+/** Define (ou troca) a senha do administrador. Usuário de acesso na aba Gestão: admin. */
+function definirSenhaAdmin() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Senha do administrador', 'Digite a nova senha do administrador (mínimo 8 caracteres). ' +
+    'Na aba Gestão do aplicativo, entre com o usuário "admin" e esta senha.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const senha = r.getResponseText();
+  if (!senha || senha.length < 8) { ui.alert('A senha precisa ter pelo menos 8 caracteres. Nada foi alterado.'); return; }
+  const salt = Utilities.getUuid();
+  PropertiesService.getScriptProperties().setProperties({ ADMIN_SALT: salt, ADMIN_HASH: hashSenha_(salt, senha) });
+  ui.alert('Senha do administrador definida. Usuário: admin');
+}
+
+function hashSenha_(salt, senha) {
+  let h = salt + '|' + senha;
+  for (let i = 0; i < 200; i++) {
+    h = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, h, Utilities.Charset.UTF_8)
+      .map(b => ('0' + (b & 255).toString(16)).slice(-2)).join('');
+  }
+  return h;
+}
+function iguais_(a, b) {   // comparação em tempo constante
+  a = String(a || ''); b = String(b || '');
+  let d = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return d === 0;
+}
+
+function gestaoSheet_(nome, cols) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(nome);
+  if (!sh) {
+    sh = ss.insertSheet(nome);
+    sh.getRange(1, 1, 1, cols.length).setValues([cols]);
+    sh.getRange(1, 1, sh.getMaxRows(), cols.length).setNumberFormat('@');   // tudo como texto (datas ISO)
+    sh.setFrozenRows(1);
+    sh.hideSheet();
+  }
+  return sh;
+}
+function gestaoLer_(nome, cols) {
+  const sh = gestaoSheet_(nome, cols), n = sh.getLastRow();
+  if (n < 2) return [];
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+  return sh.getRange(2, 1, n - 1, cols.length).getValues().map((r, i) => {
+    const o = { _linha: i + 2 };
+    cols.forEach((c, j) => { const v = r[j]; o[c] = v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v == null ? '' : v); });
+    return o;
+  }).filter(o => o[cols[0]]);
+}
+function gestaoGravar_(nome, cols, obj) {
+  const sh = gestaoSheet_(nome, cols), row = cols.map(c => obj[c] == null ? '' : String(obj[c]));
+  if (obj._linha) sh.getRange(obj._linha, 1, 1, cols.length).setNumberFormat('@').setValues([row]);
+  else { const r = sh.getLastRow() + 1; sh.getRange(r, 1, 1, cols.length).setNumberFormat('@').setValues([row]); }
+}
+function gestaoLock_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+function agora_() { return Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd HH:mm'); }
+function hoje_() { return Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd'); }
+function limpa_(s, max) { return String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, max || 120); }
+
+/* ---------- sessão ---------- */
+function gestaoLogin(req) {
+  req = req || {};
+  const usuario = key_(req.usuario).replace(/\s/g, ''), senha = String(req.senha || '');
+  if (!usuario || !senha) return { ok: false, motivo: 'Informe usuário e senha.' };
+  const cache = CacheService.getScriptCache(), kf = 'gf_' + digest_(usuario);
+  const falhas = Number(cache.get(kf) || 0);
+  if (falhas >= GESTAO.TENTATIVAS) return { ok: false, motivo: 'Muitas tentativas. Aguarde 15 minutos e tente de novo.' };
+  const falhou = () => { cache.put(kf, String(falhas + 1), 900); return { ok: false, motivo: 'Usuário ou senha incorretos.' }; };
+  let sess = null;
+  if (usuario === 'admin') {
+    const p = PropertiesService.getScriptProperties();
+    const salt = p.getProperty('ADMIN_SALT'), hash = p.getProperty('ADMIN_HASH');
+    if (!salt || !hash) return { ok: false, motivo: 'O administrador ainda não definiu a senha. Na planilha: menu Rota Preventiva ▸ Definir senha do administrador.' };
+    if (!iguais_(hashSenha_(salt, senha), hash)) return falhou();
+    sess = { usuario: 'admin', nome: 'Administrador', papel: 'admin', escopo: { cia: '', pelotao: '', grupamento: '' }, trocar: false };
+  } else {
+    const g = gestaoLer_(GESTAO.GESTORES, GESTAO.COLS_GESTORES).find(x => x.usuario === usuario);
+    if (!g || g.ativo !== 'sim' || !iguais_(hashSenha_(g.salt, senha), g.hash)) return falhou();
+    sess = { usuario: g.usuario, nome: g.nome, papel: 'gestor', escopo: { cia: g.cia, pelotao: g.pelotao, grupamento: g.grupamento }, trocar: g.trocar_senha === 'sim' };
+    gestaoLock_(() => { g.ultimo_acesso = agora_(); gestaoGravar_(GESTAO.GESTORES, GESTAO.COLS_GESTORES, g); });
+  }
+  cache.remove(kf);
+  const token = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, '');
+  cache.put('gs_' + token, JSON.stringify(sess), GESTAO.SESSAO_S);
+  return { ok: true, token: token, usuario: sess.usuario, nome: sess.nome, papel: sess.papel, escopo: sess.escopo, trocarSenha: sess.trocar };
+}
+function gestaoSair(token) { if (token) CacheService.getScriptCache().remove('gs_' + token); return { ok: true }; }
+
+/** Valida o token; para gestor, confere na aba se continua ativo (o administrador pode desativar a qualquer momento). */
+function sessao_(token, soAdmin) {
+  const raw = token && CacheService.getScriptCache().get('gs_' + token);
+  if (!raw) throw new Error('Sessão expirada. Entre novamente.');
+  const s = JSON.parse(raw);
+  if (s.papel !== 'admin') {
+    const g = gestaoLer_(GESTAO.GESTORES, GESTAO.COLS_GESTORES).find(x => x.usuario === s.usuario);
+    if (!g || g.ativo !== 'sim') { CacheService.getScriptCache().remove('gs_' + token); throw new Error('Acesso de gestor desativado pelo administrador.'); }
+    s.escopo = { cia: g.cia, pelotao: g.pelotao, grupamento: g.grupamento }; s.nome = g.nome; s.gestor = g;
+  }
+  if (soAdmin && s.papel !== 'admin') throw new Error('Somente o administrador pode fazer isso.');
+  return s;
+}
+function gestaoSessao(token) {
+  try { const s = sessao_(token); return { ok: true, usuario: s.usuario, nome: s.nome, papel: s.papel, escopo: s.escopo, trocarSenha: !!(s.gestor && s.gestor.trocar_senha === 'sim') }; }
+  catch (e) { return { ok: false, motivo: e.message }; }
+}
+function gestaoTrocarSenha(req) {
+  req = req || {};
+  const s = sessao_(req.token), nova = String(req.nova || '');
+  if (nova.length < 6) return { ok: false, motivo: 'A nova senha precisa ter pelo menos 6 caracteres.' };
+  if (s.papel === 'admin') return { ok: false, motivo: 'A senha do administrador é trocada na planilha: menu Rota Preventiva ▸ Definir senha do administrador.' };
+  const g = s.gestor;
+  if (!iguais_(hashSenha_(g.salt, String(req.atual || '')), g.hash)) return { ok: false, motivo: 'Senha atual incorreta.' };
+  return gestaoLock_(() => { g.salt = Utilities.getUuid(); g.hash = hashSenha_(g.salt, nova); g.trocar_senha = 'nao'; gestaoGravar_(GESTAO.GESTORES, GESTAO.COLS_GESTORES, g); return { ok: true }; });
+}
+
+/* ---------- gestores (somente administrador) ---------- */
+function gestaoListarGestores(token) {
+  sessao_(token, true);
+  return gestaoLer_(GESTAO.GESTORES, GESTAO.COLS_GESTORES).map(g => ({ usuario: g.usuario, nome: g.nome, cia: g.cia, pelotao: g.pelotao,
+    grupamento: g.grupamento, ativo: g.ativo === 'sim', trocarSenha: g.trocar_senha === 'sim', criadoEm: g.criado_em, ultimoAcesso: g.ultimo_acesso }));
+}
+function gestaoSalvarGestor(req) {
+  req = req || {};
+  sessao_(req.token, true);
+  const d = req.gestor || {}, usuario = key_(d.usuario).replace(/[^a-z0-9._-]/g, '');
+  if (!usuario || usuario.length < 3) return { ok: false, motivo: 'Usuário inválido: use ao menos 3 letras ou números, sem espaços.' };
+  if (usuario === 'admin') return { ok: false, motivo: 'O usuário "admin" é reservado ao administrador.' };
+  const nome = limpa_(d.nome, 80);
+  if (!nome) return { ok: false, motivo: 'Informe o nome do gestor.' };
+  return gestaoLock_(() => {
+    const todos = gestaoLer_(GESTAO.GESTORES, GESTAO.COLS_GESTORES);
+    let g = todos.find(x => x.usuario === usuario);
+    if (d.novo && g) return { ok: false, motivo: 'Já existe um gestor com o usuário "' + usuario + '".' };
+    if (!g) {
+      if (!d.senha || String(d.senha).length < 6) return { ok: false, motivo: 'Defina uma senha provisória com pelo menos 6 caracteres.' };
+      g = { usuario: usuario, criado_em: agora_(), ultimo_acesso: '' };
+    }
+    Object.assign(g, { nome: nome, cia: limpa_(d.cia), pelotao: limpa_(d.pelotao), grupamento: limpa_(d.grupamento), ativo: d.ativo === false ? 'nao' : 'sim' });
+    if (d.senha) {
+      if (String(d.senha).length < 6) return { ok: false, motivo: 'A senha precisa ter pelo menos 6 caracteres.' };
+      g.salt = Utilities.getUuid(); g.hash = hashSenha_(g.salt, String(d.senha)); g.trocar_senha = 'sim';
+    }
+    gestaoGravar_(GESTAO.GESTORES, GESTAO.COLS_GESTORES, g);
+    return { ok: true };
+  });
+}
+function gestaoExcluirGestor(req) {
+  req = req || {};
+  sessao_(req.token, true);
+  return gestaoLock_(() => {
+    const g = gestaoLer_(GESTAO.GESTORES, GESTAO.COLS_GESTORES).find(x => x.usuario === req.usuario);
+    if (!g) return { ok: false, motivo: 'Gestor não encontrado.' };
+    gestaoSheet_(GESTAO.GESTORES, GESTAO.COLS_GESTORES).deleteRow(g._linha);
+    return { ok: true };
+  });
+}
+
+/* ---------- planos (rotas do gestor) ---------- */
+const NIVEIS_ESCOPO_ = ['cia', 'pelotao', 'grupamento'];
+/** O escopo "de dentro" está contido no "de fora"? (campo vazio = todos). */
+function dentro_(fora, dentro) { return NIVEIS_ESCOPO_.every(k => !fora[k] || key_(fora[k]) === key_(dentro[k])); }
+
+function isoOk_(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+function isoDate_(s) { const p = String(s).split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])); }
+function isoStr_(d) { return d.toISOString().slice(0, 10); }
+function addMeses_(ini, m) {   // mesmo dia do mês seguinte (ou do último dia, se não existir) menos 1 dia
+  const d = isoDate_(ini), dia = d.getUTCDate();
+  const alvo = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + m, 1));
+  const ult = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  alvo.setUTCDate(dia > ult ? ult : dia - 1);   // dia 0 = último dia do mês anterior
+  return isoStr_(alvo);
+}
+function dataFim_(rep, ini, fim) {
+  if (rep === 'semana') { const d = isoDate_(ini); d.setUTCDate(d.getUTCDate() + 6); return isoStr_(d); }
+  if (rep === 'mes') return addMeses_(ini, 1);
+  if (rep === 'ano') return addMeses_(ini, 12);
+  if (rep === 'periodo') return fim;
+  return ini;
+}
+function horaOk_(h) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(h || '')); }
+
+function planoPublico_(p) {
+  let pontos = [];
+  try { pontos = JSON.parse(p.pontos_json || '[]'); } catch (e) { pontos = []; }
+  return { id: p.id, titulo: p.titulo, cia: p.cia, pelotao: p.pelotao, grupamento: p.grupamento, cidade: p.cidade,
+    dataIni: p.data_ini, dataFim: p.data_fim, repeticao: p.repeticao, diasSemana: p.dias_semana || '0123456',
+    pontos: pontos, orientacoes: p.orientacoes, autor: p.autor, autorNome: p.autor_nome,
+    criadoEm: p.criado_em, atualizadoEm: p.atualizado_em, ativo: p.ativo !== 'nao' };
+}
+function vigenteEm_(p, dia) {
+  if (p.ativo === 'nao' || !isoOk_(p.data_ini) || !isoOk_(p.data_fim)) return false;
+  if (dia < p.data_ini || dia > p.data_fim) return false;
+  const dow = String(isoDate_(dia).getUTCDay());
+  return (p.dias_semana || '0123456').indexOf(dow) >= 0;
+}
+
+function gestaoListarPlanos(token) {
+  const s = sessao_(token);
+  return { hoje: hoje_(), planos: gestaoLer_(GESTAO.PLANOS, GESTAO.COLS_PLANOS).filter(p => dentro_(s.escopo, p)).map(planoPublico_) };
+}
+
+function gestaoSalvarPlano(req) {
+  req = req || {};
+  const s = sessao_(req.token), d = req.plano || {};
+  const esc = { cia: limpa_(d.cia), pelotao: limpa_(d.pelotao), grupamento: limpa_(d.grupamento), cidade: limpa_(d.cidade) };
+  if (!dentro_(s.escopo, esc)) return { ok: false, motivo: 'Este plano está fora da sua área (' + escopoTxt_(s.escopo) + '). Ajuste os filtros de fração.' };
+  if (!isoOk_(d.dataIni)) return { ok: false, motivo: 'Informe a data inicial.' };
+  const rep = ['dia', 'semana', 'mes', 'ano', 'periodo'].indexOf(d.repeticao) >= 0 ? d.repeticao : 'dia';
+  if (rep === 'periodo' && (!isoOk_(d.dataFim) || d.dataFim < d.dataIni)) return { ok: false, motivo: 'A data final precisa ser igual ou posterior à inicial.' };
+  const fim = dataFim_(rep, d.dataIni, d.dataFim);
+  if (fim > addMeses_(d.dataIni, 24)) return { ok: false, motivo: 'O período máximo de um plano é de 2 anos.' };
+  const dias = rep === 'dia' ? '0123456' : String(d.diasSemana || '0123456').replace(/[^0-6]/g, '');
+  if (!dias) return { ok: false, motivo: 'Marque pelo menos um dia da semana.' };
+  const pontos = (d.pontos || []).slice(0, GESTAO.MAX_PONTOS).map(p => ({
+    lat: round_(Number(p.lat), 6), lng: round_(Number(p.lng), 6), nome: limpa_(p.nome, 80), tipo: p.tipo === 'passagem' ? 'passagem' : 'base',
+    operacao: limpa_(p.operacao, 160), hIni: horaOk_(p.hIni) ? p.hIni : '', hFim: horaOk_(p.hFim) ? p.hFim : '', cidade: limpa_(p.cidade, 60)
+  })).filter(p => isFinite(p.lat) && isFinite(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
+  if (!pontos.length) return { ok: false, motivo: 'Inclua pelo menos um ponto na rota.' };
+  const semOp = pontos.filter(p => p.tipo === 'base' && !p.operacao).length;
+  return gestaoLock_(() => {
+    const todos = gestaoLer_(GESTAO.PLANOS, GESTAO.COLS_PLANOS);
+    let p = d.id ? todos.find(x => x.id === d.id) : null;
+    if (d.id && !p) return { ok: false, motivo: 'Plano não encontrado (pode ter sido excluído).' };
+    if (p && !dentro_(s.escopo, p)) return { ok: false, motivo: 'Você não pode alterar planos de outra área.' };
+    if (!p) p = { id: Utilities.getUuid().slice(0, 8), criado_em: agora_() };
+    Object.assign(p, esc, {
+      titulo: limpa_(d.titulo, 100) || 'Rota do gestor', data_ini: d.dataIni, data_fim: fim, repeticao: rep, dias_semana: dias,
+      pontos_json: JSON.stringify(pontos), orientacoes: limpa_(d.orientacoes, 1000), autor: s.usuario, autor_nome: s.nome,
+      atualizado_em: agora_(), ativo: d.ativo === false ? 'nao' : 'sim'
+    });
+    gestaoGravar_(GESTAO.PLANOS, GESTAO.COLS_PLANOS, p);
+    // planos da mesma fração que coincidem em algum dia: prevalece o mais específico e, empatando, o mais recente
+    const conflitos = todos.filter(o => o.id !== p.id && o.ativo !== 'nao' && NIVEIS_ESCOPO_.concat(['cidade']).every(k => key_(o[k]) === key_(p[k])) &&
+      o.data_ini <= p.data_fim && o.data_fim >= p.data_ini).map(o => o.titulo + ' (' + o.data_ini + ' a ' + o.data_fim + ')');
+    return { ok: true, id: p.id, dataFim: fim, conflitos: conflitos, semOperacao: semOp };
+  });
+}
+function gestaoExcluirPlano(req) {
+  req = req || {};
+  const s = sessao_(req.token);
+  return gestaoLock_(() => {
+    const p = gestaoLer_(GESTAO.PLANOS, GESTAO.COLS_PLANOS).find(x => x.id === req.id);
+    if (!p) return { ok: false, motivo: 'Plano não encontrado.' };
+    if (!dentro_(s.escopo, p)) return { ok: false, motivo: 'Você não pode excluir planos de outra área.' };
+    gestaoSheet_(GESTAO.PLANOS, GESTAO.COLS_PLANOS).deleteRow(p._linha);
+    return { ok: true };
+  });
+}
+function gestaoAtivarPlano(req) {
+  req = req || {};
+  const s = sessao_(req.token);
+  return gestaoLock_(() => {
+    const p = gestaoLer_(GESTAO.PLANOS, GESTAO.COLS_PLANOS).find(x => x.id === req.id);
+    if (!p || !dentro_(s.escopo, p)) return { ok: false, motivo: 'Plano não encontrado.' };
+    p.ativo = req.ativo ? 'sim' : 'nao'; p.atualizado_em = agora_();
+    gestaoGravar_(GESTAO.PLANOS, GESTAO.COLS_PLANOS, p);
+    return { ok: true };
+  });
+}
+/** Busca de endereço para incluir um ponto (somente gestores). */
+function gestaoBuscarEndereco(req) {
+  req = req || {};
+  sessao_(req.token);
+  const txt = limpa_(req.texto, 150);
+  if (!txt) return { ok: false, motivo: 'Digite um endereço, local ou rodovia e km.' };
+  try {
+    const res = Maps.newGeocoder().setRegion('br').setLanguage('pt-BR').geocode(txt + ', ' + CFG.UF + ', Brasil');
+    if (res.status !== 'OK' || !res.results.length) return { ok: false, motivo: 'Endereço não encontrado.' };
+    return { ok: true, resultados: res.results.slice(0, 5).map(r => ({ nome: r.formatted_address, lat: r.geometry.location.lat, lng: r.geometry.location.lng })) };
+  } catch (e) { return { ok: false, motivo: String(e && e.message || e) }; }
+}
+function escopoTxt_(e) { return [e.cia, e.pelotao, e.grupamento].filter(Boolean).join(' · ') || 'todo o CPE'; }
+
+/**
+ * Rota do gestor para a fração e o dia (padrão: hoje). Vale o plano cuja fração contém a seleção do usuário;
+ * havendo mais de um, o mais específico e, empatando, o atualizado por último.
+ * sel: {cia, pelotao, grupamento, cidade} (nomes da interface; vazio = todos).
+ */
+function planoDoDia(req) {
+  req = req || {};
+  const dia = isoOk_(req.data) ? req.data : hoje_();
+  const sel = { cia: req.cia || '', pelotao: req.pelotao || '', grupamento: req.grupamento || '', cidade: req.cidade || '' };
+  const cands = gestaoLer_(GESTAO.PLANOS, GESTAO.COLS_PLANOS).filter(p => vigenteEm_(p, dia) &&
+    NIVEIS_ESCOPO_.concat(['cidade']).every(k => !p[k] || key_(p[k]) === key_(sel[k])));
+  const esp = p => NIVEIS_ESCOPO_.concat(['cidade']).filter(k => p[k]).length;
+  cands.sort((a, b) => (esp(b) - esp(a)) || (b.atualizado_em > a.atualizado_em ? 1 : b.atualizado_em < a.atualizado_em ? -1 : 0));
+  return { data: dia, hoje: hoje_(), plano: cands.length ? planoPublico_(cands[0]) : null, outros: Math.max(0, cands.length - 1) };
 }

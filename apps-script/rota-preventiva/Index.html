@@ -102,6 +102,32 @@
     .leaflet-popup-content{margin:11px 13px}.popup-card{min-width:210px;font-size:12px;line-height:1.55}.popup-card h4{margin:0 0 5px;color:var(--navy);font-size:14px}.popup-card strong{color:#354258}.popup-note{margin-top:6px;padding-top:5px;border-top:1px solid #ddd;color:#9b2424;font-weight:750}
     .rank-icon{background:var(--red);color:#fff;border:2px solid #fff;border-radius:50%;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
     .pred-icon{background:var(--purple);color:#fff;border:2px solid #fff;border-radius:50%;font:800 10px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 4px #0007}
+    .gest-icon{background:#15803d;color:#fff;border:2px solid #fff;border-radius:50%;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 5px #0008}
+    .gest-icon.pass{background:#fff;color:#15803d;border-color:#15803d}
+    .stop-icon.gestor{background:#15803d}
+    body.g-adding #map{cursor:crosshair}
+    .panel.wide{width:450px}
+    .g-form{display:grid;gap:8px;margin:8px 0}.g-form label,.g-lbl,.g-when label{display:grid;gap:3px;font-size:.7rem;font-weight:800;color:var(--muted)}
+    .g-form input,.g-form select,.g-lbl input,.g-lbl textarea,.g-when input,.g-when select,.g-pt input,.g-pt select,.g-search input,.g-dia input{font:inherit;font-size:.8rem;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:#111827;min-width:0}
+    .g-lbl{margin:8px 0}.g-lbl textarea{resize:vertical}
+    .g-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+    .g-nav{display:flex;gap:4px;margin:8px 0}.g-nav button{flex:1;padding:7px 4px;border:1px solid var(--line);background:#f8fafc;border-radius:6px;font-weight:800;font-size:.72rem;color:var(--muted);cursor:pointer}.g-nav button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .g-msg{padding:7px 9px;border-radius:6px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;margin:6px 0;font-size:.74rem}.g-msg.ok{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+    .g-box{padding:8px 10px;border-radius:8px;background:#f1f5f9;margin:6px 0;font-size:.74rem}
+    .g-plan{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0}.g-plan-top{display:flex;justify-content:space-between;gap:6px;align-items:start}
+    .g-st{font-size:.62rem;font-weight:800;padding:2px 7px;border-radius:10px;white-space:nowrap;background:#e5e7eb;color:#374151}.g-st.vig{background:#dcfce7;color:#166534}.g-st.prog{background:#dbeafe;color:#1e40af}.g-st.pausado{background:#fef3c7;color:#92400e}
+    .btn-sm.danger{color:#b91c1c}
+    .linkish{border:0;background:none;color:#1d4ed8;font-weight:700;cursor:pointer;padding:2px 0;text-align:left;font-size:.74rem}
+    .g-search{display:flex;gap:4px;margin:6px 0}.g-search input{flex:1}
+    .g-pt{border:1px solid #bbf7d0;background:#f7fef9;border-radius:8px;padding:6px 8px;margin:6px 0;display:grid;gap:5px}
+    .g-pt-top,.g-pt-row{display:flex;gap:5px;align-items:center}.g-pt-row{flex-wrap:wrap;font-size:.72rem;color:var(--muted)}.g-pt-row select{flex:1 1 100%}.g-pt-row input[type=time]{flex:1 1 90px}
+    .g-nome{flex:1;font-weight:700}.g-op{width:100%}
+    .g-num{flex:0 0 22px;height:22px;border-radius:50%;background:#15803d;color:#fff;font-weight:800;font-size:.7rem;display:grid;place-items:center}.g-num.pass{background:#fff;color:#15803d;border:2px solid #15803d}
+    .g-ic{border:1px solid var(--line);background:#fff;border-radius:5px;width:26px;height:26px;cursor:pointer;font-weight:800}.g-ic.del{color:#b91c1c}
+    .g-when{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .g-dows{display:flex;gap:3px;margin:6px 0}.g-dows button{flex:1;padding:5px 0;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:.68rem;font-weight:800;cursor:pointer;color:var(--muted)}.g-dows button.on{background:#15803d;color:#fff;border-color:#15803d}
+    .g-banner{padding:8px 10px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0;margin:6px 0;font-size:.75rem}.g-banner.sys{background:#fffbeb;border-color:#fde68a}
+    .g-dia{display:flex;justify-content:flex-end;margin-bottom:4px}.g-dia label{font-size:.7rem;font-weight:800;color:var(--muted);display:flex;gap:6px;align-items:center}
     .post-icon{background:#c6ad62;color:#111827;border:2px solid #111827;border-radius:50%;font:900 12px/22px Arial,sans-serif;text-align:center;box-shadow:0 2px 6px #0008}
     .post-card{padding:8px 10px;border:1px solid #e5d9b6;background:#fbf8ef;border-radius:8px;margin:6px 0}
     .post-card h5{margin:0 0 3px;font-size:.82rem;color:var(--navy)}
@@ -161,6 +187,7 @@
       .leaflet-control-scale{margin-bottom:4px!important}
       .fab{top:auto;bottom:18px;left:8px;flex-direction:row}
       .panel{left:0;right:0;bottom:0;top:auto;height:64%;width:auto;max-width:none;border-radius:14px 14px 0 0;z-index:1000}
+      .panel.wide{width:auto;height:78%}
       .panel-tabs button{font-size:.68rem;padding:10px 2px}
     }
   </style>
@@ -187,6 +214,7 @@
       <button class="menu-btn" type="button" data-tab="rodovias"><span class="icon">🛣</span><span class="label">Rodovias</span></button>
       <button class="menu-btn" type="button" data-tab="modelo"><span class="icon">🧠</span><span class="label">Modelo</span></button>
       <button class="menu-btn" type="button" data-tab="alertas"><span class="icon">⚠</span><span class="label">Alertas</span></button>
+      <button class="menu-btn" type="button" data-tab="gestao"><span class="icon">🛡</span><span class="label">Gestão</span></button>
       <a class="menu-btn menu-link" id="lnkTutorial" href="#" target="_blank" rel="noopener" hidden><span class="icon">📘</span><span class="label">Tutorial</span></a>
     </nav>
   </aside>
@@ -282,6 +310,7 @@
           <button type="button" data-tab="rodovias">Rodovias</button>
           <button type="button" data-tab="modelo">Modelo</button>
           <button type="button" data-tab="alertas">Alertas</button>
+          <button type="button" data-tab="gestao">Gestão</button>
           <button type="button" class="close" id="btnFechar" aria-label="Fechar">✕</button>
         </div>
         <div class="panel-body" id="panelBody"></div>
@@ -827,7 +856,7 @@
     const GRAD_PRED = {0.25:'#ddd6fe',0.5:'#a78bfa',0.75:'#7c3aed',1:'#3b0764'};
 
     let TUPLAS = [], PESOS = {recente:.6, historico:.4};
-    let map, L_view, L_route, L_access, L_alerts, L_gps, HEAT = null, legendCtl;
+    let map, L_view, L_route, L_access, L_alerts, L_gps, L_gest, HEAT = null, legendCtl;
     let RESULT = null, INC = [], PRED = [], ROUTE = null, CURRENT = null, BACKTEST = null;
     let ALERTS = {alertas:[], congestionamentos:[], fontes:[]}, ROADS = {}, G_HOURS = null, G_DAYS = null;
     let MODE = 'pred', REPR = 'cluster', tab = 'trecho', busy = 0;
@@ -861,7 +890,8 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       L.control.scale({metric:true, imperial:false, position:'bottomright', maxWidth:180}).addTo(map);
       L_access = L.featureGroup().addTo(map); L_alerts = L.featureGroup().addTo(map);
-      L_view = L.featureGroup().addTo(map); L_route = L.featureGroup().addTo(map); L_gps = L.featureGroup().addTo(map);
+      L_view = L.featureGroup().addTo(map); L_route = L.featureGroup().addTo(map); L_gps = L.featureGroup().addTo(map); L_gest = L.featureGroup().addTo(map);
+      map.on('click', e => { if (GEST.addMode && GEST.edit) { setTimeout(() => map.closePopup(), 0); gPonto(e.latlng.lat, e.latlng.lng); } });
       legendCtl = L.control({position:'bottomleft'});
       legendCtl.onAdd = () => L.DomUtil.create('div','legend');
       legendCtl.addTo(map);
@@ -947,6 +977,7 @@
         if (isPhone()) { $('controls').classList.add('collapsed'); $('insight').classList.add('min'); }
         else if (window.innerHeight < 800) toggleFiltros(false);   // notebook: mais espaço para o mapa
         RESULT = res; ROUTE = null; CURRENT = null; L_access.clearLayers();
+        GPLANO = res && res.planoGestor || null; VER_SISTEMA = false;
         if (!res || !res.cells || !res.cells.length) { clearMap(); alert('Nenhum registro encontrado para os filtros selecionados.'); return; }
         RESULT.janela = tw.label; RESULT.area = areaLabel();
         const b = res.bounds ? L.latLngBounds(res.bounds) : null;
@@ -1258,6 +1289,10 @@
         'Horário ideal: <b>'+winTxt(p)+'</b>'+(p.diaPrev?' · '+DIAS[p.diaPrev.dia]:'')+' · permanência sugerida: <b>'+minTxt(p.tempoMin)+'</b> do turno de '+PLAN.turnoH+' h';
     }
     function popupHtml(c) {
+      if (c.kind === 'gestor') return gestorPopup(c);
+      return popupBase(c) + (GEST.edit && tab === 'gestao' ? '<div style="margin-top:6px"><button class="btn-sm" type="button" onclick="gAddFrom(\''+c.id+'\')">＋ Incluir na rota do gestor</button></div>' : '');
+    }
+    function popupBase(c) {
       if (c.kind === 'posto') return '<div class="popup-card"><h4>★ Posto de operação '+c.rank+'</h4>'+postoResumo(c)+(c.st?'<br>'+stChip(c.st):'')+'<div class="popup-note">Clique para ver os trechos cobertos</div></div>';
       const stop = ROUTE ? ROUTE.stops.findIndex(s => s.id===c.id) : -1;
       return '<div class="popup-card"><h4>'+(c.kind==='pred'?'Ponto Preditivo #':'Local de acidentes #')+c.rank+'</h4>'+
@@ -1275,7 +1310,7 @@
       $('summary').innerHTML = '<span>Área: <b>'+esc(RESULT.area)+'</b></span><span>Horário: <b>'+esc(RESULT.janela)+'</b></span>'+
         '<span>Registros STV: <b>'+fmt(RESULT.totalRegistros)+'</b>'+(calibrado() && $('chkMalha').checked ? ' (na malha: <b>'+fmt(RESULT.act.reduce((a,c)=>a+c.n,0))+'</b>)' : '')+'</span>'+
         '<span>'+(MODE==='incid'?'Locais':'Pontos previstos')+' (raio '+km(radius())+'): <b>'+fmt((MODE==='incid'?INC:PRED).length)+'</b></span>'+
-        (ROUTE ? '<span>Rota: <b>'+ROUTE.stops.length+' pontos'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):'')+'</b></span>' : '');
+        (ROUTE ? '<span>Rota'+(ROUTE.gestor?' do gestor':'')+': <b>'+ROUTE.stops.length+' pontos'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):'')+'</b></span>' : '');
     }
 
     /* ---------- síntese da fração: incidência × predição ---------- */
@@ -1310,6 +1345,8 @@
     function pct(x) { return x == null ? 'N/D' : fmt(x*100,0)+'%'; }
     function mlInsight() {
       let h = '';
+      const gpl = planoAtivo();
+      if (gpl) h += '<div class="ins-block"><div class="ic">📋</div><div><h5>Rota do gestor '+(GPLANO.data===GPLANO.hoje?'para hoje':'em '+dataBR(GPLANO.data))+'</h5><b>'+esc(gpl.titulo)+'</b> · '+gpl.pontos.length+' ponto(s) · por '+esc(gpl.autorNome||'')+'<br>Prevalece sobre a sugestão do sistema. <a onclick="openPanel(\'rota\')">Ver rota</a></div></div>';
       if (PLAN && PLAN.postos.length && estrategia() === 'postos') {
         const p0 = PLAN.postos[0];
         h += '<div class="ins-block"><div class="ic">🎯</div><div><h5>Postos de operação</h5><b>'+PLAN.postos.length+' postos</b> cobrem <b>'+fmt(100*PLAN.coberto/(PLAN.total||1),0)+'%</b> dos acidentes previstos a até '+km(PLAN.alcance)+'.<br>'+
@@ -1394,6 +1431,324 @@
       if (back && origin && prev) d += hav(prev,[origin.lat,origin.lng]);
       return d;
     }
+    /* =====================================================================
+     * Gestão: rota definida pelo gestor (prevalece sobre a do sistema no dia)
+     * ===================================================================== */
+    const GEST = { token:null, user:null, view:'planos', planos:[], hoje:null, gestores:null, edit:null, addMode:false, msg:'', busca:null, prevPath:null };
+    let GPLANO = null, VER_SISTEMA = false;
+    const DOW = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const REPET = {dia:'Somente neste dia', semana:'Durante uma semana', mes:'Durante um mês', ano:'Durante um ano', periodo:'Período específico'};
+    function planoAtivo() { return !VER_SISTEMA && GPLANO && GPLANO.plano && GPLANO.plano.pontos && GPLANO.plano.pontos.length ? GPLANO.plano : null; }
+    function ultimo(v) { return String(v||'').split(JOIN).pop(); }
+    function escopoTxt(e) { return [e.cia, ultimo(e.pelotao), ultimo(e.grupamento), e.cidade].filter(Boolean).join(' · ') || 'Todo o CPE'; }
+    function dataBR(iso) { return iso ? iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4) : ''; }
+    function diasTxt(ds) { ds = ds || '0123456'; if (ds === '0123456') return 'todos os dias'; if (ds === '12345') return 'segunda a sexta'; if (ds === '06') return 'fins de semana'; return ds.split('').map(d => DOW[d]).join(', '); }
+    function vigenciaTxt(p) { return p.repeticao === 'dia' || p.dataIni === p.dataFim ? 'em '+dataBR(p.dataIni) : 'de '+dataBR(p.dataIni)+' a '+dataBR(p.dataFim)+' · '+diasTxt(p.diasSemana); }
+    function horaTxt(p) { return p.hIni && p.hFim ? p.hIni+' às '+p.hFim : p.hIni ? 'a partir das '+p.hIni : p.hFim ? 'até '+p.hFim : ''; }
+    /** Mesma regra do servidor: semana = 7 dias; mês/ano = até a véspera do mesmo dia (ou o último dia do mês). */
+    function fimPlano(rep, ini, fim) {
+      if (!ini) return ini;
+      const [y,m,d] = ini.split('-').map(Number), iso = dt => dt.toISOString().slice(0,10);
+      if (rep === 'semana') return iso(new Date(Date.UTC(y, m-1, d+6)));
+      if (rep === 'mes' || rep === 'ano') { const k = rep === 'mes' ? 1 : 12, ult = new Date(Date.UTC(y, m-1+k+1, 0)).getUTCDate();
+        return iso(new Date(Date.UTC(y, m-1+k, d > ult ? ult : d-1))); }
+      if (rep === 'periodo') return fim && fim >= ini ? fim : ini;
+      return ini;
+    }
+    function hm(h) { return String(((h%24)+24)%24).padStart(2,'0')+':00'; }
+    function statusPlano(p) {
+      const d = GEST.hoje || (GPLANO && GPLANO.hoje) || new Date().toISOString().slice(0,10);
+      if (!p.ativo) return ['pausado','Pausado'];
+      if (p.dataFim < d) return ['fim','Encerrado'];
+      if (p.dataIni > d) return ['prog','Programado'];
+      return (p.diasSemana||'0123456').indexOf(String(new Date(d+'T12:00:00').getDay())) >= 0 ? ['vig','Vigente hoje'] : ['prog','Vigente (não hoje)'];
+    }
+    function gStore(tok) { try { if (tok) sessionStorage.setItem('rpGest', tok); else sessionStorage.removeItem('rpGest'); } catch (e) {} }
+    function gRender() { if (tab === 'gestao' && $('panel').classList.contains('open')) renderPanel(); }
+    function gMsg(txt, ok) { GEST.msg = txt ? '<div class="g-msg'+(ok?' ok':'')+'">'+txt+'</div>' : ''; gRender(); }
+    function gCall(fn, arg) { return run(fn, arg).catch(err => { const m = String(err && err.message || err); if (/Sessão expirada|desativado/.test(m)) gLogout(true); throw err; }); }
+
+    /* ---------- acesso ---------- */
+    function gLogin(ev) {
+      ev.preventDefault();
+      const u = $('gUser').value.trim(), s = $('gPass').value;
+      loading(true,'Verificando acesso...');
+      run('gestaoLogin', {usuario:u, senha:s}).then(r => {
+        loading(false);
+        if (!r.ok) return gMsg(esc(r.motivo));
+        GEST.token = r.token; GEST.user = r; GEST.msg = ''; gStore(r.token);
+        GEST.view = r.trocarSenha ? 'senha' : 'planos'; gLoadPlanos();
+      }).catch(err => { loading(false); gMsg(esc(err.message||err)); });
+    }
+    function gLogout(expirou) {
+      if (GEST.token && !expirou) run('gestaoSair', GEST.token).catch(()=>{});
+      Object.assign(GEST, {token:null, user:null, planos:[], gestores:null, edit:null, addMode:false, view:'planos', prevPath:null});
+      gStore(null); L_gest.clearLayers(); document.body.classList.remove('g-adding');
+      gMsg(expirou ? 'Sessão encerrada. Entre novamente.' : '');
+    }
+    function gRestore() {
+      let tok = null; try { tok = sessionStorage.getItem('rpGest'); } catch (e) {}
+      if (!tok) return;
+      run('gestaoSessao', tok).then(r => { if (!r.ok) return gStore(null); GEST.token = tok; GEST.user = r; GEST.view = r.trocarSenha ? 'senha' : 'planos'; gLoadPlanos(); }).catch(()=>{});
+    }
+    function gSenha(ev) {
+      ev.preventDefault();
+      const a = $('gAtual').value, n = $('gNova').value, c = $('gConf').value;
+      if (n !== c) return gMsg('A confirmação não confere com a nova senha.');
+      gCall('gestaoTrocarSenha', {token:GEST.token, atual:a, nova:n}).then(r => {
+        if (!r.ok) return gMsg(esc(r.motivo));
+        GEST.user.trocarSenha = false; GEST.view = 'planos'; gMsg('Senha alterada.', true);
+      }).catch(err => gMsg(esc(err.message||err)));
+    }
+
+    /* ---------- planos ---------- */
+    function gLoadPlanos() {
+      return gCall('gestaoListarPlanos', GEST.token).then(r => { GEST.planos = r.planos || []; GEST.hoje = r.hoje; gRender(); }).catch(err => gMsg(esc(err.message||err)));
+    }
+    function gNovo(base) {
+      const sel = selection(), hoje = GEST.hoje || new Date().toISOString().slice(0,10);
+      GEST.edit = base ? JSON.parse(JSON.stringify(base)) : {titulo:'', cia:sel.cia, pelotao:sel.pelotao, grupamento:sel.grupamento, cidade:sel.cidade,
+        dataIni:hoje, dataFim:hoje, repeticao:'dia', diasSemana:'0123456', pontos:[], orientacoes:'', ativo:true};
+      if (base && base.copia) { delete GEST.edit.id; GEST.edit.titulo = (base.titulo||'')+' (cópia)'; }
+      GEST.view = 'editar'; GEST.addMode = false; GEST.prevPath = null; GEST.msg = '';
+      gDrawEdit(true); gRender();
+    }
+    function gEditar(id, copia) { const p = GEST.planos.find(x => x.id === id); if (p) gNovo(Object.assign({}, p, copia ? {copia:true} : {})); }
+    function gCancelar() { GEST.edit = null; GEST.view = 'planos'; GEST.addMode = false; document.body.classList.remove('g-adding'); L_gest.clearLayers(); GEST.msg=''; gRender(); }
+    function gVer(id) {
+      const p = GEST.planos.find(x => x.id === id); if (!p) return;
+      L_gest.clearLayers();
+      const pts = p.pontos.map(x => [x.lat, x.lng]);
+      L.polyline(pts, {color:'#15803d', weight:3, dashArray:'6 6'}).addTo(L_gest);
+      p.pontos.forEach((x,i) => L.marker([x.lat,x.lng], {icon:L.divIcon({className:'gest-icon', html:String(i+1), iconSize:[24,24]})}).bindTooltip(esc(x.nome||'')+(x.operacao?' — '+esc(x.operacao):'')+(horaTxt(x)?' · '+horaTxt(x):'')).addTo(L_gest));
+      if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.3), {maxZoom:14});
+      if (isPhone()) $('panel').classList.remove('open');
+    }
+    function gPausar(id, ativo) { gCall('gestaoAtivarPlano', {token:GEST.token, id, ativo}).then(r => { if (!r.ok) return gMsg(esc(r.motivo)); gLoadPlanos(); gRefreshDia(); }).catch(err => gMsg(esc(err.message||err))); }
+    function gExcluir(id) {
+      const p = GEST.planos.find(x => x.id === id); if (!p || !confirm('Excluir o plano "'+(p.titulo||'')+'"? Esta ação não pode ser desfeita.')) return;
+      gCall('gestaoExcluirPlano', {token:GEST.token, id}).then(r => { if (!r.ok) return gMsg(esc(r.motivo)); L_gest.clearLayers(); gLoadPlanos(); gRefreshDia(); }).catch(err => gMsg(esc(err.message||err)));
+    }
+    /** Atualiza a rota do dia (usuário) depois de uma mudança do gestor. */
+    function gRefreshDia(data) {
+      if (!RESULT) return;
+      return run('planoDoDia', Object.assign({}, selection(), data ? {data} : {})).then(r => {
+        GPLANO = r; VER_SISTEMA = false; buildRoute(); renderInsight(); if ($('panel').classList.contains('open')) renderPanel();
+      }).catch(()=>{});
+    }
+
+    /* ---------- editor ---------- */
+    function gSet(i, k, v) { const p = GEST.edit.pontos[i]; if (!p) return; p[k] = v; if (k === 'nome' || k === 'operacao') gDrawEdit(); }
+    function gField(k, v) { GEST.edit[k] = v; if (k === 'repeticao' || k === 'dataIni' || k === 'dataFim') gRender(); }
+    function gDia(d) { let s = GEST.edit.diasSemana || ''; s = s.indexOf(d) >= 0 ? s.replace(d,'') : s + d; GEST.edit.diasSemana = s.split('').sort().join(''); gRender(); }
+    function gMove(i, dir) { const a = GEST.edit.pontos, j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; GEST.prevPath = null; gDrawEdit(); gRender(); }
+    function gDel(i) { GEST.edit.pontos.splice(i,1); GEST.prevPath = null; gDrawEdit(); gRender(); }
+    function gToggleAdd() { GEST.addMode = !GEST.addMode; document.body.classList.toggle('g-adding', GEST.addMode); gRender(); if (GEST.addMode && isPhone()) $('panel').classList.remove('open'); }
+    function nomeLocal(lat, lng) {
+      let best = null, bd = 1e9;
+      const cand = [].concat(PLAN && PLAN.postos ? PLAN.postos : [], PRED.slice(0, 300));
+      cand.forEach(c => { const d = hav([lat,lng],[c.lat,c.lng]); if (d < bd) { bd = d; best = c; } });
+      if (best && bd <= Math.max(400, radius())) return { nome: best.kind === 'posto' ? best.nome : [roadOf(best), kmTxt(best)].filter(Boolean).join(' ') || 'Ponto previsto P'+best.rank, cidade: best.cidades && best.cidades[0] || '', c: best };
+      let cell = null; bd = 600;
+      (RESULT ? RESULT.cells : []).forEach(c => { const d = hav([lat,lng],[c.la,c.lo]); if (d < bd) { bd = d; cell = c; } });
+      if (cell && cell.rd) return { nome: cell.rd + (cell.km ? ' km '+fmt(cell.km[0],1) : ''), cidade: cell.ci || '' };
+      return { nome: '', cidade: cell ? cell.ci || '' : '' };
+    }
+    function gPonto(lat, lng, extra) {
+      const n = nomeLocal(lat, lng), c = n.c;
+      const p = Object.assign({ lat:+lat.toFixed(6), lng:+lng.toFixed(6), nome: n.nome || 'Ponto '+(GEST.edit.pontos.length+1), cidade:n.cidade, tipo:'base', operacao:'',
+        hIni: c && c.janela ? hm(c.janela.ini) : '', hFim: c && c.janela ? hm(c.janela.fim) : '' }, extra || {});
+      if (GEST.edit.pontos.length >= 25) return gMsg('Máximo de 25 pontos por rota.');
+      GEST.edit.pontos.push(p); GEST.prevPath = null; gDrawEdit(); gRender();
+    }
+    function gAddFrom(id) { const c = findC(id); if (!c || !GEST.edit) return; map.closePopup(); gPonto(c.lat, c.lng, c.kind === 'posto' ? { nome: c.nome } : {}); }
+    function gSugestao() {
+      let src = ROUTE && !ROUTE.gestor ? ROUTE.stops : (PLAN && PLAN.postos.length ? PLAN.postos : PRED.slice(0, Number($('selectPontos').value)));
+      if (!src || !src.length) return gMsg('Gere a análise (botão Gerar rota preventiva) para usar a sugestão do sistema.');
+      if (GEST.edit.pontos.length && !confirm('Substituir os '+GEST.edit.pontos.length+' ponto(s) atuais pela sugestão do sistema?')) return;
+      GEST.edit.pontos = src.slice(0, 25).map((c,i) => ({ lat:+c.lat.toFixed(6), lng:+c.lng.toFixed(6),
+        nome: c.kind === 'posto' ? c.nome : ([roadOf(c), kmTxt(c)].filter(Boolean).join(' ') || 'Ponto '+(i+1)), cidade: c.cidades && c.cidades[0] || '',
+        tipo: 'base', operacao:'', hIni: c.janela ? hm(c.janela.ini) : '', hFim: c.janela ? hm(c.janela.fim) : '' }));
+      if (!GEST.edit.titulo) GEST.edit.titulo = 'Rota preventiva — ' + areaLabel();
+      GEST.prevPath = null; gDrawEdit(true); gRender();
+    }
+    function gBuscar(ev) {
+      ev.preventDefault();
+      const txt = $('gEnd').value.trim(); if (!txt) return;
+      gCall('gestaoBuscarEndereco', {token:GEST.token, texto:txt}).then(r => { GEST.busca = r.ok ? r.resultados : []; if (!r.ok) gMsg(esc(r.motivo)); else gRender(); }).catch(err => gMsg(esc(err.message||err)));
+    }
+    function gUsarBusca(i) { const r = GEST.busca && GEST.busca[i]; if (!r) return; GEST.busca = null; gPonto(r.lat, r.lng, { nome: r.nome.split(',')[0] }); map.setView([r.lat, r.lng], Math.max(map.getZoom(), 13)); }
+    function gDrawEdit(fit) {
+      L_gest.clearLayers(); const e = GEST.edit; if (!e) return;
+      const pts = e.pontos.map(p => [p.lat, p.lng]);
+      if (GEST.prevPath) L.polyline(GEST.prevPath, {color:'#15803d', weight:5, opacity:.8}).addTo(L_gest);
+      else if (pts.length > 1) L.polyline(pts, {color:'#15803d', weight:3, dashArray:'6 6'}).addTo(L_gest);
+      e.pontos.forEach((p,i) => {
+        const m = L.marker([p.lat,p.lng], {draggable:true, zIndexOffset:1000, icon:L.divIcon({className:'gest-icon'+(p.tipo==='passagem'?' pass':''), html:String(i+1), iconSize:[24,24]})});
+        m.bindTooltip('<b>'+(i+1)+'. '+esc(p.nome||'')+'</b>'+(p.operacao?'<br>'+esc(p.operacao):'')+(horaTxt(p)?'<br>'+horaTxt(p):''));
+        m.on('dragend', ev => { const ll = ev.target.getLatLng(); p.lat = +ll.lat.toFixed(6); p.lng = +ll.lng.toFixed(6); GEST.prevPath = null; gDrawEdit(); gRender(); });
+        m.addTo(L_gest);
+      });
+      if (fit && pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.3), {maxZoom:14});
+    }
+    function gPreview() {
+      const e = GEST.edit; if (!e || !e.pontos.length) return gMsg('Inclua pelo menos um ponto.');
+      loading(true, 'Traçando a rota do gestor pelas rodovias...');
+      run('calcularTrajeto', {origem:null, retornar:false, manterOrdem:true, pontos:e.pontos.map((p,i) => ({id:'e'+i, lat:p.lat, lng:p.lng}))}).then(r => {
+        loading(false);
+        if (!r || !r.ok) return gMsg('Traçado viário indisponível agora ('+esc(r && r.motivo || 'sem resposta')+').');
+        GEST.prevPath = r.path; e.km = r.km; e.min = r.min; gDrawEdit(true); gMsg('Rota traçada: '+fmt(r.km,1)+' km · '+minTxt(r.min)+' (sem contar a ida e a volta da sede).', true);
+      }).catch(err => { loading(false); gMsg(esc(err.message||err)); });
+    }
+    function gSalvar() {
+      const e = GEST.edit; if (!e) return;
+      const semHora = e.pontos.filter(p => p.tipo === 'base' && (!p.hIni || !p.hFim)).length;
+      if (semHora && !confirm(semHora+' ponto(s) base sem horário definido. Salvar assim mesmo?')) return;
+      loading(true, 'Salvando o plano...');
+      gCall('gestaoSalvarPlano', {token:GEST.token, plano:e}).then(r => {
+        loading(false);
+        if (!r.ok) return gMsg(esc(r.motivo));
+        GEST.edit = null; GEST.view = 'planos'; GEST.addMode = false; document.body.classList.remove('g-adding'); L_gest.clearLayers();
+        GEST.msg = '<div class="g-msg ok">Plano salvo. Vale até '+dataBR(r.dataFim)+'.'+(r.conflitos && r.conflitos.length ? '<br>Coincide com: '+r.conflitos.map(esc).join('; ')+'. Na mesma fração, prevalece o atualizado por último.' : '')+(r.semOperacao ? '<br>'+r.semOperacao+' ponto(s) base sem operação descrita.' : '')+'</div>';
+        gLoadPlanos(); gRefreshDia();
+      }).catch(err => { loading(false); gMsg(esc(err.message||err)); });
+    }
+
+    /* ---------- gestores (administrador) ---------- */
+    function gLoadGestores() { gCall('gestaoListarGestores', GEST.token).then(r => { GEST.gestores = r; gRender(); }).catch(err => gMsg(esc(err.message||err))); }
+    function opcoesNivel(lvl, cia, pel) {
+      const set = new Map();
+      TUPLAS.forEach(t => { if (lvl !== 'cia' && cia && t[1] !== cia) return; if (lvl === 'grupamento' && pel && tupleValue(t,'pelotao') !== pel) return; const v = tupleValue(t, lvl); if (v) set.set(v, ultimo(v)); });
+      return [...set].sort((a,b) => a[1].localeCompare(b[1], 'pt-BR', {numeric:true}));
+    }
+    function gFormGestor(u) {
+      const g = u ? GEST.gestores.find(x => x.usuario === u) : null;
+      GEST.gForm = g ? Object.assign({}, g) : {novo:true, usuario:'', nome:'', cia:'', pelotao:'', grupamento:'', ativo:true};
+      gRender();
+    }
+    function gGF(k, v) { GEST.gForm[k] = v; if (k === 'cia') { GEST.gForm.pelotao = ''; GEST.gForm.grupamento = ''; gRender(); } if (k === 'pelotao') { GEST.gForm.grupamento = ''; gRender(); } }
+    function gSalvarGestor(ev) {
+      ev.preventDefault();
+      const f = Object.assign({}, GEST.gForm);
+      gCall('gestaoSalvarGestor', {token:GEST.token, gestor:f}).then(r => {
+        if (!r.ok) return gMsg(esc(r.motivo));
+        GEST.gForm = null; GEST.msg = '<div class="g-msg ok">Gestor salvo.'+(f.senha ? ' Informe a senha provisória a ele: no primeiro acesso o sistema pede para trocá-la.' : '')+'</div>'; gLoadGestores();
+      }).catch(err => gMsg(esc(err.message||err)));
+    }
+    function gAtivarGestor(u, ativo) { const g = GEST.gestores.find(x => x.usuario === u); gCall('gestaoSalvarGestor', {token:GEST.token, gestor:Object.assign({}, g, {ativo})}).then(r => { if (!r.ok) return gMsg(esc(r.motivo)); gLoadGestores(); }).catch(err => gMsg(esc(err.message||err))); }
+    function gExcluirGestor(u) { if (!confirm('Excluir o acesso de "'+u+'"? Os planos criados por ele continuam valendo.')) return; gCall('gestaoExcluirGestor', {token:GEST.token, usuario:u}).then(r => { if (!r.ok) return gMsg(esc(r.motivo)); gLoadGestores(); }).catch(err => gMsg(esc(err.message||err))); }
+
+    /* ---------- telas ---------- */
+    function gestHtml() {
+      const msg = GEST.msg || '';
+      if (!GEST.token) return '<h3>🛡 Gestão</h3><p class="muted">Acesso restrito a gestores autorizados pelo administrador. Aqui o gestor vê a sugestão do sistema e define a rota e os pontos base de operação da sua fração.</p>'+msg+
+        '<form class="g-form" onsubmit="gLogin(event)"><label>Usuário<input id="gUser" autocomplete="username" autocapitalize="none" required></label>'+
+        '<label>Senha<input id="gPass" type="password" autocomplete="current-password" required></label><button class="btn-sm" type="submit">Entrar</button></form>';
+      const u = GEST.user, adm = u.papel === 'admin';
+      let h = '<div class="g-head"><div><b>'+esc(u.nome)+'</b><br><small>'+(adm ? 'Administrador · todo o CPE' : 'Gestor · '+esc(escopoTxt(u.escopo)))+'</small></div>'+
+        '<div>'+(adm?'':'<button class="btn-sm ghost" type="button" onclick="GEST.view=\'senha\';gRender()">Senha</button> ')+'<button class="btn-sm ghost" type="button" onclick="gLogout()">Sair</button></div></div>';
+      if (GEST.view === 'senha') return h + msg + '<h4>'+(u.trocarSenha?'Primeiro acesso: troque a senha provisória':'Trocar senha')+'</h4><form class="g-form" onsubmit="gSenha(event)">'+
+        '<label>Senha atual<input id="gAtual" type="password" autocomplete="current-password" required></label><label>Nova senha (mín. 6)<input id="gNova" type="password" autocomplete="new-password" minlength="6" required></label>'+
+        '<label>Confirmar nova senha<input id="gConf" type="password" autocomplete="new-password" required></label><div class="btn-row"><button class="btn-sm" type="submit">Salvar</button>'+(u.trocarSenha?'':'<button class="btn-sm ghost" type="button" onclick="GEST.view=\'planos\';gRender()">Voltar</button>')+'</div></form>';
+      h += '<div class="g-nav">'+[['planos','Planos'],['editar', GEST.edit ? (GEST.edit.id?'Editando':'Novo plano') : '＋ Novo plano']].concat(adm?[['gestores','Gestores']]:[]).map(([k,l]) =>
+        '<button type="button" class="'+(GEST.view===k?'on':'')+'" onclick="'+(k==='editar'&&!GEST.edit?'gNovo()':k==='gestores'?'GEST.view=\'gestores\';gLoadGestores()':'GEST.view=\''+k+'\';gRender()')+'">'+l+'</button>').join('')+'</div>'+msg;
+      if (GEST.view === 'editar' && GEST.edit) return h + editorHtml();
+      if (GEST.view === 'gestores' && adm) return h + gestoresHtml();
+      return h + planosHtml();
+    }
+    function sugestaoHtml() {
+      if (!RESULT) return '<div class="g-box">Escolha a fração nos filtros e clique em <b>Gerar rota preventiva</b> para ver a sugestão do sistema no mapa.</div>';
+      const pl = GPLANO && GPLANO.plano;
+      const sis = PLAN && PLAN.postos.length && estrategia() === 'postos' ? PLAN.postos.length+' postos de operação cobrem '+fmt(100*PLAN.coberto/(PLAN.total||1),0)+'% dos acidentes previstos' : Math.min(PRED.length, Number($('selectPontos').value))+' pontos previstos';
+      return '<div class="g-box"><b>'+esc(RESULT.area)+'</b><br>Sugestão do sistema: '+sis+'.<br>'+
+        (pl ? '📋 Em vigor '+(GPLANO.data===GPLANO.hoje?'hoje':'em '+dataBR(GPLANO.data))+': <b>'+esc(pl.titulo)+'</b> ('+esc(pl.autorNome||'')+'). É a rota que o efetivo recebe.' : 'Nenhuma rota do gestor para hoje nesta fração: o efetivo recebe a sugestão do sistema.')+'</div>';
+    }
+    function planosHtml() {
+      const ord = {vig:0, prog:1, pausado:2, fim:3};
+      const ps = GEST.planos.slice().sort((a,b) => (ord[statusPlano(a)[0]] - ord[statusPlano(b)[0]]) || (a.dataIni < b.dataIni ? -1 : 1));
+      return sugestaoHtml() + '<h4>Planos da sua área ('+ps.length+')</h4>' + (ps.length ? ps.map(p => { const st = statusPlano(p);
+        return '<div class="g-plan"><div class="g-plan-top"><b>'+esc(p.titulo||'Rota do gestor')+'</b><span class="g-st '+st[0]+'">'+st[1]+'</span></div>'+
+          '<small>'+esc(escopoTxt(p))+'<br>'+vigenciaTxt(p)+' · '+p.pontos.length+' ponto(s) · por '+esc(p.autorNome||p.autor||'')+'</small>'+
+          '<div class="btn-row"><button class="btn-sm ghost" type="button" onclick="gVer(\''+p.id+'\')">Ver no mapa</button><button class="btn-sm" type="button" onclick="gEditar(\''+p.id+'\')">Editar</button>'+
+          '<button class="btn-sm ghost" type="button" onclick="gEditar(\''+p.id+'\',true)">Duplicar</button><button class="btn-sm ghost" type="button" onclick="gPausar(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Pausar':'Reativar')+'</button>'+
+          '<button class="btn-sm ghost danger" type="button" onclick="gExcluir(\''+p.id+'\')">Excluir</button></div></div>'; }).join('')
+        : '<p class="muted">Nenhum plano ainda. Clique em <b>＋ Novo plano</b>.</p>');
+    }
+    function editorHtml() {
+      const e = GEST.edit, rep = e.repeticao;
+      const fimCalc = fimPlano(rep, e.dataIni, e.dataFim);
+      return '<div class="g-box">Aplica-se a: <b>'+esc(escopoTxt(e))+'</b>'+(e.id?'':'<br><small>É a fração escolhida nos filtros do topo. Para outra fração, mude os filtros antes de criar o plano.</small>')+
+          (e.id?'<br><button class="linkish" type="button" onclick="Object.assign(GEST.edit, selection());gRender()">Usar a fração dos filtros atuais ('+esc(areaLabel())+')</button>':'')+'</div>'+
+        '<label class="g-lbl">Título<input value="'+esc(e.titulo)+'" placeholder="Ex.: Operação Feriado — BR-381" oninput="gField(\'titulo\',this.value)"></label>'+
+        '<h4>Pontos da rota ('+e.pontos.length+')</h4>'+
+        '<div class="btn-row"><button class="btn-sm alt" type="button" onclick="gSugestao()">⭐ Partir da sugestão do sistema</button>'+
+        '<button class="btn-sm '+(GEST.addMode?'':'ghost')+'" type="button" onclick="gToggleAdd()">'+(GEST.addMode?'✔ Clicando no mapa… (concluir)':'✚ Adicionar clicando no mapa')+'</button></div>'+
+        (GEST.addMode?'<p class="muted" style="font-size:.7rem">Clique no mapa para incluir cada ponto; perto de um ponto previsto ou posto, o nome e o horário vêm dele. Arraste os marcadores verdes para ajustar.</p>':'')+
+        '<form class="g-search" onsubmit="gBuscar(event)"><input id="gEnd" placeholder="Buscar endereço, trevo, posto, cidade…"><button class="btn-sm ghost" type="submit">🔎</button></form>'+
+        (GEST.busca ? (GEST.busca.length ? GEST.busca.map((r,i) => '<button class="linkish" type="button" onclick="gUsarBusca('+i+')">＋ '+esc(r.nome)+'</button>').join('<br>') : '<p class="muted">Nada encontrado.</p>') : '')+
+        e.pontos.map((p,i) => '<div class="g-pt"><div class="g-pt-top"><span class="g-num'+(p.tipo==='passagem'?' pass':'')+'">'+(i+1)+'</span>'+
+          '<input class="g-nome" value="'+esc(p.nome)+'" oninput="gSet('+i+',\'nome\',this.value)" aria-label="Nome do ponto">'+
+          '<button class="g-ic" type="button" title="Subir" onclick="gMove('+i+',-1)">↑</button><button class="g-ic" type="button" title="Descer" onclick="gMove('+i+',1)">↓</button><button class="g-ic del" type="button" title="Remover" onclick="gDel('+i+')">✕</button></div>'+
+          '<div class="g-pt-row"><select onchange="gSet('+i+',\'tipo\',this.value);gDrawEdit();gRender()"><option value="base"'+(p.tipo!=='passagem'?' selected':'')+'>Ponto base de operação</option><option value="passagem"'+(p.tipo==='passagem'?' selected':'')+'>Ponto de passagem</option></select>'+
+          '<span>das</span><input type="time" value="'+esc(p.hIni||'')+'" onchange="gSet('+i+',\'hIni\',this.value)" aria-label="Hora inicial"><span>às</span><input type="time" value="'+esc(p.hFim||'')+'" onchange="gSet('+i+',\'hFim\',this.value)" aria-label="Hora final"></div>'+
+          '<input class="g-op" value="'+esc(p.operacao||'')+'" placeholder="'+(p.tipo==='passagem'?'Observação (opcional)':'Operação: ex. blitz de alcoolemia, radar, fiscalização de ultrapassagem')+'" oninput="gSet('+i+',\'operacao\',this.value)"></div>').join('')+
+        '<h4>Quando vale</h4><div class="g-when"><label>Data inicial<input type="date" value="'+e.dataIni+'" onchange="gField(\'dataIni\',this.value)"></label>'+
+        '<label>Repetição<select onchange="gField(\'repeticao\',this.value)">'+Object.entries(REPET).map(([k,l]) => '<option value="'+k+'"'+(rep===k?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
+        (rep==='periodo'?'<label>Data final<input type="date" value="'+(e.dataFim||e.dataIni)+'" min="'+e.dataIni+'" onchange="gField(\'dataFim\',this.value)"></label>':'')+'</div>'+
+        (rep!=='dia'?'<div class="g-dows">'+DOW.map((d,k) => '<button type="button" class="'+((e.diasSemana||'').indexOf(String(k))>=0?'on':'')+'" onclick="gDia(\''+k+'\')">'+d+'</button>').join('')+'</div>':'')+
+        '<p class="muted" style="font-size:.7rem">'+'Vale '+(fimCalc===e.dataIni?'em '+dataBR(e.dataIni):'de '+dataBR(e.dataIni)+' a '+dataBR(fimCalc)) + (rep!=='dia'?' · '+diasTxt(e.diasSemana):'')+'.</p>'+
+        '<label class="g-lbl">Orientações ao efetivo<textarea rows="3" placeholder="Ex.: priorizar abordagem a motocicletas; apoio da 2ª Cia no km 450" oninput="gField(\'orientacoes\',this.value)">'+esc(e.orientacoes||'')+'</textarea></label>'+
+        '<div class="btn-row"><button class="btn-sm ghost" type="button" onclick="gPreview()">👁 Traçar pelas rodovias</button><button class="btn-sm gm" type="button" onclick="gSalvar()">💾 Salvar plano</button><button class="btn-sm ghost" type="button" onclick="gCancelar()">Cancelar</button></div>'+
+        '<p class="muted" style="font-size:.68rem">Enquanto o plano estiver em vigor, quem pedir a rota desta fração recebe esta rota, na ordem definida aqui, em vez da sugestão do sistema.</p>';
+    }
+    function gestoresHtml() {
+      const f = GEST.gForm, gs = GEST.gestores;
+      let h = '';
+      if (f) {
+        const sel = (lvl, v, opts) => '<select onchange="gGF(\''+lvl+'\',this.value)"><option value="">'+(lvl==='cia'?'Todo o CPE':'Todos')+'</option>'+opts.map(([val,l]) => '<option value="'+esc(val)+'"'+(val===v?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
+        h += '<h4>'+(f.novo?'Novo gestor':'Editar gestor')+'</h4><form class="g-form" onsubmit="gSalvarGestor(event)">'+
+          '<label>Nome e posto/graduação<input value="'+esc(f.nome)+'" oninput="gGF(\'nome\',this.value)" required></label>'+
+          '<label>Usuário (login)<input value="'+esc(f.usuario)+'" '+(f.novo?'':'disabled')+' oninput="gGF(\'usuario\',this.value)" autocapitalize="none" required></label>'+
+          '<label>'+(f.novo?'Senha provisória (mín. 6)':'Nova senha provisória (deixe em branco para manter)')+'<input id="gfSenha" type="text" autocomplete="off" value="'+esc(f.senha||'')+'" oninput="gGF(\'senha\',this.value)" '+(f.novo?'required minlength="6"':'')+'></label>'+
+          '<label>Cia'+sel('cia', f.cia, opcoesNivel('cia'))+'</label>'+
+          (f.cia?'<label>Pelotão'+sel('pelotao', f.pelotao, opcoesNivel('pelotao', f.cia))+'</label>':'')+
+          (f.pelotao?'<label>Grupamento'+sel('grupamento', f.grupamento, opcoesNivel('grupamento', f.cia, f.pelotao))+'</label>':'')+
+          '<p class="muted" style="font-size:.7rem">O gestor só vê e altera planos da área escolhida (e das frações subordinadas).</p>'+
+          '<div class="btn-row"><button class="btn-sm" type="submit">Salvar</button><button class="btn-sm ghost" type="button" onclick="GEST.gForm=null;gRender()">Cancelar</button></div></form>';
+      } else h += '<div class="btn-row"><button class="btn-sm" type="button" onclick="gFormGestor()">＋ Autorizar gestor</button></div>';
+      h += '<h4>Gestores autorizados</h4>';
+      if (!gs) return h + '<p class="muted">Carregando…</p>';
+      if (!gs.length) return h + '<p class="muted">Nenhum gestor autorizado ainda.</p>';
+      return h + gs.map(g => '<div class="g-plan"><div class="g-plan-top"><b>'+esc(g.nome)+'</b><span class="g-st '+(g.ativo?'vig':'pausado')+'">'+(g.ativo?'Ativo':'Desativado')+'</span></div>'+
+        '<small>Usuário: '+esc(g.usuario)+' · '+esc(escopoTxt(g))+'<br>'+(g.ultimoAcesso?'Último acesso: '+esc(g.ultimoAcesso):'Ainda não acessou')+(g.trocarSenha?' · senha provisória':'')+'</small>'+
+        '<div class="btn-row"><button class="btn-sm ghost" type="button" onclick="gFormGestor(\''+esc(g.usuario)+'\')">Editar / nova senha</button><button class="btn-sm ghost" type="button" onclick="gAtivarGestor(\''+esc(g.usuario)+'\','+(!g.ativo)+')">'+(g.ativo?'Desativar':'Reativar')+'</button>'+
+        '<button class="btn-sm ghost danger" type="button" onclick="gExcluirGestor(\''+esc(g.usuario)+'\')">Excluir</button></div></div>').join('');
+    }
+
+    /* ---------- lado do usuário: rota do gestor ---------- */
+    function gestorStops(pl) {
+      return pl.pontos.map((p,i) => ({ id:'g'+i, kind:'gestor', rank:i+1, lat:p.lat, lng:p.lng, nome:p.nome || 'Ponto '+(i+1), tipo:p.tipo, operacao:p.operacao,
+        hIni:p.hIni, hFim:p.hFim, cidades:[p.cidade||''], rodovias:[], st:null, escore:null }));
+    }
+    function gestorPopup(s) {
+      return '<div class="popup-card"><h4>📋 '+s.rank+'. '+esc(s.nome)+'</h4><b>'+(s.tipo==='passagem'?'Ponto de passagem':'Ponto base de operação')+'</b>'+
+        (s.operacao?'<br>'+esc(s.operacao):'')+(horaTxt(s)?'<br>Horário: <b>'+horaTxt(s)+'</b>':'')+(s.cidades[0]?'<br>'+esc(s.cidades[0]):'')+'<div class="popup-note">Definido pelo gestor</div></div>';
+    }
+    function gestorCard(s) {
+      const pl = ROUTE && ROUTE.gestor, n = nomeLocal(s.lat, s.lng), c = n.c;
+      return '<h3>📋 '+s.rank+'. '+esc(s.nome)+'</h3><div class="post-card"><b>'+(s.tipo==='passagem'?'Ponto de passagem':'Ponto base de operação')+'</b>'+
+        (s.operacao?'<br>Operação: <b>'+esc(s.operacao)+'</b>':'')+(horaTxt(s)?'<br>Horário: <b>'+horaTxt(s)+'</b>':'')+(s.cidades[0]?'<br>'+esc(s.cidades[0]):'')+'</div>'+
+        (pl?'<p style="font-size:.74rem">Definido por <b>'+esc(pl.autorNome||'')+'</b> no plano “'+esc(pl.titulo)+'”.</p>':'')+
+        (c?'<h4>Predição no local</h4><p style="font-size:.74rem">'+(c.kind==='posto'?'Posto de operação ★'+c.rank+' do sistema. ':'Ponto previsto P'+c.rank+' · intensidade '+fmt(c.escore,0)+'. ')+'Janela prevista: <b>'+winTxt(c)+'</b>'+(c.e30?' · ≈ '+fmt(c.e30,1)+' acidente(s) em 30 dias':'')+'.</p>':'<p class="muted">Nenhum ponto previsto pelo sistema a menos de '+km(Math.max(400, radius()))+' deste local.</p>')+
+        '<div class="btn-row"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><a class="btn-sm gm" target="_blank" rel="noopener" href="'+gmapsUrl(s)+'">Google Maps</a></div>';
+    }
+    function planoDiaHtml() {
+      const d = GPLANO ? GPLANO.data : '', pl = GPLANO && GPLANO.plano;
+      let h = '<div class="g-dia"><label>Rota do dia <input type="date" value="'+esc(d)+'" onchange="gRefreshDia(this.value)"></label></div>';
+      if (pl && VER_SISTEMA) h += '<div class="g-banner sys">Você está vendo a <b>sugestão do sistema</b>. Para '+(d===GPLANO.hoje?'hoje':dataBR(d))+' vale a rota do gestor “'+esc(pl.titulo)+'”. <button class="linkish" type="button" onclick="VER_SISTEMA=false;buildRoute();renderInsight();renderPanel()">Voltar para a rota do gestor</button></div>';
+      return h;
+    }
+
     /* ---------- postos de operação (cobertura máxima) ---------- */
     function estrategia() { return $('selEstrategia').value; }
     /** Demanda: acidentes previstos em 30 dias por trecho de 1 km (modelo em uso). */
@@ -1448,6 +1803,8 @@
       });
     }
     function buildRoute() {
+      const pl = planoAtivo();
+      if (pl) return traceRoute({origin:routeOrigin(), back:!!routeOrigin(), gestor:pl, stops:gestorStops(pl), skipped:0, km:0, min:0, legs:[], path:null, viario:false});
       if (!PRED.length) return;
       const N = Number($('selectPontos').value), maxKm = Number($('selectKm').value), origin = routeOrigin(), back = !!origin;
       const chosen = [], skipped = [];
@@ -1462,12 +1819,17 @@
         chosen.push(c);
       }
       if (!chosen.length) { ROUTE=null; L_route.clearLayers(); notice('<strong>Rota:</strong> nenhum ponto previsto cabe na extensão máxima a partir da origem. Aumente a extensão ou mude o início da rota.'); return; }
-      ROUTE = {origin, back, stops:nnOrder(origin, chosen), skipped:skipped.length, km:0, min:0, legs:[], path:null, viario:false};
+      traceRoute({origin, back, stops:nnOrder(origin, chosen), skipped:skipped.length, km:0, min:0, legs:[], path:null, viario:false});
+    }
+    /** Traça pelas rodovias (Google Directions). Rota do gestor: mantém a ordem definida por ele. */
+    function traceRoute(r) {
+      ROUTE = r; const origin = r.origin, back = r.back;
       drawRoute();
-      loading(true,'Traçando a rota preditiva pelas rodovias...');
-      run('calcularTrajeto', {origem:origin, retornar:back, pontos:ROUTE.stops.map(s => ({id:s.id, lat:+s.lat.toFixed(6), lng:+s.lng.toFixed(6)}))}).then(res => {
+      loading(true, r.gestor ? 'Traçando a rota definida pelo gestor...' : 'Traçando a rota preditiva pelas rodovias...');
+      run('calcularTrajeto', {origem:origin, retornar:back, manterOrdem:!!r.gestor, pontos:ROUTE.stops.map(s => ({id:s.id, lat:+s.lat.toFixed(6), lng:+s.lng.toFixed(6)}))}).then(res => {
         loading(false);
         if (!res || !res.ok) { notice('<strong>Rota:</strong> traçado viário indisponível agora ('+esc(res && res.motivo || 'sem resposta')+'). Exibindo ligação direta; os links do Google Maps/Waze continuam válidos.'); return; }
+        if (ROUTE !== r) return;   // outra rota foi pedida enquanto esta era traçada
         const byId = new Map(ROUTE.stops.map(s => [s.id,s]));
         ROUTE.stops = res.sequencia.map(id => byId.get(id)).filter(Boolean);
         Object.assign(ROUTE, {path:res.path, legs:res.legs, km:res.km, min:res.min, resumo:res.resumo, avisos:res.avisos, viario:true});
@@ -1478,9 +1840,9 @@
     function drawRoute() {
       L_route.clearLayers(); if (!ROUTE) return;
       const pts = ROUTE.path || [].concat(ROUTE.origin?[[ROUTE.origin.lat,ROUTE.origin.lng]]:[], ROUTE.stops.map(s=>[s.lat,s.lng]), ROUTE.back&&ROUTE.origin?[[ROUTE.origin.lat,ROUTE.origin.lng]]:[]);
-      L.polyline(pts, {color:'#1d4ed8', weight:ROUTE.viario?5:3, opacity:.85, dashArray:ROUTE.viario?null:'8 6'}).addTo(L_route);
+      L.polyline(pts, {color:ROUTE.gestor?'#15803d':'#1d4ed8', weight:ROUTE.viario?5:3, opacity:.85, dashArray:ROUTE.viario?null:'8 6'}).addTo(L_route);
       if (ROUTE.origin) L.marker([ROUTE.origin.lat,ROUTE.origin.lng], {icon:L.divIcon({className:'stop-icon',html:'⌂',iconSize:[24,24]})}).bindTooltip('Início: '+esc(ROUTE.origin.nome||'')).addTo(L_route);
-      ROUTE.stops.forEach((s,i) => L.marker([s.lat,s.lng], {zIndexOffset:800, icon:L.divIcon({className:'stop-icon',html:String(i+1),iconSize:[24,24]})})
+      ROUTE.stops.forEach((s,i) => L.marker([s.lat,s.lng], {zIndexOffset:800, icon:L.divIcon({className:'stop-icon'+(ROUTE.gestor?' gestor':''),html:String(i+1),iconSize:[24,24]})})
         .bindPopup(() => popupHtml(s)).on('click', () => openCard(s)).addTo(L_route));
       if (MODE === 'rota' && L_route.getLayers().length) map.fitBounds(L_route.getBounds().pad(0.1));
     }
@@ -1539,10 +1901,12 @@
 
     /* ---------- painel: cartão / rota / rodovias / alertas ---------- */
     function openPanel(t) { if (isPhone()) toggleFiltros(false); tab = t || tab; $('panel').classList.add('open'); document.querySelectorAll('.panel-tabs button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab===tab)); renderPanel(); }
-    function openCard(c) { CURRENT = c; openPanel('trecho'); }
+    function openCard(c) { if (GEST.addMode) return; CURRENT = c; openPanel('trecho'); }
     function renderPanel() {
       const b = $('panelBody');
-      if (tab === 'rota') b.innerHTML = routeHtml();
+      $('panel').classList.toggle('wide', tab === 'gestao');
+      if (tab === 'gestao') b.innerHTML = gestHtml();
+      else if (tab === 'rota') b.innerHTML = routeHtml();
       else if (tab === 'alertas') b.innerHTML = alertsHtml();
       else if (tab === 'rodovias') b.innerHTML = roadsHtml();
       else if (tab === 'modelo') b.innerHTML = modelHtml();
@@ -1559,6 +1923,7 @@
     function cardHtml(c) {
       if (!c) return '<p class="muted">Gere a rota e clique em um ponto para ver o cartão do trecho.</p>';
       if (c.kind === 'posto') return postoCard(c);
+      if (c.kind === 'gestor') return gestorCard(c);
       const stopIdx = ROUTE ? ROUTE.stops.findIndex(s => s.id===c.id) : -1;
       const near = alertsNear(c.lat, c.lng, 5000), segs = planoFor(c);
       const w = Number($('selJanela').value), jan = [30,60,90][w];
@@ -1618,12 +1983,32 @@
         '<h4>Horário dos acidentes cobertos</h4>'+hoursHtml(p.h, p.janela)+
         '<div class="btn-row"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(p)+'">Waze</a><a class="btn-sm gm" target="_blank" rel="noopener" href="'+gmapsUrl(p)+'">Google Maps</a><button class="btn-sm ghost" type="button" onclick="map.setView(['+p.lat+','+p.lng+'],13)">Centralizar</button></div>';
     }
+    function gestorRouteHtml() {
+      const pl = ROUTE.gestor, next = nextStop(), links = mapsLinks();
+      return planoDiaHtml()+'<h3>📋 Rota definida pelo gestor</h3>'+
+        '<div class="g-banner"><b>'+esc(pl.titulo)+'</b><br>Definida por <b>'+esc(pl.autorNome||'')+'</b> · '+esc(escopoTxt(pl))+'<br>Vale '+vigenciaTxt(pl)+'.'+
+        '<br><small>Prevalece sobre a sugestão do sistema enquanto estiver em vigor.</small></div>'+
+        (pl.orientacoes?'<h4>Orientações do gestor</h4><p style="font-size:.76rem;white-space:pre-wrap">'+esc(pl.orientacoes)+'</p>':'')+
+        '<div class="muted">'+ROUTE.stops.length+' ponto(s)'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+
+        (next?'<div class="alert-item"><b>Próxima parada: nº '+(next.i+1)+'</b> — '+km(next.d)+' · <a target="_blank" rel="noopener" href="'+wazeUrl(next.s)+'">Waze</a></div>':'')+
+        '<h4>Navegação GPS (Google Maps em '+links.length+' trecho'+(links.length>1?'s':'')+')</h4><div class="btn-row">'+
+        links.map((l,i) => '<a class="btn-sm gm" target="_blank" rel="noopener" href="'+l+'">Trecho '+(i+1)+'</a>').join('')+'</div>'+
+        '<h4>Pontos (na ordem definida pelo gestor)</h4>'+
+        (ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Início:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
+        ROUTE.stops.map((s,i) => { const leg = ROUTE.legs[ROUTE.origin?i:i-1];
+          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num" style="background:#15803d">'+(i+1)+'</div><div><b>'+esc(s.nome)+'</b><br><small>'+
+            (s.tipo==='passagem'?'Passagem':'<b>Base de operação</b>')+(s.operacao?' · '+esc(s.operacao):'')+(horaTxt(s)?' · <b>'+horaTxt(s)+'</b>':'')+(s.cidades[0]?' · '+esc(s.cidades[0]):'')+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
+            '<div style="display:flex;flex-direction:column;gap:3px"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><button class="btn-sm ghost" type="button" onclick="openCard(ROUTE.stops['+i+'])">Cartão</button></div></div>'; }).join('')+
+        (ROUTE.back&&ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Retorno:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
+        '<div class="btn-row" style="margin-top:8px"><button class="btn-sm ghost" type="button" onclick="VER_SISTEMA=true;buildRoute();renderInsight();renderPanel()">Comparar com a sugestão do sistema</button></div>';
+    }
     function routeHtml() {
-      if (!ROUTE) return '<p class="muted">Gere a rota preventiva para ver as paradas.</p>';
+      if (!ROUTE) return (RESULT ? planoDiaHtml() : '') + '<p class="muted">Gere a rota preventiva para ver as paradas.</p>';
+      if (ROUTE.gestor) return gestorRouteHtml();
       const next = nextStop(), links = mapsLinks();
       const nearRoute = ROUTE.path ? ALERTS.alertas.filter(a => ROUTE.path.some((p,k) => k%4===0 && hav(p,[a.lat,a.lng]) < 2000)) : [];
       const porPostos = ROUTE.stops.length && ROUTE.stops[0].kind === 'posto';
-      return '<h3>'+(porPostos?'Rota pelos postos de operação':'Rota preditiva')+'</h3>'+
+      return planoDiaHtml()+'<h3>'+(porPostos?'Rota pelos postos de operação':'Rota preditiva')+'</h3>'+
         (porPostos?'<p style="font-size:.74rem">'+PLAN.postos.length+' postos cobrem <b>'+fmt(100*PLAN.coberto/(PLAN.total||1),0)+'%</b> dos acidentes previstos a até '+km(PLAN.alcance)+'. Permanência sugerida proporcional ao que cada posto cobre, num turno de '+PLAN.turnoH+' h.</p>':'')+
         '<div class="muted">'+ROUTE.stops.length+(porPostos?' postos':' pontos previstos')+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+
         '<p class="muted" style="font-size:.7rem">Paradas = pontos de maior intensidade prevista (kernel ponderado por recência'+($('chkGravidade').checked?', gravidade':'')+' e tendência), limitados a '+$('selectPontos').value+' pontos'+(Number($('selectKm').value)?' e '+$('selectKm').value+' km':'')+'.</p>'+
@@ -1764,6 +2149,7 @@
       $('selectTurno').querySelector('option[value="AUTO"]').textContent = 'Automático — agora: ' + turnoAtual()[1];
       $('rangeRaio').value = metersToSlider(1000); $('lblRaio').textContent = km(radius());
       if (initMap()) loadFilters(); else $('loadingOverlay').style.display='none';
+      gRestore();
       run('getUrlApp').then(u => { if (u) { $('lnkTutorial').href = u + '?pagina=tutorial'; $('lnkTutorial').hidden = false; } }).catch(() => {});
     });
   </script>
