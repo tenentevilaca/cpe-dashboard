@@ -109,6 +109,9 @@
     body.modo-usuario .only-gestor{display:none!important}
     #indBox label[hidden]{display:none}
     body:not(.modo-usuario) .only-usuario{display:none!important}
+    .welcome{position:absolute;top:10px;left:56px;z-index:445;background:#fff;border-radius:10px;box-shadow:0 6px 24px #0003;padding:10px 14px;font-size:.78rem;line-height:1.55;max-width:380px;border-left:4px solid var(--gold)}
+    .welcome.off{display:none!important}
+    @media(max-width:820px){.welcome{left:8px;right:8px;max-width:none}}
     .preview-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:460;background:#111827;color:#fff;border-radius:20px;padding:6px 8px 6px 14px;font-size:.74rem;font-weight:700;display:flex;gap:10px;align-items:center;box-shadow:0 4px 14px #0005;white-space:nowrap}
     .preview-bar[hidden]{display:none}.preview-bar button{border:0;border-radius:14px;background:var(--gold);color:#111827;font-weight:800;padding:5px 10px;cursor:pointer}
     .cp-head{border:2px solid var(--navy);border-radius:10px;padding:8px 10px;margin-bottom:8px}.cp-head h3{margin:0}
@@ -323,6 +326,7 @@
 
     <div class="map-wrap">
       <div id="map" aria-label="Mapa de pontos preditivos"></div>
+      <div class="welcome only-usuario" id="welcome"><b>📋 Cartão programa</b><br>1. Escolha a sua <b>Cia</b> (e, se quiser, pelotão, grupamento, município e horário).<br>2. Clique em <b>Gerar cartão programa</b>.<br><small>A rota do dia aparece no mapa e no cartão. <b>Gestores</b>: entrem em <b>🛡 Gestão</b> para ver todas as opções (predição, síntese, rodovias, modelo, alertas e variáveis).</small></div>
       <div class="preview-bar" id="previewBar" hidden>👁 Ambiente do efetivo (visualização) <button type="button" onclick="gVoltarGestao()">↩ Voltar à Gestão</button></div>
       <section class="insight only-gestor" id="insight" aria-label="Síntese da fração">
         <header id="insightHead"><span id="insightTitle">Síntese da área</span><span>▾</span></header>
@@ -1059,6 +1063,7 @@
     /* ---------- consulta ---------- */
     function processRoute() {
       const tw = timeWindow(), sel = selection();
+      if (!gestorAtivo() && !sel.cia && !sel.cidade) { alert('Escolha a sua Cia (ou o município) para gerar o cartão programa.'); $('selectCia').focus(); return; }
       const params = Object.assign({}, sel, {horaInicio:tw.start, horaFim:tw.end});
       loading(true,'Buscando registros STV da área e calculando a predição...'); $('btnGerar').disabled = true;
       run('calcularRotaAvancada', params).then(res => {
@@ -1078,6 +1083,7 @@
         $('viewbar').style.display = 'flex';
         calibNotice();
         RESULT.cells.forEach((c,i) => c.idx = i);
+        $('welcome').classList.add('off');
         indicadoresUI();
         retrain(true);
         loadAlerts();
@@ -1732,7 +1738,7 @@
         if (['rodovias','modelo','alertas','incid'].includes(tab)) tab = 'rota';
         if (MODE !== 'rota') setMode('rota');
       } else if (MODE === 'rota') setMode('pred');
-      if (RESULT) { updateLegend(); fitInsight(); }
+      updateLegend(); if (RESULT) fitInsight();
     }
     function gVoltarGestao() {
       GEST.preview = false; notice(''); aplicarModo(); openPanel('gestao');
