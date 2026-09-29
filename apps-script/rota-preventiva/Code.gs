@@ -1602,6 +1602,7 @@ const GESTAO = {
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Rota Preventiva')
     .addItem('Definir senha do administrador', 'definirSenhaAdmin')
+    .addItem('Arquivar execuções antigas agora', 'arquivarExecucoesMenu_')
     .addToUi();
 }
 
@@ -1617,6 +1618,8 @@ function definirSenhaAdmin() {
   PropertiesService.getScriptProperties().setProperties({ ADMIN_SALT: salt, ADMIN_HASH: hashSenha_(salt, senha) });
   ui.alert('Senha do administrador definida. Usuário: admin');
 }
+
+function arquivarExecucoesMenu_() { SpreadsheetApp.getUi().alert(arquivarExecucoes()); }
 
 function hashSenha_(salt, senha) {
   let h = salt + '|' + senha;
@@ -1910,4 +1913,211 @@ function planoDoDia(req) {
   const esp = p => NIVEIS_ESCOPO_.concat(['cidade']).filter(k => p[k]).length;
   cands.sort((a, b) => (esp(b) - esp(a)) || (b.atualizado_em > a.atualizado_em ? 1 : b.atualizado_em < a.atualizado_em ? -1 : 0));
   return { data: dia, hoje: hoje_(), plano: cands.length ? planoPublico_(cands[0]) : null, outros: Math.max(0, cands.length - 1) };
+}
+
+/* ======================================================================= */
+/*  Execução da rota: cumprimento pelo efetivo, acompanhamento ao vivo e   */
+/*  auditoria. Armazenamento enxuto: uma linha por patrulhamento; posição  */
+/*  ao vivo só no cache; linhas antigas arquivadas por ano.                */
+/* ======================================================================= */
+const EXEC = {
+  SHEET: '_EXECUCOES',
+  COLS: ['id', 'data', 'inicio', 'fim', 'status', 'viatura', 'responsavel', 'cia', 'pelotao', 'grupamento', 'cidade', 'fonte', 'plano_id',
+         'titulo', 'n_pontos', 'cumpridos', 'parciais', 'atraso_med_min', 'km', 'paradas', 'trilha', 'atualizado'],
+  RETENCAO_MESES: 3,    // meses mantidos nesta planilha; o restante vai para o arquivo anual
+  LIVE_S: 21600,        // posição ao vivo no cache (renovada a cada envio)
+  MAX_PARADAS: 25,
+  MAX_TRILHA: 4000      // caracteres da trilha (polilinha codificada; ~1 ponto a cada 3 min)
+};
+
+function execSheet_() { return gestaoSheet_(EXEC.SHEET, EXEC.COLS); }
+function execAppend_(sh, obj) {
+  const r = sh.getLastRow() + 1;
+  if (r > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 500);
+  sh.getRange(r, 1, 1, EXEC.COLS.length).setNumberFormat('@').setValues([EXEC.COLS.map(c => obj[c] == null ? '' : String(obj[c]))]);
+}
+function execRow_(sh, id) {
+  const n = sh.getLastRow(); if (n < 2) return 0;
+  const f = sh.getRange(2, 1, n - 1, 1).createTextFinder(id).matchEntireCell(true).findNext();
+  return f ? f.getRow() : 0;
+}
+function execObj_(vals) { const o = {}; EXEC.COLS.forEach((c, j) => { const v = vals[j]; o[c] = v instanceof Date ? Utilities.formatDate(v, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd') : String(v == null ? '' : v); }); return o; }
+function horaAgora_() { return Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'HH:mm'); }
+function execId_(s) { return String(s || '').replace(/[^a-f0-9]/g, '').slice(0, 12); }
+
+/** Índice das execuções em andamento (um só registro no cache: [id, hora de início]). */
+function liveIndex_(id, add) {
+  const cache = CacheService.getScriptCache();
+  gestaoLock_(() => {
+    let list = []; try { list = JSON.parse(cache.get('live_idx') || '[]'); } catch (e) { list = []; }
+    const now = Date.now();
+    list = list.filter(x => x[0] !== id && now - x[1] < 16 * 3600e3);
+    if (add) list.push([id, now]);
+    cache.put('live_idx', JSON.stringify(list), EXEC.LIVE_S);
+  });
+}
+
+/**
+ * Início do patrulhamento (efetivo, sem login). d = { viatura, responsavel, cia, pelotao, grupamento, cidade,
+ * fonte: 'gestor'|'sistema', planoId, titulo, paradas: [{n, la, lo, tp: b|p|o, hi, hf, pm, pc}] }.
+ */
+function execIniciar(d) {
+  d = d || {};
+  const viatura = limpa_(d.viatura, 30), resp = limpa_(d.responsavel, 60);
+  if (!viatura || !resp) return { ok: false, motivo: 'Informe a viatura e o responsável.' };
+  const paradas = (d.paradas || []).slice(0, EXEC.MAX_PARADAS).map(p => ({
+    n: limpa_(p.n, 80), la: round_(Number(p.la), 5), lo: round_(Number(p.lo), 5), tp: ['b', 'p', 'o'].indexOf(p.tp) >= 0 ? p.tp : 'p',
+    hi: horaOk_(p.hi) ? p.hi : '', hf: horaOk_(p.hf) ? p.hf : '', pm: Math.max(0, Math.min(720, Math.round(Number(p.pm) || 0))),
+    pc: horaOk_(p.pc) ? p.pc : '', st: 'pend', c: '', s: '', d: 0, m: ''
+  })).filter(p => isFinite(p.la) && isFinite(p.lo) && Math.abs(p.la) <= 90 && Math.abs(p.lo) <= 180);
+  if (!paradas.length) return { ok: false, motivo: 'Rota sem pontos.' };
+  const id = Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+  const row = { id: id, data: hoje_(), inicio: horaAgora_(), fim: '', status: 'em andamento', viatura: viatura, responsavel: resp,
+    cia: limpa_(d.cia), pelotao: limpa_(d.pelotao), grupamento: limpa_(d.grupamento), cidade: limpa_(d.cidade),
+    fonte: d.fonte === 'gestor' ? 'gestor' : 'sistema', plano_id: limpa_(d.planoId, 20), titulo: limpa_(d.titulo, 100),
+    n_pontos: paradas.length, cumpridos: 0, parciais: 0, atraso_med_min: '', km: 0, paradas: JSON.stringify(paradas), trilha: '', atualizado: agora_() };
+  gestaoLock_(() => execAppend_(execSheet_(), row));
+  const now = Date.now();
+  const live = { id: id, v: viatura, r: resp, cia: row.cia, pelotao: row.pelotao, grupamento: row.grupamento, cidade: row.cidade, fonte: row.fonte,
+    titulo: row.titulo, data: row.data, inicio: row.inicio, t0: now, t: now, idxT: now, pos: null, atraso: null, km: 0, paradas: paradas };
+  CacheService.getScriptCache().put('live_' + id, JSON.stringify(live), EXEC.LIVE_S);
+  liveIndex_(id, true);
+  instalarArquivamento_();
+  return { ok: true, id: id, data: row.data, inicio: row.inicio };
+}
+
+/**
+ * Envio periódico do efetivo (a cada ~3 min e a cada chegada/saída de ponto).
+ * d = { id, pos: [lat, lng, precisão], paradas: [{st, c, s, d, m}], atraso, km, trilha, fim }.
+ * A planilha só é escrita quando o cumprimento de algum ponto muda ou no encerramento.
+ */
+function execAtualizar(d) {
+  d = d || {};
+  const id = execId_(d.id); if (!id) return { ok: false, motivo: 'Execução inválida.' };
+  const cache = CacheService.getScriptCache(), now = Date.now();
+  const st = (d.paradas || []).slice(0, EXEC.MAX_PARADAS).map(p => ({
+    st: ['ok', 'parcial', 'pend', 'nao', 'no'].indexOf(p.st) >= 0 ? p.st : 'pend', c: horaOk_(p.c) ? p.c : '', s: horaOk_(p.s) ? p.s : '',
+    d: Math.max(0, Math.min(99999, Math.round(Number(p.d) || 0))), m: p.m === 'm' ? 'm' : p.m === 'g' ? 'g' : '' }));
+  const atraso = d.atraso === null || d.atraso === undefined || !isFinite(Number(d.atraso)) ? null : Math.round(Number(d.atraso));
+  const km = round_(Math.max(0, Math.min(2000, Number(d.km) || 0)), 1);
+  let live = null; try { live = JSON.parse(cache.get('live_' + id) || 'null'); } catch (e) { live = null; }
+  if (live) {
+    live.t = now; live.atraso = atraso; live.km = km;
+    if (d.pos && isFinite(Number(d.pos[0])) && isFinite(Number(d.pos[1]))) live.pos = [round_(Number(d.pos[0]), 5), round_(Number(d.pos[1]), 5), Math.round(Number(d.pos[2]) || 0)];
+    st.forEach((x, i) => { if (live.paradas[i]) Object.assign(live.paradas[i], x); });
+    if (d.fim) live.fim = true;
+    const refresh = !d.fim && now - (live.idxT || live.t0) > 3600e3;
+    if (refresh) live.idxT = now;
+    cache.put('live_' + id, JSON.stringify(live), EXEC.LIVE_S);
+    if (refresh) liveIndex_(id, true);   // mantém no índice patrulhamentos longos (> 6 h)
+  }
+  const sig = digest_(JSON.stringify(st) + '|' + (d.fim ? 1 : 0));
+  if (d.fim || d.trilha || cache.get('sig_' + id) !== sig) {
+    const res = gestaoLock_(() => {
+      const sh = execSheet_(), r = execRow_(sh, id); if (!r) return false;
+      const o = execObj_(sh.getRange(r, 1, 1, EXEC.COLS.length).getValues()[0]);
+      let paradas = []; try { paradas = JSON.parse(o.paradas || '[]'); } catch (e) { paradas = []; }
+      st.forEach((x, i) => { if (paradas[i]) Object.assign(paradas[i], x); });
+      o.paradas = JSON.stringify(paradas);
+      o.cumpridos = paradas.filter(p => p.st === 'ok').length; o.parciais = paradas.filter(p => p.st === 'parcial').length;
+      if (atraso !== null) o.atraso_med_min = atraso;
+      o.km = km;
+      if (d.trilha) o.trilha = String(d.trilha).replace(/[^\x20-\x7e]/g, '').slice(0, EXEC.MAX_TRILHA);
+      if (d.fim) { o.fim = horaAgora_(); o.status = 'encerrada'; }
+      o.atualizado = agora_();
+      sh.getRange(r, 1, 1, EXEC.COLS.length).setNumberFormat('@').setValues([EXEC.COLS.map(c => o[c] == null ? '' : String(o[c]))]);
+      return true;
+    });
+    if (!res) return { ok: false, motivo: 'Execução não encontrada.' };
+    cache.put('sig_' + id, sig, EXEC.LIVE_S);
+  }
+  if (d.fim) liveIndex_(id, false);
+  return { ok: true };
+}
+
+/** Patrulhamentos em andamento na área do gestor (posição ao vivo, cumprimento, atraso). */
+function execAtivas(token) {
+  const s = sessao_(token), cache = CacheService.getScriptCache();
+  let list = []; try { list = JSON.parse(cache.get('live_idx') || '[]'); } catch (e) { list = []; }
+  const keys = list.map(x => 'live_' + x[0]), got = keys.length ? cache.getAll(keys) : {}, now = Date.now(), out = [];
+  keys.forEach(k => { let v = null; try { v = JSON.parse(got[k] || 'null'); } catch (e) { v = null; }
+    if (!v || v.fim || !dentro_(s.escopo, v)) return;
+    v.semSinalMin = Math.round((now - v.t) / 60000); out.push(v); });
+  out.sort((a, b) => (a.cia + a.v).localeCompare(b.cia + b.v));
+  return { agora: agora_(), ativas: out };
+}
+
+/** Planilhas de arquivo (uma por ano), guardadas nas propriedades do script. */
+function arquivosExec_() {
+  const p = PropertiesService.getScriptProperties().getProperties(), out = {};
+  Object.keys(p).forEach(k => { const m = k.match(/^EXEC_ARQ_(\d{4})$/); if (m) out[m[1]] = p[k]; });
+  return out;
+}
+function lerExec_(sh, de, ate) {
+  const n = sh.getLastRow(); if (n < 2) return [];
+  const datas = sh.getRange(2, 2, n - 1, 1).getDisplayValues(), linhas = [];
+  datas.forEach((x, i) => { const d = x[0]; if (d >= de && d <= ate) linhas.push(i + 2); });
+  if (!linhas.length) return [];
+  const a = linhas[0], b = linhas[linhas.length - 1];
+  const vals = sh.getRange(a, 1, b - a + 1, EXEC.COLS.length).getValues();
+  return linhas.map(r => execObj_(vals[r - a]));
+}
+
+/** Auditoria: execuções entre duas datas (inclui o arquivo anual quando o período é antigo). */
+function execListar(req) {
+  req = req || {};
+  const s = sessao_(req.token);
+  const de = isoOk_(req.de) ? req.de : hoje_(), ate = isoOk_(req.ate) ? req.ate : hoje_();
+  if (ate < de) return { ok: false, motivo: 'A data final é anterior à inicial.' };
+  let rows = lerExec_(execSheet_(), de, ate);
+  const arq = arquivosExec_();
+  Object.keys(arq).forEach(ano => { if (ano >= de.slice(0, 4) && ano <= ate.slice(0, 4)) {
+    try { const sh = SpreadsheetApp.openById(arq[ano]).getSheetByName('EXECUCOES'); if (sh) rows = lerExec_(sh, de, ate).concat(rows); } catch (e) { /* arquivo removido */ } } });
+  rows = rows.filter(o => dentro_(s.escopo, o));
+  const limite = 3000, total = rows.length;
+  rows = rows.slice(-limite).map(o => { delete o.trilha; return o; });
+  return { ok: true, de: de, ate: ate, total: total, linhas: rows, truncado: total > limite };
+}
+/** Uma execução completa (com a trilha), para ver no mapa. */
+function execDetalhe(req) {
+  req = req || {};
+  const s = sessao_(req.token), id = execId_(req.id);
+  const busca = sh => { const r = sh ? execRow_(sh, id) : 0; return r ? execObj_(sh.getRange(r, 1, 1, EXEC.COLS.length).getValues()[0]) : null; };
+  let o = busca(execSheet_());
+  if (!o) { const arq = arquivosExec_(); for (const ano of Object.keys(arq)) { try { o = busca(SpreadsheetApp.openById(arq[ano]).getSheetByName('EXECUCOES')); } catch (e) { o = null; } if (o) break; } }
+  if (!o || !dentro_(s.escopo, o)) return { ok: false, motivo: 'Execução não encontrada.' };
+  return { ok: true, exec: o };
+}
+
+/** Move para o arquivo anual as execuções mais antigas que RETENCAO_MESES (gatilho mensal). */
+function arquivarExecucoes() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(EXEC.SHEET);
+  if (!sh || sh.getLastRow() < 2) return 'Nada a arquivar.';
+  const hoje = new Date(), corte = Utilities.formatDate(new Date(hoje.getFullYear(), hoje.getMonth() - EXEC.RETENCAO_MESES, 1), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  return gestaoLock_(() => {
+    const n = sh.getLastRow(), vals = sh.getRange(2, 1, n - 1, EXEC.COLS.length).getValues().map(execObj_);
+    let k = 0; while (k < vals.length && vals[k].data && vals[k].data < corte) k++;
+    if (!k) return 'Nada a arquivar.';
+    const porAno = {}; vals.slice(0, k).forEach(o => (porAno[o.data.slice(0, 4)] = porAno[o.data.slice(0, 4)] || []).push(o));
+    const props = PropertiesService.getScriptProperties();
+    Object.keys(porAno).forEach(ano => {
+      let arq = null, idArq = props.getProperty('EXEC_ARQ_' + ano);
+      if (idArq) { try { arq = SpreadsheetApp.openById(idArq); } catch (e) { arq = null; } }
+      if (!arq) { arq = SpreadsheetApp.create('Rota Preventiva — Execuções ' + ano); props.setProperty('EXEC_ARQ_' + ano, arq.getId());
+        const s0 = arq.getSheets()[0]; s0.setName('EXECUCOES'); s0.getRange(1, 1, 1, EXEC.COLS.length).setValues([EXEC.COLS]); s0.setFrozenRows(1); }
+      const dst = arq.getSheetByName('EXECUCOES');
+      porAno[ano].forEach(o => execAppend_(dst, o));
+    });
+    sh.deleteRows(2, k);
+    return k + ' execução(ões) arquivada(s) (anteriores a ' + corte + ').';
+  });
+}
+function instalarArquivamento_() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('arq_ok')) return;
+  try {
+    if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'arquivarExecucoes'))
+      ScriptApp.newTrigger('arquivarExecucoes').timeBased().onMonthDay(1).atHour(3).create();
+    cache.put('arq_ok', '1', 21600);
+  } catch (e) { /* sem permissão de gatilho: o menu da planilha continua disponível */ }
 }

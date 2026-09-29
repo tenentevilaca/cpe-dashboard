@@ -26,6 +26,12 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
 ("01ª RPM", "03ª Cia PMRv"); valores como "Sim/Não", "#######" e "#N/A" são ignorados.
 
 ## Funcionalidades
+- **Cumprimento da rota**: o efetivo inicia o patrulhamento no cartão programa; o GPS marca chegada/saída de cada ponto
+  (300 m / 600 m), com permanência cumprida ou parcial, orientação adiantado/no horário/atrasado e registro manual
+  (Cheguei/Saí). Funciona sem sinal (reenvio automático) e retoma após recarregar.
+- **Acompanhamento e auditoria** (Gestão): patrulhamentos ao vivo na área do gestor (posição via cache, sem gravar na
+  planilha) e auditoria por período (cumprimento, atraso, km, trajeto no mapa, CSV). Aba oculta `_EXECUCOES` com uma
+  linha (~2 KB) por patrulhamento; gatilho mensal arquiva o que tem mais de 3 meses em planilhas anuais.
 - **Indicadores** (gestão): acidentes, furtos e roubos de veículos — um, dois ou os três. Mapa, síntese, modelos de
   aprendizagem de máquina, ST-DBSCAN, postos, rota e cartão programa usam só os marcados; o cartão mostra a composição.
 - **Dois ambientes.** *Efetivo* (padrão, sem login): só fração, horário e **📋 Gerar cartão programa**;
