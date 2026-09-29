@@ -18,6 +18,7 @@ App web da Rota Preventiva / Policiamento Preditivo do Estado-Maior do CPE / PMR
 | **ARTICULACAO** | Frações (Cia/Pel/Gp), código de cada fração, município-sede e municípios atendidos. O cruzamento pelo código define toda a área de responsabilidade da fração. Aceita tabelas lado a lado, células mescladas e vários municípios na mesma célula (separados por `;` ou `,`). |
 | **STV** | Registros com Latitude/Longitude, Data/Hora, Município, Rodovia, KM e Gravidade/Escore. |
 | **BLOQUEIOS** (opcional) | Latitude, Longitude, Tipo (Interdição, Acidente, Obra, Estrangulamento), Rodovia, Descrição. |
+| **VOLUME_TRAFEGO** (opcional) | Rodovia, Km inicial, Km final, VMD (volume médio diário); opcionais Ano e Fonte. Fontes gratuitas: DNIT/PNCT, ANTT (pedágios), DER-MG. |
 | **Mapa Frações** (opcional) | Tipo, Código, Nome, para traduzir códigos. |
 
 As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam numeração
@@ -68,6 +69,10 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
 - **Clima**: chuva horária do **Open-Meteo** (gratuito, sem cadastro, uso não comercial). O efeito é testado com
   intervalo de 95%, descontando dia, horário e região; só entra na previsão se for comprovado.
 - **Próximos 7 dias**: risco por faixa horária (calendário + chuva prevista, quando comprovada).
+- **Variáveis do modelo** (caixas de seleção na gestão, salvas no navegador): vizinhança (2 km), calendário,
+  clima, volume de tráfego (VMD da aba VOLUME_TRAFEGO, cruzado pelo km; o aplicativo compara o acerto com e sem ele
+  e mostra a taxa de risco — acidentes por milhão de veículos) e trânsito agora (Google `duration_in_traffic` na rota;
+  cada medição é gravada na aba oculta `_HIST_TRANSITO` para formar histórico).
 - **ST-DBSCAN** (1 km, 30 dias, mínimo 4): ativo, emergente, em queda, controlado, esporádico; a rota pode excluir os controlados.
 
 ## Km dos acidentes e malha sob responsabilidade

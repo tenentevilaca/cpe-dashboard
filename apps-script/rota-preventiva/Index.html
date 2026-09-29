@@ -272,6 +272,16 @@
           <label title="Tira da rota os pontos que o ST-DBSCAN classifica como controlados"><input type="checkbox" id="chkAtivos" checked> Rota só com pontos ativos (ST-DBSCAN)</label>
         </div>
       </div>
+      <div class="only-gestor form-group span2">
+        <span class="group-title">Variáveis do modelo (aprendizagem de máquina)</span>
+        <div class="checks">
+          <label title="Acidentes nos trechos a até 2 km (efeito de transbordamento)"><input type="checkbox" id="varViz" checked> Vizinhança (trechos a até 2 km)</label>
+          <label title="Feriados nacionais e móveis, vésperas e férias escolares"><input type="checkbox" id="varCal" checked> Calendário (feriados, vésperas, férias)</label>
+          <label title="Chuva horária do Open-Meteo; só entra na previsão se o efeito for comprovado"><input type="checkbox" id="varClima" checked> Clima (chuva)</label>
+          <label title="Volume médio diário por trecho, da aba VOLUME_TRAFEGO"><input type="checkbox" id="varVmd" checked> Volume de tráfego (aba VOLUME_TRAFEGO)</label>
+          <label title="Tempo de viagem com o trânsito do momento, medido pelo Google na rota"><input type="checkbox" id="varTransito" checked> Trânsito agora (Google, na rota)</label>
+        </div>
+      </div>
       <div class="only-gestor form-group"><label for="selModelo">Modelo preditivo</label>
         <select id="selModelo"><option value="auto" selected>Automático (o que mais acertou)</option><option value="gbm">Gradient Boosting</option><option value="nb">Binomial Negativa</option><option value="rule">Regra w₂₀₂₆ (kernel)</option></select></div>
       <div class="only-gestor form-group"><label for="selEstrategia">Estratégia da operação</label>
@@ -505,13 +515,21 @@
       }
 
       /** Variáveis de um trecho no corte c (só usa o que aconteceu antes de c). */
-      function features(units, u, c, start) {
+      /** V = variáveis escolhidas: { viz: vizinhança 2 km, vmd: volume de tráfego (aba VOLUME_TRAFEGO) }. */
+      function features(units, u, c, start, V) {
         const d = units[u].days;
         const n30 = cnt(d,c-30,c), n90 = cnt(d,c-90,c), n90p = cnt(d,c-180,c-90), n365 = cnt(d,c-365,c), nAll = cnt(d,start,c);
         const age = Math.max(30, c-start), li = lowerBound(d, c) - 1, since = li >= 0 ? Math.min(730, c-d[li]) : 730;
-        let nb = 0; for (const j of units[u].nb) nb += cnt(units[j].days, c-365, c);
-        return { x: [Math.log1p(n30), Math.log1p(n90), Math.log1p(n365), Math.log1p(nAll*365/age), Math.log((n90+1)/(n90p+1)), Math.log1p(nb), Math.log1p(since)],
-                 raw: { n90, n90p, n365 } };
+        const x = [Math.log1p(n30), Math.log1p(n90), Math.log1p(n365), Math.log1p(nAll*365/age), Math.log((n90+1)/(n90p+1))];
+        if (!V || V.viz !== false) { let nb = 0; for (const j of units[u].nb) nb += cnt(units[j].days, c-365, c); x.push(Math.log1p(nb)); }
+        x.push(Math.log1p(since));
+        if (V && V.vmd) { const v = units[u].vmd; x.push(v > 0 ? Math.log(v) : V.vmdMed, v > 0 ? 0 : 1); }   // sempre as duas últimas colunas
+        return { x, raw: { n90, n90p, n365 } };
+      }
+      function featNames(V) {
+        const n = FEAT_NAMES.slice(0, 5); if (!V || V.viz !== false) n.push(FEAT_NAMES[5]); n.push(FEAT_NAMES[6]);
+        if (V && V.vmd) n.push('volume de tráfego (VMD)', 'trecho sem VMD');
+        return n;
       }
       const FEAT_NAMES = ['últimos 30 dias','últimos 90 dias','últimos 365 dias','média anual histórica','tendência trimestral','vizinhança (2 km, 1 ano)','dias desde o último'];
 
@@ -541,8 +559,21 @@
         if (K < 5) return { ok:false, motivo:'Histórico curto: são necessários pelo menos ~10 meses de registros com data para treinar e validar.', units, cellUnit };
         // limita a quantidade de trechos (os de maior volume) para manter o treino rápido
         const order = units.map((U,i)=>i).sort((a,b)=>units[b].n-units[a].n).slice(0, 1500);
+        // variáveis opcionais: vizinhança e volume de tráfego (VMD por célula → média geométrica por trecho)
+        const V = { viz: opt.viz !== false, vmd: false, vmdMed: 0 };
+        let vmdInfo = null;
+        if (opt.vmdCells) {
+          units.forEach(U => { let s = 0, w = 0; U.cells.forEach(i => { const v = opt.vmdCells[i]; if (v > 0) { s += Math.log(v)*cells[i].n; w += cells[i].n; } }); U.vmd = w ? Math.exp(s/w) : 0; });
+          const known = order.filter(u => units[u].vmd > 0), cob = order.length ? known.length/order.length : 0;
+          if (cob >= 0.2 && known.length >= 10) { const l = known.map(u => Math.log(units[u].vmd)).sort((a,b)=>a-b); V.vmd = true; V.vmdMed = l[l.length >> 1]; }
+          // taxa de risco: acidentes por ano ÷ milhão de veículos que passam no trecho de 1 km
+          const anos = Math.max(0.5, (ref - start)/365); let accT = 0, expT = 0;
+          known.forEach(u => { const U = units[u]; if (!/^r\|/.test(U.key)) return; const acc = U.days.length/anos, ex = U.vmd*365/1e6; U.taxa = acc/ex; accT += acc; expT += ex; });
+          vmdInfo = { usado: V.vmd, cobertura: cob, trechos: known.length, taxaMedia: expT ? accT/expT : null,
+            motivo: V.vmd ? '' : 'O VMD cobre só '+Math.round(cob*100)+'% dos trechos analisados (mínimo 20% e 10 trechos).' };
+        }
         const rowsAt = k => { const c = ref - H*k, X = [], Y = [], R = [];
-          order.forEach(u => { const f = features(units, u, c, start); X.push(f.x); R.push(f.raw); Y.push(k > 0 ? cnt(units[u].days, c, c+H) : 0); });
+          order.forEach(u => { const f = features(units, u, c, start, V); X.push(f.x); R.push(f.raw); Y.push(k > 0 ? cnt(units[u].days, c, c+H) : 0); });
           return { X, Y, R }; };
         const byK = []; for (let k=0; k<=K; k++) byK.push(rowsAt(k));
         const N = opt.N || 10, pesos = opt.pesos, recency = opt.recency;
@@ -553,17 +584,22 @@
         };
         const score = {};
         const tests = [1,2,3].filter(k => k+2 <= K);
-        Object.keys(cand).forEach(id => {
+        const avalia = (id, tf) => {   // validação retroativa; tf = transformação das variáveis (ex.: sem o VMD)
+          tf = tf || (x => x);
           const caps = [], devs = [];
           tests.forEach(kt => {
-            const X = [], Y = []; for (let k=kt+1; k<=K; k++) { X.push(...byK[k].X); Y.push(...byK[k].Y); }
+            const X = [], Y = []; for (let k=kt+1; k<=K; k++) { X.push(...byK[k].X.map(tf)); Y.push(...byK[k].Y); }
             const model = cand[id].fit(X, Y), T = byK[kt];
-            const pred = T.X.map((x,i) => model.predict(x, T.R[i]));
+            const pred = T.X.map((x,i) => model.predict(tf(x), T.R[i]));
             const cp = capture(pred, T.Y, N); if (cp !== null) caps.push(cp);
             devs.push(deviance(pred, T.Y));
           });
-          score[id] = { nome: cand[id].nome, captura: caps.length ? caps.reduce((a,b)=>a+b,0)/caps.length : null, desvio: devs.reduce((a,b)=>a+b,0)/Math.max(1,devs.length), janelas: caps.length };
-        });
+          return { nome: cand[id].nome, captura: caps.length ? caps.reduce((a,b)=>a+b,0)/caps.length : null, desvio: devs.reduce((a,b)=>a+b,0)/Math.max(1,devs.length), janelas: caps.length };
+        };
+        Object.keys(cand).forEach(id => { score[id] = avalia(id); });
+        // o volume ajudou? mesmos modelos, mesmas janelas, sem as duas colunas do VMD
+        if (V.vmd) { vmdInfo.com = {}; vmdInfo.sem = {};
+          ['nb','gbm'].forEach(id => { const s = avalia(id, x => x.slice(0, -2)); vmdInfo.com[id] = score[id]; vmdInfo.sem[id] = s; }); }
         const ranked = Object.keys(score).filter(k => score[k].captura !== null).sort((a,b) => (score[b].captura - score[a].captura) || (score[a].desvio - score[b].desvio));
         const melhor = ranked[0] || 'rule';
         // modelos finais treinados com todas as janelas conhecidas; previsão a partir de hoje (k=0)
@@ -571,8 +607,8 @@
         const finais = {}, prev = {};
         Object.keys(cand).forEach(id => { finais[id] = cand[id].fit(X, Y); prev[id] = byK[0].X.map((x,i) => finais[id].predict(x, byK[0].R[i])); });
         // importância das variáveis (NB: |coeficiente padronizado|)
-        const nbm = finais.nb, imp = nbm.beta.slice(1).map((b,j) => ({ nome: FEAT_NAMES[j], coef: b, se: nbm.se ? nbm.se[j+1] : null }));
-        return { ok:true, units, cellUnit, order, prev, score, melhor, start, K, H, testes: tests.length, importancia: imp, alpha: nbm.alpha };
+        const names = featNames(V), nbm = finais.nb, imp = nbm.beta.slice(1).map((b,j) => ({ nome: names[j], coef: b, se: nbm.se ? nbm.se[j+1] : null }));
+        return { ok:true, units, cellUnit, order, prev, score, melhor, start, K, H, testes: tests.length, importancia: imp, alpha: nbm.alpha, vars: V, vmdInfo };
       }
 
       /** Distribui a previsão de cada trecho entre as suas células (pelo peso recente de cada uma). */
@@ -615,7 +651,10 @@
        * Modelo de "quando": Poisson (com escala de sobredispersão) por dia × faixa de 3 h × região.
        * Variáveis: tipo de dia, véspera, férias, faixa horária, região e, se houver clima, chuva na faixa.
        */
-      function trainWhen(cells, active, ev, ref, reg, rain, climaStartDay, desde) {
+      function trainWhen(cells, active, ev, ref, reg, rain, climaStartDay, desde, opt) {
+        const cal = !opt || opt.calendario !== false;
+        // sem calendário: só o dia da semana (feriados, vésperas e férias deixam de ser distinguidos)
+        const dinfo = d => { if (cal) return dayInfo(d); const w = new Date(d*DAY).getUTCDay(); return { tipo: w === 5 ? 1 : w === 6 ? 2 : w === 0 ? 3 : 0, vesp:false, ferias:false, dow:w }; };
         const R = reg.centers.length || 1;
         const counts = new Map(), key = (d,b,r) => (d*8+b)*8+r;
         let first = Infinity;
@@ -624,7 +663,7 @@
         const d0 = Math.max(first, desde || first, ref - 1095), useRain = !!rain;
         const agg = new Map();
         for (let d=d0; d<ref; d++) {
-          const di = dayInfo(d);
+          const di = dinfo(d);
           for (let b=0;b<8;b++) for (let r=0;r<R;r++) {
             let rf = 0;
             if (useRain) {
@@ -638,14 +677,14 @@
           }
         }
         const rows = [...agg.values()]; if (rows.length < 10) return null;
-        const vec = a => { const x=[]; for (let t=1;t<5;t++) x.push(a.tipo===t?1:0); x.push(a.vesp?1:0, a.ferias?1:0); for (let b=0;b<8;b++) if (b!==3) x.push(a.b===b?1:0); for (let r=1;r<R;r++) x.push(a.r===r?1:0); if (useRain) x.push(a.rf); return x; };
+        const vec = a => { const x=[]; for (let t=1;t<(cal?5:4);t++) x.push(a.tipo===t?1:0); if (cal) x.push(a.vesp?1:0, a.ferias?1:0); for (let b=0;b<8;b++) if (b!==3) x.push(a.b===b?1:0); for (let r=1;r<R;r++) x.push(a.r===r?1:0); if (useRain) x.push(a.rf); return x; };
         const X = rows.map(vec), Y = rows.map(a=>a.y), off = rows.map(a=>Math.log(a.m));
         const fit = fitGLM(X, Y, { offset: off, standardize: false, ridge: 0.01 });
-        const names = ['sexta','sábado','domingo','feriado','véspera de feriado','férias escolares'].concat(BLOCOS.filter((_,b)=>b!==3)).concat(Array.from({length:R-1},(_,r)=>'região '+(r+2))).concat(useRain?['chuva na faixa horária']:[]);
+        const names = (cal ? ['sexta','sábado','domingo','feriado','véspera de feriado','férias escolares'] : ['sexta','sábado','domingo']).concat(BLOCOS.filter((_,b)=>b!==3)).concat(Array.from({length:R-1},(_,r)=>'região '+(r+2))).concat(useRain?['chuva na faixa horária']:[]);
         const fatores = names.map((nm,j) => { const b = fit.beta[j+1], se = fit.se ? fit.se[j+1] : null; return { nome:nm, rr:Math.exp(b), lo: se!=null?Math.exp(b-1.96*se):null, hi: se!=null?Math.exp(b+1.96*se):null }; });
         const slots = rows.reduce((a,r)=>a+r.m,0), eventos = Y.reduce((a,b)=>a+b,0);
-        return { fit, fatores, useRain, R, vec, slots, eventos, desde: d0, meanRate: eventos/slots,
-          rateFor(d, b, r, pRain) { const di = dayInfo(d), base = { tipo:di.tipo, vesp:di.vesp, ferias:di.ferias, b, r:r||0, rf:0 };
+        return { fit, fatores, useRain, R, vec, slots, eventos, desde: d0, meanRate: eventos/slots, calendario: cal,
+          rateFor(d, b, r, pRain) { const di = dinfo(d), base = { tipo:di.tipo, vesp:di.vesp, ferias:di.ferias, b, r:r||0, rf:0 };
             if (!useRain) return fit.predict(vec(base));
             const dry = fit.predict(vec(base)), wet = fit.predict(vec(Object.assign({}, base, { rf:1 }))); return (1-pRain)*dry + pRain*wet; } };
       }
@@ -1051,12 +1090,21 @@
         if (withClima) loadClima(); else refitRain();
       }, 30);
     }
+    /* ---------- variáveis do modelo (escolhidas pelo gestor; ficam salvas neste navegador) ---------- */
+    const VARS = ['varViz','varCal','varClima','varVmd','varTransito'];
+    function varOn(id) { const e = $(id); return !!(e && e.checked && !e.disabled); }
+    function saveVars() { try { localStorage.setItem('rpVars', JSON.stringify(Object.fromEntries(VARS.map(id => [id, $(id).checked])))); } catch (e) {} }
+    function loadVars() { try { const v = JSON.parse(localStorage.getItem('rpVars') || '{}'); VARS.forEach(id => { if (typeof v[id] === 'boolean') $(id).checked = v[id]; }); } catch (e) {} }
+    function temVmd() { return !!(RESULT && RESULT.volume && RESULT.volume.celulas); }
     function trainAll() {
       const cells = RESULT.cells, act = activeMask(), ev = RESULT.ev || [];
-      ML.W = RESULT.temData ? MLX.trainWhere(cells, act, ev, RESULT.diaRef, { N:Number($('selectPontos').value), pesos:PESOS, recency:$('chkRecente').checked })
+      $('varVmd').disabled = !temVmd();
+      $('varVmd').parentElement.title = temVmd() ? 'Volume médio diário por trecho, da aba VOLUME_TRAFEGO' : (RESULT.volume && RESULT.volume.aba ? 'A aba VOLUME_TRAFEGO não cobre os acidentes desta área (confira rodovia e km)' : 'Crie a aba VOLUME_TRAFEGO (Rodovia, Km inicial, Km final, VMD) para usar esta variável');
+      const vmdCells = varOn('varVmd') ? Float64Array.from(cells, c => c.vm || 0) : null;
+      ML.W = RESULT.temData ? MLX.trainWhere(cells, act, ev, RESULT.diaRef, { N:Number($('selectPontos').value), pesos:PESOS, recency:$('chkRecente').checked, viz:varOn('varViz'), vmdCells })
                             : { ok:false, motivo:'A base não informa a data dos acidentes.' };
       ML.reg = MLX.regions(cells, act, 6);
-      ML.when = RESULT.temData ? MLX.trainWhen(cells, act, ev, RESULT.diaRef, ML.reg, null) : null;
+      ML.when = RESULT.temData ? MLX.trainWhen(cells, act, ev, RESULT.diaRef, ML.reg, null, undefined, undefined, { calendario: varOn('varCal') }) : null;
       ML.ST = RESULT.temData ? MLX.stdbscan(cells, act, ev, 1000, 30, 4) : null;
       chooseModel();
     }
@@ -1070,6 +1118,7 @@
     function dayFromStr(s) { const m = String(s).match(/(\d{4})-(\d{2})-(\d{2})/); return m ? Date.UTC(+m[1], m[2]-1, +m[3]) / 864e5 : null; }
     function loadClima() {
       ML.clima = null; ML.whenRain = null; ML.rain = null; ML.prev7 = null;
+      if (!varOn('varClima')) { ML.climaStatus = 'Clima desligado nas variáveis do modelo.'; refitRain(); return; }
       if (!RESULT.temData || !ML.reg || !ML.reg.centers.length || !ML.when) { ML.climaStatus = 'Sem dados de data/hora suficientes para testar o clima.'; return; }
       const fim = Math.min(RESULT.diaRef - 1, hojeDia() - 6), inicio = Math.max(ML.when.desde, fim - 1095);
       if (fim - inicio < 60) { ML.climaStatus = 'Período com histórico de clima curto demais para o teste.'; return; }
@@ -1082,17 +1131,18 @@
     }
     function refitRain() {
       ML.whenRain = null;
-      if (ML.clima && ML.clima.ok) {
+      if (!varOn('varClima')) ML.climaStatus = 'Clima desligado nas variáveis do modelo.';
+      else if (ML.clima && ML.clima.ok) {
         const sd = dayFromStr(ML.clima.inicio);
         ML.rain = MLX.rainSets(ML.clima, sd);
-        try { ML.whenRain = MLX.trainWhen(RESULT.cells, activeMask(), RESULT.ev, RESULT.diaRef, ML.reg, ML.rain, sd, sd); } catch (e) { console.error(e); }
+        try { ML.whenRain = MLX.trainWhen(RESULT.cells, activeMask(), RESULT.ev, RESULT.diaRef, ML.reg, ML.rain, sd, sd, { calendario: varOn('varCal') }); } catch (e) { console.error(e); }
         ML.climaStatus = ML.whenRain ? '' : 'Poucos acidentes com hora no período do clima para testar o efeito da chuva.';
       }
       ML.prev7 = forecast7();
       renderInsight(); if ($('panel').classList.contains('open')) renderPanel();
     }
     function rainFactor() { if (!ML.whenRain) return null; return ML.whenRain.fatores.find(f => /chuva/.test(f.nome)) || null; }
-    function rainSignificant() { const f = rainFactor(); return !!(f && f.lo != null && (f.lo > 1 || f.hi < 1)); }
+    function rainSignificant() { if (!varOn('varClima')) return false; const f = rainFactor(); return !!(f && f.lo != null && (f.lo > 1 || f.hi < 1)); }
     /** Risco por faixa de 3 h nos próximos 7 dias (calendário + chuva prevista, se a chuva se mostrou relevante). */
     function forecast7() {
       if (!RESULT || RESULT.referenciaAjustada) return null;
@@ -1419,9 +1469,49 @@
       return h;
     }
     /** Aba Modelo: placar da validação, o que foi aprendido, clima, próximos 7 dias e ST-DBSCAN. */
+    /* ---------- exibição das variáveis ---------- */
+    function nivelTransito(i) { return i <= 1.15 ? ['normal','#15803d'] : i <= 1.4 ? ['moderado','#b45309'] : ['intenso','#b91c1c']; }
+    function transitoHtml() {
+      const tr = ROUTE && ROUTE.transito; if (!tr) return '';
+      if (!tr.ok) return '<div class="muted" style="font-size:.7rem">🚦 '+esc(tr.motivo)+'</div>';
+      const i = tr.min / Math.max(1, tr.minLivre), n = nivelTransito(i);
+      return '<div class="alert-item" style="border-left-color:'+n[1]+'">🚦 <b>Trânsito agora</b> ('+esc(String(tr.hora).slice(11))+'): <b style="color:'+n[1]+'">'+n[0]+'</b> · '+minTxt(tr.min)+' com trânsito × '+minTxt(tr.minLivre)+' livre (índice '+fmt(i,2)+')</div>';
+    }
+    function transLeg(leg) { if (!leg || leg.minTransito == null || !leg.min) return ''; const i = leg.minTransito/leg.min; return i > 1.15 ? ' · <b style="color:'+nivelTransito(i)[1]+'">com trânsito '+minTxt(leg.minTransito)+'</b>' : ''; }
+    /** Volume de tráfego e taxa de risco do trecho de 1 km do ponto (quando a aba VOLUME_TRAFEGO cobre o local). */
+    function vmdInfoOf(c) {
+      const ms = c.members || []; let s = 0, w = 0;
+      ms.forEach(i => { const x = RESULT.cells[i]; if (x && x.vm > 0) { s += Math.log(x.vm)*x.n; w += x.n; } });
+      if (!w) return null;
+      const out = { vmd: Math.exp(s/w) };
+      const W = ML.W, vi = W && W.vmdInfo;
+      if (W && W.ok && W.cellUnit && vi) { const u = W.cellUnit[ms[0]], U = u >= 0 ? W.units[u] : null; if (U && U.taxa != null) { out.taxa = U.taxa; out.media = vi.taxaMedia; } }
+      return out;
+    }
+    function vmdDd(c) {
+      if (!varOn('varVmd')) return '';
+      const v = vmdInfoOf(c); if (!v) return '';
+      return '<dt>Volume de tráfego</dt><dd>≈ '+fmt(Math.round(v.vmd/100)*100)+' veículos/dia'+(v.taxa!=null?'<br>'+fmt(v.taxa,2)+' acidentes/ano por milhão de veículos'+(v.media?' ('+fmt(v.taxa/v.media,1)+'× a média da área)':''):'')+'</dd>';
+    }
+    function varsHtml() {
+      const W = ML.W, vi = W && W.vmdInfo, on = id => varOn(id) ? '✅' : '⬜';
+      const vmdTxt = !temVmd() ? (RESULT.volume && RESULT.volume.aba ? (RESULT.volume.erro ? esc(RESULT.volume.erro) : 'a aba VOLUME_TRAFEGO não cobre os acidentes desta área') : 'sem a aba VOLUME_TRAFEGO')
+        : !varOn('varVmd') ? 'desligado' : !vi ? '' : !vi.usado ? esc(vi.motivo)
+        : 'cobre '+pct(vi.cobertura)+' dos trechos · acerto '+['gbm','nb'].map(id => (id==='gbm'?'GB':'BN')+' '+pct(vi.com[id].captura)+' com × '+pct(vi.sem[id].captura)+' sem').join(' · ')+
+          ' → '+(['gbm','nb'].some(id => vi.com[id].captura > vi.sem[id].captura + 0.005) ? '<b>melhorou a previsão</b>' : ['gbm','nb'].every(id => vi.com[id].captura < vi.sem[id].captura - 0.005) ? '<b>piorou a previsão</b> (considere desligar)' : 'efeito pequeno');
+      const tr = ROUTE && ROUTE.transito;
+      return '<h4>Variáveis em uso</h4><div style="font-size:.74rem;line-height:1.7">'+
+        '✅ Histórico do trecho (30, 90, 365 dias, média, tendência, dias desde o último)<br>'+
+        on('varViz')+' Vizinhança (2 km)<br>'+
+        on('varCal')+' Calendário (feriados, vésperas, férias)'+(ML.when && ML.when.calendario === false ? ' — só dia da semana' : '')+'<br>'+
+        on('varClima')+' Clima (chuva)'+(varOn('varClima') ? ' — '+(ML.climaStatus ? esc(ML.climaStatus) : rainSignificant() ? 'efeito comprovado, em uso' : 'efeito não comprovado, fora da previsão') : '')+'<br>'+
+        on('varVmd')+' Volume de tráfego'+(vmdTxt?' — '+vmdTxt:'')+'<br>'+
+        on('varTransito')+' Trânsito agora (Google)'+(varOn('varTransito') ? ' — '+(tr ? (tr.ok ? 'índice '+fmt(tr.min/Math.max(1,tr.minLivre),2)+' na rota às '+esc(String(tr.hora).slice(11)) : esc(tr.motivo)) : 'medido quando a rota é traçada')+'. Cada medição fica gravada (aba oculta _HIST_TRANSITO) para formar histórico.' : '')+
+        '</div>';
+    }
     function modelHtml() {
       if (!RESULT) return '<p class="muted">Gere a rota para treinar os modelos.</p>';
-      let h = '<h3>Modelo preditivo</h3>';
+      let h = '<h3>Modelo preditivo</h3>' + varsHtml();
       const W = ML.W;
       if (!W || !W.ok) h += '<p class="muted">'+esc(W ? W.motivo : 'Sem treino.')+' A predição usa a regra w₂₀₂₆.</p>';
       else {
@@ -1601,7 +1691,7 @@
       if (!g) {
         if (['rodovias','modelo','alertas','incid'].includes(tab)) tab = 'rota';
         if (MODE !== 'rota') setMode('rota');
-      } else if (MODE === 'rota' && RESULT) setMode('pred');
+      } else if (MODE === 'rota') setMode('pred');
       if (RESULT) { updateLegend(); fitInsight(); }
     }
     function gVoltarGestao() {
@@ -1957,13 +2047,13 @@
         if (GEST.preview) notice(r.gestor ? '<strong>Visão do efetivo:</strong> é este o cartão programa que o efetivo recebe para <b>'+esc(areaLabel())+'</b> em '+dataBR(GPLANO.data)+'.'
           : '<strong>Visão do efetivo:</strong> não há rota do gestor em vigor para <b>'+esc(areaLabel())+'</b> nesta data; o efetivo recebe a rota preditiva do sistema.'); }
       loading(true, r.gestor ? 'Traçando a rota definida pelo gestor...' : 'Traçando a rota preditiva pelas rodovias...');
-      run('calcularTrajeto', {origem:origin, retornar:back, manterOrdem:!!r.gestor, pontos:ROUTE.stops.map(s => ({id:s.id, lat:+s.lat.toFixed(6), lng:+s.lng.toFixed(6)}))}).then(res => {
+      run('calcularTrajeto', {origem:origin, retornar:back, manterOrdem:!!r.gestor, transito:varOn('varTransito'), pontos:ROUTE.stops.map(s => ({id:s.id, lat:+s.lat.toFixed(6), lng:+s.lng.toFixed(6)}))}).then(res => {
         loading(false);
         if (!res || !res.ok) { notice('<strong>Rota:</strong> traçado viário indisponível agora ('+esc(res && res.motivo || 'sem resposta')+'). Exibindo ligação direta; os links do Google Maps/Waze continuam válidos.'); return; }
         if (ROUTE !== r) return;   // outra rota foi pedida enquanto esta era traçada
         const byId = new Map(ROUTE.stops.map(s => [s.id,s]));
         ROUTE.stops = res.sequencia.map(id => byId.get(id)).filter(Boolean);
-        Object.assign(ROUTE, {path:res.path, legs:res.legs, km:res.km, min:res.min, resumo:res.resumo, avisos:res.avisos, viario:true});
+        Object.assign(ROUTE, {path:res.path, legs:res.legs, km:res.km, min:res.min, resumo:res.resumo, avisos:res.avisos, viario:true, transito:res.transito || null});
         drawRoute(); updateSummary(); if (tab === 'rota' && $('panel').classList.contains('open')) renderPanel();
       }).catch(err => { loading(false); notice('<strong>Rota:</strong> '+esc(err && err.message || err)); });
       updateSummary(); if (MODE === 'rota') openPanel('rota');
@@ -2075,7 +2165,7 @@
         '<dt>Fração</dt><dd>'+esc(c.fracoes[0]||'PMRv')+'</dd>'+
         (sede?'<dt>Sede</dt><dd>'+esc(sede)+'</dd>':'')+
         '<dt>Escore de risco</dt><dd>'+fmt(score(c),1)+'</dd>'+
-        '<dt>Volume STV</dt><dd>'+fmt(c.n)+' registros'+(RESULT.temData?' · '+fmt(c.r[w])+' nos últimos '+jan+' dias':'')+'</dd>'+
+        '<dt>Volume STV</dt><dd>'+fmt(c.n)+' registros'+(RESULT.temData?' · '+fmt(c.r[w])+' nos últimos '+jan+' dias':'')+'</dd>'+vmdDd(c)+
         (c.ul?'<dt>Último registro</dt><dd>'+esc(c.ul)+'</dd>':'')+
         '<dt>Abrangência</dt><dd>raio de '+km(radius())+'</dd></dl>'+
         '<h4>Horário: incidência × predição</h4>'+hoursHtml(c.h, c.janela)+
@@ -2123,7 +2213,7 @@
         '<div class="g-banner"><b>'+esc(pl.titulo)+'</b><br>Definida por <b>'+esc(pl.autorNome||'')+'</b> · '+esc(escopoTxt(pl))+'<br>Vale '+vigenciaTxt(pl)+'.'+
         '<br><small>Prevalece sobre a sugestão do sistema enquanto estiver em vigor.</small></div>'+
         (pl.orientacoes?'<h4>Orientações do gestor</h4><p style="font-size:.76rem;white-space:pre-wrap">'+esc(pl.orientacoes)+'</p>':'')+
-        '<div class="muted">'+ROUTE.stops.length+' ponto(s)'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+
+        '<div class="muted">'+ROUTE.stops.length+' ponto(s)'+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+transitoHtml()+
         (next?'<div class="alert-item"><b>Próxima parada: nº '+(next.i+1)+'</b> — '+km(next.d)+' · <a target="_blank" rel="noopener" href="'+wazeUrl(next.s)+'">Waze</a></div>':'')+
         '<h4 class="no-print">Navegação GPS (Google Maps em '+links.length+' trecho'+(links.length>1?'s':'')+')</h4><div class="btn-row">'+
         links.map((l,i) => '<a class="btn-sm gm" target="_blank" rel="noopener" href="'+l+'">Trecho '+(i+1)+'</a>').join('')+'</div>'+
@@ -2131,7 +2221,7 @@
         (ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Início:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         ROUTE.stops.map((s,i) => { const leg = ROUTE.legs[ROUTE.origin?i:i-1];
           return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num" style="background:#15803d">'+(i+1)+'</div><div><b>'+esc(s.nome)+'</b><br><small>'+
-            (s.tipo==='passagem'?'Passagem':'<b>Base de operação</b>')+(s.operacao?' · '+esc(s.operacao):'')+(horaTxt(s)?' · <b>'+horaTxt(s)+'</b>':'')+(s.cidades[0]?' · '+esc(s.cidades[0]):'')+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
+            (s.tipo==='passagem'?'Passagem':'<b>Base de operação</b>')+(s.operacao?' · '+esc(s.operacao):'')+(horaTxt(s)?' · <b>'+horaTxt(s)+'</b>':'')+(s.cidades[0]?' · '+esc(s.cidades[0]):'')+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min)+transLeg(leg):'')+'</small></div>'+
             '<div style="display:flex;flex-direction:column;gap:3px"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><button class="btn-sm ghost" type="button" onclick="openCard(ROUTE.stops['+i+'])">'+(gestorAtivo()?'Cartão':'Detalhe')+'</button></div></div>'; }).join('')+
         (ROUTE.back&&ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Retorno:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         '<div class="btn-row only-gestor" style="margin-top:8px"><button class="btn-sm ghost" type="button" onclick="VER_SISTEMA=true;buildRoute();renderInsight();renderPanel()">Comparar com a sugestão do sistema</button></div>';
@@ -2144,7 +2234,7 @@
       const porPostos = ROUTE.stops.length && ROUTE.stops[0].kind === 'posto';
       return planoDiaHtml()+'<h3>'+(porPostos?'Rota pelos postos de operação':'Rota preditiva')+'</h3>'+
         (porPostos?'<p style="font-size:.74rem">'+PLAN.postos.length+' postos cobrem <b>'+fmt(100*PLAN.coberto/(PLAN.total||1),0)+'%</b> dos acidentes previstos a até '+km(PLAN.alcance)+'. Permanência sugerida proporcional ao que cada posto cobre, num turno de '+PLAN.turnoH+' h.</p>':'')+
-        '<div class="muted">'+ROUTE.stops.length+(porPostos?' postos':' pontos previstos')+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+
+        '<div class="muted">'+ROUTE.stops.length+(porPostos?' postos':' pontos previstos')+(ROUTE.km?' · '+fmt(ROUTE.km,1)+' km · '+minTxt(ROUTE.min):' · estimativa em linha reta')+(ROUTE.resumo?' · via '+esc(ROUTE.resumo):'')+'</div>'+transitoHtml()+
         '<p class="muted only-gestor" style="font-size:.7rem">Paradas = pontos de maior intensidade prevista (kernel ponderado por recência'+($('chkGravidade').checked?', gravidade':'')+' e tendência), limitados a '+$('selectPontos').value+' pontos'+(Number($('selectKm').value)?' e '+$('selectKm').value+' km':'')+'.</p>'+
         (ROUTE.skipped?'<p class="muted">'+ROUTE.skipped+' ponto(s) previsto(s) ficaram fora por excederem a extensão máxima.</p>':'')+
         (next?'<div class="alert-item"><b>Próxima parada: nº '+(next.i+1)+'</b> — '+km(next.d)+' · <a target="_blank" rel="noopener" href="'+wazeUrl(next.s)+'">Waze</a></div>':'')+
@@ -2155,7 +2245,7 @@
         '<h4>Paradas (ordem de deslocamento)</h4>'+
         (ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Início:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         ROUTE.stops.map((s,i) => { const leg = ROUTE.legs[ROUTE.origin?i:i-1];
-          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>'+(s.kind==='posto'?'★'+s.rank+' · '+esc(s.nome):'P'+s.rank+' · '+esc(roadOf(s)||'Rodovia N/D'))+'</b> '+stChip(s.st)+(s.kind==='posto'?'<br><small>permanência '+minTxt(s.tempoMin)+'</small>':'')+'<br><small>'+esc(s.cidades[0]||'')+' · janela '+winTxt(s)+(s.diaPrev?' ('+DIAS[s.diaPrev.dia].slice(0,3)+')':'')+' · intensidade '+fmt(s.escore,0)+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min):'')+'</small></div>'+
+          return '<div class="stop'+(GPS.visited.has(s.id)?' done':'')+(next&&next.i===i?' next':'')+'"><div class="num">'+(i+1)+'</div><div><b>'+(s.kind==='posto'?'★'+s.rank+' · '+esc(s.nome):'P'+s.rank+' · '+esc(roadOf(s)||'Rodovia N/D'))+'</b> '+stChip(s.st)+(s.kind==='posto'?'<br><small>permanência '+minTxt(s.tempoMin)+'</small>':'')+'<br><small>'+esc(s.cidades[0]||'')+' · janela '+winTxt(s)+(s.diaPrev?' ('+DIAS[s.diaPrev.dia].slice(0,3)+')':'')+' · intensidade '+fmt(s.escore,0)+(leg?' · trecho '+fmt(leg.km,1)+' km / '+minTxt(leg.min)+transLeg(leg):'')+'</small></div>'+
             '<div style="display:flex;flex-direction:column;gap:3px"><a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl(s)+'">Waze</a><button class="btn-sm ghost" type="button" onclick="openCard(ROUTE.stops['+i+'])">'+(gestorAtivo()?'Cartão':'Detalhe')+'</button></div></div>'; }).join('')+
         (ROUTE.back&&ROUTE.origin?'<div class="stop"><div class="num">⌂</div><div><b>Retorno:</b> '+esc(ROUTE.origin.nome||'')+'</div><div></div></div>':'')+
         (ROUTE.avisos&&ROUTE.avisos.length?'<p class="muted"><small>'+esc(ROUTE.avisos.join(' '))+'</small></p>':'');
@@ -2260,6 +2350,10 @@
     ['chkRecente','selJanela','chkMalha'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) retrain(false); }));
     $('selModelo').addEventListener('change', () => { if (RESULT && ML.W) { chooseModel(); analyze(true); } });
     $('chkAtivos').addEventListener('change', () => { if (RESULT) buildRoute(); });
+    loadVars();
+    ['varViz','varCal','varVmd'].forEach(id => $(id).addEventListener('change', () => { saveVars(); if (RESULT) retrain(false); }));
+    $('varClima').addEventListener('change', () => { saveVars(); if (!RESULT) return; if (varOn('varClima') && !(ML.clima && ML.clima.ok)) loadClima(); else refitRain(); });
+    $('varTransito').addEventListener('change', () => { saveVars(); if (RESULT) buildRoute(); });
     ['selEstrategia','selPostos','selAlcance'].forEach(id => $(id).addEventListener('change', () => { if (RESULT) { planPosts(); draw(); buildRoute(); renderInsight(); if ($('panel').classList.contains('open')) renderPanel(); } }));
     ['selectPontos','selectKm','selectOrigem'].forEach(id => $(id).addEventListener('change', () => {
       if (id==='selectOrigem' && $(id).value==='GPS' && GPS.watch===null) toggleGps();

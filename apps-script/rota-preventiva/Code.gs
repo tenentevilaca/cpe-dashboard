@@ -37,6 +37,8 @@ const CFG = {
   RAZAO_OK: [0.75, 1.35],        // comprimento do traçado ÷ extensão (Fim − Início) aceito na calibração
   ARTICULACAO_SHEETS: ['ARTICULACAO', 'ARTICULAÇÃO', 'Articulacao', 'Articulação'],
   ALERT_SHEETS: ['BLOQUEIOS', 'ALERTAS', 'INTERDICOES', 'INTERDIÇÕES'],
+  VOLUME_SHEETS: ['VOLUME_TRAFEGO', 'VOLUME TRAFEGO', 'Volume de tráfego', 'VMD'],
+  HIST_TRANSITO: '_HIST_TRANSITO',   // amostras do índice de lentidão (Google) para formar histórico
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
   CACHE_PREFIX: 'rota_preventiva_v9_',
   CACHE_SECONDS: 1800,
@@ -224,6 +226,8 @@ function calcularRotaAvancada(p) {
     }
     return c;
   }).sort((a, b) => b.n - a.n).slice(0, CFG.MAX_CELLS);
+  const vol = volumeTrafego_(ss);
+  if (vol.n) out.forEach(c => { const v = vol.at(c.rd, c.km); if (v) c.vm = v; });
   const idx = {};
   out.forEach((c, i) => { idx[c.key] = i; delete c.key; });
   const ev = [];   // [índice da célula, dia (dias desde 1970, horário local), hora ou -1] em sequência
@@ -251,6 +255,7 @@ function calcularRotaAvancada(p) {
     calibracao: lin.info,
     malhaGeo: malhaGeo_(lin, total ? box : null),
     planoGestor: planoGestorSeguro_(p),
+    volume: Object.assign({ celulas: out.filter(c => c.vm).length }, vol.info),
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
 }
@@ -613,6 +618,7 @@ function calcularTrajeto(req) {
     else df.setDestination(o.lat, o.lng);
     rest.slice(0, CFG.MAX_WAYPOINTS).forEach(p => df.addWaypoint(p.lat, p.lng));
     if (rest.length > 1 && !req.manterOrdem) df.setOptimizeWaypoints(true);   // rota do gestor: ordem definida por ele
+    if (req.transito) df.setDepart(new Date());   // pede o tempo com o trânsito do momento (duration_in_traffic)
     const res = df.getDirections();
     if (!res || res.status !== 'OK' || !res.routes || !res.routes.length) return { ok: false, motivo: res && res.status };
     const route = res.routes[0];
@@ -627,6 +633,7 @@ function calcularTrajeto(req) {
       path: pairs_(Maps.decodePolyline(route.overview_polyline.points)),
       legs: route.legs.map(l => ({
         km: round_(l.distance.value / 1000, 1), min: Math.round(l.duration.value / 60),
+        minTransito: l.duration_in_traffic ? Math.round(l.duration_in_traffic.value / 60) : null,
         passos: (l.steps || []).slice(0, 40).map(s => ({ txt: stripHtml_(s.html_instructions), km: round_(s.distance.value / 1000, 1) }))
       })),
       resumo: route.summary || '',
@@ -634,11 +641,83 @@ function calcularTrajeto(req) {
     };
     out.km = round_(out.legs.reduce((a, l) => a + l.km, 0), 1);
     out.min = out.legs.reduce((a, l) => a + l.min, 0);
-    cacheSet_(cacheKey, out, 21600);
+    if (req.transito) {
+      const comT = out.legs.filter(l => l.minTransito != null);
+      out.transito = comT.length ? { ok: true, hora: agora_(), min: comT.reduce((a, l) => a + l.minTransito, 0), minLivre: comT.reduce((a, l) => a + l.min, 0) }
+        : { ok: false, motivo: 'O Google não informou o tempo com trânsito para esta rota.' };
+      if (comT.length) gravarTransito_(route.legs, out.legs);
+    }
+    cacheSet_(cacheKey, out, req.transito ? 600 : 21600);   // com trânsito, o resultado vale só 10 minutos
     return out;
   } catch (e) {
     return { ok: false, motivo: String(e && e.message || e) };
   }
+}
+
+/** Guarda cada trecho medido (hora, dia, índice de lentidão) para formar o histórico de trânsito. */
+function gravarTransito_(gLegs, legs) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet(), tz = ss.getSpreadsheetTimeZone(), now = new Date();
+    let sh = ss.getSheetByName(CFG.HIST_TRANSITO);
+    if (!sh) { sh = ss.insertSheet(CFG.HIST_TRANSITO); sh.appendRow(['data_hora', 'dia_semana', 'hora', 'lat_ini', 'lng_ini', 'lat_fim', 'lng_fim', 'km', 'min_livre', 'min_transito', 'indice']); sh.hideSheet(); }
+    const rows = [];
+    gLegs.forEach((g, i) => { const l = legs[i]; if (!l || l.minTransito == null || !l.min) return;
+      rows.push([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), Number(Utilities.formatDate(now, tz, 'u')) % 7, Number(Utilities.formatDate(now, tz, 'H')),
+        round_(g.start_location.lat, 5), round_(g.start_location.lng, 5), round_(g.end_location.lat, 5), round_(g.end_location.lng, 5), l.km, l.min, l.minTransito, round_(l.minTransito / l.min, 2)]); });
+    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  } catch (e) { /* o histórico é complementar: falha aqui não impede a rota */ }
+}
+
+/* ---------- volume de tráfego (VMD) ---------- */
+/** "BR-381", "BR 381", "br381" → "BR381"; só números → "381". */
+function rodKey_(s) {
+  const u = String(s || '').toUpperCase(), m = u.match(/([A-Z]{2,4})\s*[-\/ ]?\s*0*(\d{1,4})/);
+  if (m) return m[1] + m[2];
+  const d = u.match(/\d{2,4}/); return d ? String(Number(d[0])) : '';
+}
+/**
+ * Aba VOLUME_TRAFEGO: Rodovia | Km inicial | Km final | VMD (volume médio diário) | Ano (opcional) | Fonte (opcional).
+ * Cada acidente recebe o VMD do trecho da mesma rodovia que contém o seu km (o ano mais recente, se houver vários).
+ */
+function volumeTrafego_(ss) {
+  const vazio = { n: 0, at: () => null, info: { aba: false } };
+  const sh = findSheet_(ss, CFG.VOLUME_SHEETS);
+  if (!sh || sh.getLastRow() < 2) return vazio;
+  const hit = cacheGet_('vmd_' + sh.getLastRow() + '_' + sh.getLastColumn());
+  let rows = hit;
+  if (!rows) {
+    const vals = sh.getDataRange().getValues(), nk = s => key_(s).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const al = { rod: ['rodovia', 'br', 'rod', 'via'], ini: ['km inicial', 'km inicio', 'km ini', 'inicio', 'km de', 'km inicial trecho'],
+      fim: ['km final', 'km fim', 'fim', 'km ate', 'km final trecho'], vmd: ['vmd', 'vmda', 'vdm', 'volume medio diario', 'volume', 'volume diario', 'vmd anual'], ano: ['ano'] };
+    let hr = -1, col = {};
+    for (let r = 0; r < Math.min(10, vals.length) && hr < 0; r++) {
+      const h = vals[r].map(nk), c = {};
+      Object.keys(al).forEach(k => { c[k] = h.findIndex(x => al[k].indexOf(x) >= 0); });
+      if (c.vmd < 0) c.vmd = h.findIndex(x => /^(vmd|volume)/.test(x));
+      if (c.rod >= 0 && c.vmd >= 0 && c.ini >= 0) { hr = r; col = c; }
+    }
+    if (hr < 0) return { n: 0, at: () => null, info: { aba: true, erro: 'Cabeçalho não reconhecido: use Rodovia, Km inicial, Km final e VMD.' } };
+    rows = [];
+    for (let r = hr + 1; r < vals.length; r++) {
+      const v = vals[r], rod = rodKey_(v[col.rod]), ini = number_(v[col.ini]), fim = col.fim >= 0 ? number_(v[col.fim]) : null, vmd = number_(v[col.vmd]);
+      if (!rod || ini === null || !vmd || vmd <= 0) continue;
+      rows.push([rod, Math.min(ini, fim === null ? ini : fim), Math.max(ini, fim === null ? ini : fim), vmd, col.ano >= 0 ? Number(v[col.ano]) || 0 : 0]);
+    }
+    cacheSet_('vmd_' + sh.getLastRow() + '_' + sh.getLastColumn(), rows, 1800);
+  }
+  const byRod = {};
+  rows.forEach(r => (byRod[r[0]] = byRod[r[0]] || []).push(r));
+  const numOnly = {};   // "381" → trechos de qualquer prefixo com esse número
+  rows.forEach(r => { const n = r[0].replace(/^[A-Z]+/, ''); (numOnly[n] = numOnly[n] || []).push(r); });
+  const at = (rd, km) => {
+    if (!rd || !km) return null;
+    const k = rodKey_(rd), list = byRod[k] || numOnly[k.replace(/^[A-Z]+/, '')] || [];
+    const x = (km[0] + km[1]) / 2;
+    let best = null;
+    list.forEach(r => { if (x >= r[1] - 0.5 && x <= r[2] + 0.5 && (!best || r[4] > best[4])) best = r; });
+    return best ? best[3] : null;
+  };
+  return { n: rows.length, at: at, info: { aba: true, trechos: rows.length } };
 }
 
 /** Rotas de acesso (principal + alternativas) da origem até um ponto: atendimento a acidente. */
