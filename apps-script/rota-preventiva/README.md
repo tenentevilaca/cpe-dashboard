@@ -18,6 +18,7 @@ App web da Rota Preventiva / Policiamento Preditivo do Estado-Maior do CPE / PMR
 | **ARTICULACAO** | Frações (Cia/Pel/Gp), código de cada fração, município-sede e municípios atendidos. O cruzamento pelo código define toda a área de responsabilidade da fração. Aceita tabelas lado a lado, células mescladas e vários municípios na mesma célula (separados por `;` ou `,`). |
 | **STV** | Registros com Latitude/Longitude, Data/Hora, Município, Rodovia, KM e Gravidade/Escore. |
 | **BLOQUEIOS** (opcional) | Latitude, Longitude, Tipo (Interdição, Acidente, Obra, Estrangulamento), Rodovia, Descrição. |
+| **IFRV** (opcional) | Furtos e roubos de veículos: Latitude/Longitude (ou Rodovia + KM, posicionados pela malha calibrada), Data, Hora, Município e Natureza (FURTO/ROUBO ou REDS C01155/C01157; recuperações são ignoradas). |
 | **VOLUME_TRAFEGO** (opcional) | Rodovia, Km inicial, Km final, VMD (volume médio diário); opcionais Ano e Fonte. Fontes gratuitas: DNIT/PNCT, ANTT (pedágios), DER-MG. |
 | **Mapa Frações** (opcional) | Tipo, Código, Nome, para traduzir códigos. |
 
@@ -25,6 +26,8 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
 ("01ª RPM", "03ª Cia PMRv"); valores como "Sim/Não", "#######" e "#N/A" são ignorados.
 
 ## Funcionalidades
+- **Indicadores** (gestão): acidentes, furtos e roubos de veículos — um, dois ou os três. Mapa, síntese, modelos de
+  aprendizagem de máquina, ST-DBSCAN, postos, rota e cartão programa usam só os marcados; o cartão mostra a composição.
 - **Dois ambientes.** *Efetivo* (padrão, sem login): só fração, horário e **📋 Gerar cartão programa**;
   o mapa mostra apenas a rota do dia e o Cartão programa (paradas, horários, Google Maps/Waze, impressão).
   A rota é a do gestor, se houver plano em vigor, ou a rota preditiva otimizada do sistema.

@@ -37,6 +37,7 @@ const CFG = {
   RAZAO_OK: [0.75, 1.35],        // comprimento do traçado ÷ extensão (Fim − Início) aceito na calibração
   ARTICULACAO_SHEETS: ['ARTICULACAO', 'ARTICULAÇÃO', 'Articulacao', 'Articulação'],
   ALERT_SHEETS: ['BLOQUEIOS', 'ALERTAS', 'INTERDICOES', 'INTERDIÇÕES'],
+  IFRV_SHEETS: ['IFRV', 'FURTO_ROUBO', 'FURTOS E ROUBOS', 'Furto e Roubo de Veículos'],
   VOLUME_SHEETS: ['VOLUME_TRAFEGO', 'VOLUME TRAFEGO', 'Volume de tráfego', 'VMD'],
   HIST_TRANSITO: '_HIST_TRANSITO',   // amostras do índice de lentidão (Google) para formar histórico
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
@@ -44,7 +45,7 @@ const CFG = {
   CACHE_SECONDS: 1800,
   HEADER_SCAN_ROWS: 15,
   SAMPLE_ROWS: 300,
-  MAX_CELLS: 12000,       // células de ~110 m enviadas ao mapa (reagrupadas no navegador)
+  MAX_CELLS: 16000,       // células de ~110 m enviadas ao mapa (reagrupadas no navegador), somando os indicadores
   MAX_WAYPOINTS: 23,      // limite do Google Directions (Apps Script)
   W_RECENTE: 0.6,         // Ponderação Recente (w2026)
   W_HISTORICO: 0.4,
@@ -131,8 +132,19 @@ function calcularRotaAvancada(p) {
   const ctx = cacheGet_('ctx') || loadContext_();
   const found = findStvTable_(ss, ctx.codeToFrac);
   if (!found) throw new Error('Não encontrei a base STV: nenhuma aba tem colunas de Latitude/Longitude (ou "Coordenadas").');
-  const table = found.table, col = table.columns;
   const tz = ss.getSpreadsheetTimeZone();
+  // Fontes: acidentes (STV) e, se existir, a aba IFRV (furtos e roubos de veículos)
+  const sources = [{ table: found.table, tipo: 0 }];
+  const ifrvSheet = findSheet_(ss, CFG.IFRV_SHEETS);
+  const ifrvInfo = { aba: !!ifrvSheet, linhas: 0, usados: 0, semLocal: 0, recuperacao: 0, semNatureza: 0, porKm: 0 };
+  if (ifrvSheet && (!found.sheet || ifrvSheet.getSheetId() !== found.sheet.getSheetId())) {
+    const tb = readTable_(ifrvSheet, { fracCodes: ctx.codeToFrac });
+    ifrvInfo.linhas = tb.rows.length;
+    ifrvInfo.colunas = Object.keys(tb.columns).filter(k => tb.columns[k] >= 0).map(k => k + '=' + (tb.headers[tb.columns[k]] || ''));
+    if (tb.rows.length) sources.push({ table: tb, tipo: 'ifrv' });
+  }
+  const lin = linearRef_(ss, ctx);
+  const cont = [0, 0, 0, 0];   // acidentes, furtos, roubos, furto/roubo sem natureza
 
   const sel = {
     rpm: selectedKey_(p.rpm), cia: selectedKey_(p.cia), pelotao: selectedKey_(p.pelotao),
@@ -144,7 +156,7 @@ function calcularRotaAvancada(p) {
 
   // Data de referência da ponderação recente: hoje; se a base for mais antiga, o registro mais recente.
   let maxDate = 0;
-  if (col.data >= 0) table.rows.forEach(r => { const d = parseDate_(r[col.data]); if (d && d > maxDate) maxDate = d; });
+  sources.forEach(src => { const cl = src.table.columns; if (cl.data >= 0) src.table.rows.forEach(r => { const d = parseDate_(r[cl.data]); if (d && d > maxDate && d <= Date.now() + 864e5) maxDate = d; }); });
   const today = Date.now();
   let ref = today, refAjustada = false;
   if (maxDate && maxDate < today - 90 * 864e5) { ref = maxDate; refAjustada = true; }
@@ -157,11 +169,22 @@ function calcularRotaAvancada(p) {
   const dayOf = ms => Math.floor((ms - tzOff) / 864e5);
   const evKey = [], evDay = [], evHour = [];
 
+  sources.forEach(src => { const table = src.table, col = table.columns, natCols = src.tipo === 'ifrv' ? naturezaCols_(table) : null;
   table.rows.forEach(r => {
-    let lat, lng;
+    let tipo = src.tipo;
+    if (tipo === 'ifrv') {
+      tipo = naturezaIfrv_(r, natCols);
+      if (tipo < 0) { ifrvInfo.recuperacao++; return; }   // recuperação/localização de veículo não é furto nem roubo
+      if (tipo === 3) ifrvInfo.semNatureza++;
+    }
+    let lat = null, lng = null;
     if (col.lat >= 0 && col.lng >= 0) { lat = coord_(r[col.lat], 90); lng = coord_(r[col.lng], 180); }
-    else { const c = splitCoord_(r[col.coord]); lat = c[0]; lng = c[1]; }
-    if (lat === null || lng === null || (lat === 0 && lng === 0)) return;
+    else if (col.coord >= 0) { const c = splitCoord_(r[col.coord]); lat = c[0]; lng = c[1]; }
+    if ((lat === null || lng === null || (lat === 0 && lng === 0)) && col.rodovia >= 0 && col.km >= 0) {
+      const pt = lin.pointAt(r[col.rodovia], number_(r[col.km]));   // sem coordenada: rodovia + km pela malha calibrada
+      if (pt) { lat = pt[0]; lng = pt[1]; if (src.tipo === 'ifrv') ifrvInfo.porKm++; }
+    }
+    if (lat === null || lng === null || (lat === 0 && lng === 0)) { if (src.tipo === 'ifrv') ifrvInfo.semLocal++; return; }
 
     const v = rowOwn_(r, table, ctx);
     const city = v.cidade ? ctx.cities[key_(v.cidade)] : null;
@@ -177,13 +200,13 @@ function calcularRotaAvancada(p) {
     if (col.hora >= 0) hour = getHour_(r[col.hora], tz);
     if (useHours && hour !== null && !inWindow_(hour, from, to)) return;
 
-    total++;
+    total++; cont[tipo]++; if (src.tipo === 'ifrv') ifrvInfo.usados++;
     box.s = Math.min(box.s, lat); box.n = Math.max(box.n, lat);
     box.w = Math.min(box.w, lng); box.e = Math.max(box.e, lng);
 
-    const k = lat.toFixed(3) + ',' + lng.toFixed(3);
+    const k = lat.toFixed(3) + ',' + lng.toFixed(3) + '|' + tipo;   // uma célula por indicador
     let c = cells[k];
-    if (!c) c = cells[k] = { key: k, la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0, 0, 0], h: null, w: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
+    if (!c) c = cells[k] = { key: k, t: tipo, la: 0, lo: 0, n: 0, s: 0, sn: 0, r: [0, 0, 0, 0, 0], h: null, w: null, rd: '', ci: '', fr: '', sd: '', km: null, ul: 0 };
     c.la += lat; c.lo += lng; c.n++;
     const sev = col.escore >= 0 ? number_(r[col.escore]) : null;
     if (sev !== null) { c.s += sev; c.sn++; }
@@ -212,8 +235,8 @@ function calcularRotaAvancada(p) {
     const sd = frac ? (frac.sedes && frac.sedes[sedeLevel]) || frac.sede : '';
     if (sd) sedes[sd] = (sedes[sd] || 0) + 1;
   });
+  });
 
-  const lin = linearRef_(ss, ctx);
   const out = Object.keys(cells).map(k => {
     const c = cells[k];
     c.la = round_(c.la / c.n, 6); c.lo = round_(c.lo / c.n, 6);
@@ -249,13 +272,14 @@ function calcularRotaAvancada(p) {
     diasBase: minDate ? Math.max(1, Math.round((ref - minDate) / 864e5)) : null,
     ev: ev,
     diaRef: dayOf(ref),
-    temHora: col.hora >= 0, temData: col.data >= 0, temEscore: col.escore >= 0,
+    temHora: sources.some(s => s.table.columns.hora >= 0), temData: sources.some(s => s.table.columns.data >= 0), temEscore: found.table.columns.escore >= 0,
     origemSede: origemSede,
     malha: malha,
     calibracao: lin.info,
     malhaGeo: malhaGeo_(lin, total ? box : null),
     planoGestor: planoGestorSeguro_(p),
     volume: Object.assign({ celulas: out.filter(c => c.vm).length }, vol.info),
+    indicadores: { acidentes: cont[0], furtos: cont[1], roubos: cont[2], semNatureza: cont[3], ifrv: ifrvInfo },
     pesos: { recente: CFG.W_RECENTE, historico: CFG.W_HISTORICO }
   };
 }
@@ -494,7 +518,7 @@ function resumoCalibracao_(rows, map) {
 /** Monta o índice espacial dos trechos calibrados ("ok") e a função de projeção ponto → km. */
 function linearRef_(ss, ctx) {
   const rows = planoRows_(ss, ctx);
-  const empty = { segs: [], match: () => null, info: null };
+  const empty = { segs: [], match: () => null, pointAt: () => null, info: null };
   if (!rows.length) return empty;
   const cache = planoCache_();
   const info = resumoCalibracao_(rows, cache.map);
@@ -531,7 +555,20 @@ function linearRef_(ss, ctx) {
     const km = s.ini + (s.fim - s.ini) * (s.len ? along / s.len : 0);  // escala para a extensão oficial do plano
     return { rod: s.rod, km: round_(km, 1), fr: s.fr, dist: Math.round(best.d) };
   };
-  return { segs: segs, match: match, info: info };
+  /** Rodovia + km → coordenada sobre o traçado calibrado (para registros sem latitude/longitude). */
+  const pointAt = (rod, km) => {
+    const k = rodKey_(rod);
+    if (!k || km === null) return null;
+    for (const s of segs) {
+      if (rodKey_(s.rod) !== k || km < Math.min(s.ini, s.fim) - 0.05 || km > Math.max(s.ini, s.fim) + 0.05 || s.fim === s.ini) continue;
+      const along = Math.max(0, Math.min(s.len, (km - s.ini) / (s.fim - s.ini) * s.len));
+      let i = 1; while (i < s.cum.length - 1 && s.cum[i] < along) i++;
+      const f = (along - s.cum[i - 1]) / Math.max(1e-9, s.cum[i] - s.cum[i - 1]);
+      return [s.pts[i - 1][0] + f * (s.pts[i][0] - s.pts[i - 1][0]), s.pts[i - 1][1] + f * (s.pts[i][1] - s.pts[i - 1][1])];
+    }
+    return null;
+  };
+  return { segs: segs, match: match, pointAt: pointAt, info: info };
 }
 /** Traçados calibrados da malha perto da área (para a rede viária dos postos de operação). */
 function malhaGeo_(lin, box) {
@@ -666,6 +703,31 @@ function gravarTransito_(gLegs, legs) {
         round_(g.start_location.lat, 5), round_(g.start_location.lng, 5), round_(g.end_location.lat, 5), round_(g.end_location.lng, 5), l.km, l.min, l.minTransito, round_(l.minTransito / l.min, 2)]); });
     if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   } catch (e) { /* o histórico é complementar: falha aqui não impede a rota */ }
+}
+
+/* ---------- furtos e roubos de veículos (aba IFRV) ---------- */
+/** Colunas que descrevem a natureza do fato (pelo nome do cabeçalho). */
+function naturezaCols_(table) {
+  const nat = [], out = [];
+  (table.headers || []).forEach((h, i) => {
+    const k = key_(h);
+    if (/natureza/.test(k)) nat.push(i);
+    else if (/ocorr|crime|fato|tipo|classif|indicador|delito/.test(k)) out.push(i);
+  });
+  return nat.length ? nat : out;   // havendo coluna de natureza, só ela decide (textos livres podem citar "recuperado", "km 155"...)
+}
+/**
+ * 1 = furto, 2 = roubo, 3 = furto/roubo sem natureza identificada, -1 = recuperação/localização (ignorado).
+ * Reconhece o texto (FURTO, ROUBO) e os códigos do REDS/Código Penal (C01155 / art. 155 = furto; C01157 / art. 157 = roubo).
+ */
+function naturezaIfrv_(row, cols) {
+  const txt = (cols && cols.length ? cols.map(i => row[i]) : row).map(v => String(v == null ? '' : v)).join(' ').toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/RECUPERA|LOCALIZA(CAO|DO)|ENCONTRAD/.test(txt)) return -1;
+  const roubo = /ROUB|C0?1\.?157|ART\.?\s*157/.test(txt), furto = /FURT|C0?1\.?155|ART\.?\s*155/.test(txt);
+  if (roubo) return 2;
+  if (furto) return 1;
+  return 3;
 }
 
 /* ---------- volume de tráfego (VMD) ---------- */
@@ -818,6 +880,14 @@ function diagnosticarPlanilha() {
   report.push('Frações com código: ' + Object.keys(ctx.codeToFrac).length);
   const rows = planoRows_(SpreadsheetApp.getActiveSpreadsheet(), ctx);
   if (rows.length) { const c = resumoCalibracao_(rows, planoCache_().map); report.push('Plano rodoviário: ' + c.trechos + ' trechos · calibrados ' + c.ok + ' · revisar ' + c.revisar + ' · falha ' + c.falha + ' · sem calibrar ' + c.semCalibrar); }
+  const ifrv = findSheet_(SpreadsheetApp.getActiveSpreadsheet(), CFG.IFRV_SHEETS);
+  if (ifrv) {
+    const tb = readTable_(ifrv, { fracCodes: ctx.codeToFrac }), nc = naturezaCols_(tb), cnt = { 1: 0, 2: 0, 3: 0, '-1': 0 };
+    tb.rows.forEach(r => cnt[naturezaIfrv_(r, nc)]++);
+    report.push('IFRV: ' + tb.rows.length + ' linhas · furtos ' + cnt[1] + ' · roubos ' + cnt[2] + ' · sem natureza ' + cnt[3] + ' · recuperações ignoradas ' + cnt['-1'] +
+      ' · colunas: ' + Object.keys(tb.columns).filter(k => tb.columns[k] >= 0).map(k => k + '=' + tb.headers[tb.columns[k]]).join(', ') +
+      ' · natureza lida em: ' + (nc.map(i => tb.headers[i]).join(', ') || 'todas as colunas'));
+  } else report.push('IFRV: aba não encontrada (nomes aceitos: ' + CFG.IFRV_SHEETS.join(', ') + ').');
   ctx.warnings.forEach(w => report.push('AVISO: ' + w));
   Logger.log(report.join('\n'));
   return report;
@@ -1203,8 +1273,10 @@ function findStvTable_(ss, fracCodes) {
   const named = findSheet_(ss, CFG.STV_SHEETS);
   if (named) { const t = readTable_(named, { fracCodes: fracCodes }); if (hasCoords(t) && t.rows.length) return { sheet: named, table: t }; }
   let best = null;
+  const ifrv = findSheet_(ss, CFG.IFRV_SHEETS);
   ss.getSheets().forEach(sh => {
     if (named && sh.getSheetId() === named.getSheetId()) return;
+    if (ifrv && sh.getSheetId() === ifrv.getSheetId()) return;   // furtos/roubos: fonte própria
     const head = readTable_(sh, { maxRows: 1 });
     if (!hasCoords(head)) return;
     if (!best || sh.getLastRow() > best.getLastRow()) best = sh;
