@@ -108,6 +108,7 @@
     body.g-adding #map{cursor:crosshair}
     body.modo-usuario .only-gestor{display:none!important}
     #indBox label[hidden]{display:none}
+    #grpMalha .checks label{display:flex;flex-wrap:nowrap;gap:7px;align-items:center;text-transform:none;letter-spacing:0;font-size:.8rem;font-weight:600;color:var(--navy);margin-top:9px;cursor:pointer}#grpMalha .checks input{width:auto;flex:0 0 auto;margin:0}
     body:not(.modo-usuario) .only-usuario{display:none!important}
     .welcome{position:absolute;top:10px;left:56px;z-index:445;background:#fff;border-radius:10px;box-shadow:0 6px 24px #0003;padding:10px 14px;font-size:.78rem;line-height:1.55;max-width:380px;border-left:4px solid var(--gold)}
     .welcome.off{display:none!important}
@@ -275,6 +276,10 @@
           <option value="CUSTOM">Período específico…</option>
         </select>
       </div>
+      <div class="form-group" id="grpMalha">
+        <label>Abrangência</label>
+        <div class="checks"><label title="Considera só registros a até 300 m de um trecho calibrado do PLANO_RODOVIARIO"><input type="checkbox" id="chkMalha" checked> Somente registros na malha PMRv</label></div>
+      </div>
       <div class="form-group" id="divCustomHora" hidden>
         <label>Da hora … até a hora</label>
         <div class="time-range"><select id="horaIni" aria-label="Hora inicial"></select><span>até</span><select id="horaFim" aria-label="Hora final"></select></div>
@@ -294,7 +299,6 @@
           <label><input type="checkbox" id="chkGravidade" checked> Gravidade × volume de registros STV</label>
           <label><input type="checkbox" id="chkRecente" checked> Ponderação recente (w₂₀₂₆ = <span id="lblPeso">0,6</span>) nos últimos
             <select id="selJanela"><option value="0">30</option><option value="1">60</option><option value="2" selected>90</option></select> dias</label>
-          <label title="Considera só registros a até 300 m de um trecho do PLANO_RODOVIARIO"><input type="checkbox" id="chkMalha" checked> Somente registros na malha PMRv (km do plano rodoviário)</label>
           <label title="Tira da rota os pontos que o ST-DBSCAN classifica como controlados"><input type="checkbox" id="chkAtivos" checked> Rota só com pontos ativos (ST-DBSCAN)</label>
         </div>
       </div>
@@ -1345,10 +1349,16 @@
 
     function calibrado() { return !!(RESULT && RESULT.calibracao && RESULT.calibracao.ok); }
     /** Registros considerados: todos, ou só os projetados sobre a malha do plano rodoviário. */
+    function activeMaskInd(c) { return indSel()[c.t || 0]; }   // indicador marcado (sem o filtro da malha)
     function activeCells() { const m = activeMask(); return RESULT.cells.filter((c,i) => m[i]); }
     function analyze(withRoute) {
       if (!RESULT || !RESULT.cells.length) return;
       const R = radius(), cells = RESULT.act = activeCells();
+      if (!cells.length && $('chkMalha').checked && calibrado() && RESULT.cells.some((c,i) => activeMaskInd(c))) {
+        $('chkMalha').checked = false;
+        notice('<strong>Malha PMRv:</strong> nenhum registro desta área está sobre os trechos já calibrados do plano rodoviário. A opção “Somente registros na malha PMRv” foi desmarcada e a rota usa todos os registros da área.');
+        return retrain(false);
+      }
       if (!cells.length) { clearMap(); $('viewbar').style.display='flex'; notice('<strong>Malha:</strong> nenhum registro desta área está a até 300 m dos trechos calibrados do plano rodoviário. Desmarque “Somente na malha PMRv” para ver todos.'); INC=[]; PRED=[]; ROUTE=null; return; }
       G_HOURS = new Array(24).fill(0); G_DAYS = new Array(7).fill(0);
       cells.forEach(c => { if (c.h) c.h.forEach((v,i)=>G_HOURS[i]+=v); if (c.w) c.w.forEach((v,i)=>G_DAYS[i]+=v); });

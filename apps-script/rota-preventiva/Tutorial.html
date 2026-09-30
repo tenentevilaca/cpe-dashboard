@@ -222,6 +222,7 @@
           <p>Ao abrir o aplicativo, qualquer pessoa entra no <b>ambiente do efetivo</b>. Ele é simples de propósito:</p>
           <ul>
             <li>escolha a fração e o horário. A <b>Cia</b> (ou o município) é obrigatória; pelotão e grupamento são opcionais;</li>
+            <li>em <b>Abrangência</b>, “Somente registros na malha PMRv” limita a rota aos registros sobre os trechos já calibrados do plano rodoviário. Desmarque para usar todos os registros da área. Se a área ainda não tiver nenhum registro na malha calibrada, o aplicativo desmarca a opção sozinho e avisa, para a rota não ficar vazia;</li>
             <li>clique em <span class="ui gold">📋 Gerar cartão programa</span>;</li>
             <li>o mapa mostra só a rota do dia, e o painel abre o <b>Cartão programa</b> com as paradas, horários, links do Google Maps e do Waze e o botão <span class="ui">🖨 Imprimir</span>.</li>
           </ul>
@@ -298,7 +299,7 @@
       <ul>
         <li><b>Gravidade × volume</b>: usa a gravidade do registro, quando a base tiver essa coluna. Hoje a DADOS_STV não tem, então esse marcador não altera o resultado.</li>
         <li><b>Ponderação recente (w₂₀₂₆ = 0,6)</b>: dá peso 0,6 aos acidentes dos últimos <b>30, 60 ou 90 dias</b> (você escolhe) e 0,4 aos demais.</li>
-        <li><b>Somente acidentes na malha PMRv</b>: restringe análise, predição e rota aos acidentes projetados sobre o plano rodoviário. Só fica ativo depois da calibração.</li>
+        <li><b>Somente registros na malha PMRv</b> (grupo <b>Abrangência</b>, visível também para o efetivo): restringe análise, predição e rota aos registros projetados sobre o plano rodoviário. Só fica ativo depois da calibração. Sem nenhum registro na malha calibrada da área, é desmarcado automaticamente, com aviso.</li>
         <li><b>Rota só com pontos ativos (ST-DBSCAN)</b>: tira da rota os pontos classificados como <b>controlados</b> (seção 19).</li>
       </ul>
       <p>Os dois marcadores de ponderação valem para a <b>regra w₂₀₂₆</b>. Os modelos de aprendizagem de máquina aprendem sozinhos quanto pesa o que é recente.</p>
