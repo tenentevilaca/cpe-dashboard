@@ -119,10 +119,10 @@
     .ex-pt{display:grid;grid-template-columns:24px 1fr auto;gap:6px;align-items:start;padding:6px 0;border-bottom:1px dashed var(--line)}
     .ex-pt .num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;font-weight:800;color:#fff;background:#94a3b8}
     .ex-act{display:flex;flex-direction:column;gap:3px}
-    .num.ex-ok,.ex-icon.ex-ok{background:#16a34a}.num.ex-no,.ex-icon.ex-no{background:#2563eb}.num.ex-parcial,.ex-icon.ex-parcial{background:#d97706}.num.ex-nao,.ex-icon.ex-nao{background:#dc2626}
+    .num.ex-ok,.ex-icon.ex-ok{background:#16a34a}.num.ex-no,.ex-icon.ex-no{background:#2563eb}.num.ex-parcial,.ex-icon.ex-parcial{background:#d97706}.num.ex-nao,.ex-icon.ex-nao{background:#dc2626}.num.ex-nc,.ex-icon.ex-nc{background:#9333ea}
     .ex-icon{background:#94a3b8;color:#fff;border:2px solid #fff;border-radius:50%;font:800 11px/20px Arial,sans-serif;text-align:center;box-shadow:0 1px 5px #0008}
     .ex-car{font-size:20px;line-height:26px;text-align:center;filter:drop-shadow(0 1px 2px #0008)}
-    .ex-chip{font-size:.64rem;font-weight:800;padding:1px 6px;border-radius:9px;background:#e2e8f0;white-space:nowrap}.ex-chip.ex-ok{background:#dcfce7;color:#166534}.ex-chip.ex-no{background:#dbeafe;color:#1e40af}.ex-chip.ex-parcial{background:#fef3c7;color:#92400e}.ex-chip.ex-nao{background:#fee2e2;color:#991b1b}
+    .ex-chip{font-size:.64rem;font-weight:800;padding:1px 6px;border-radius:9px;background:#e2e8f0;white-space:nowrap}.ex-chip.ex-ok{background:#dcfce7;color:#166534}.ex-chip.ex-no{background:#dbeafe;color:#1e40af}.ex-chip.ex-parcial{background:#fef3c7;color:#92400e}.ex-chip.ex-nao{background:#fee2e2;color:#991b1b}.ex-chip.ex-nc{background:#f3e8ff;color:#6b21a8}
     .g-plan.sel{border-color:#0f766e;box-shadow:0 0 0 2px #0f766e33}
     .g-nav button{font-size:.66rem}
     .preview-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:460;background:#111827;color:#fff;border-radius:20px;padding:6px 8px 6px 14px;font-size:.74rem;font-weight:700;display:flex;gap:10px;align-items:center;box-shadow:0 4px 14px #0005;white-space:nowrap}
@@ -2032,7 +2032,7 @@
      * Execução da rota: o efetivo cumpre o cartão programa com o GPS;
      * o gestor acompanha ao vivo e audita depois.
      * ===================================================================== */
-    const EXR = 300, EXSAI = 600;          // chegada: a até 300 m do ponto; saída: além de 600 m
+    const EXR = 300, EXSAI = 600, EXMAN = 400;   // chegada automática: 300 m; saída: além de 600 m; "Cheguei": só com GPS a até 400 m
     let EXS = null, EXF = false, EXTIMER = null, EXLAST = 0, EXWATCH = null;
     const hhmm = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
     const hmToMs = (hm, base) => { if (!hm) return null; const [h,m] = hm.split(':').map(Number), d = new Date(base || Date.now()); d.setHours(h, m, 0, 0); return d.getTime(); };
@@ -2112,24 +2112,53 @@
     /** Atualiza o estado de cada ponto; true se algo mudou. */
     function exAvaliar() {
       if (!EXS || !EXS.pos) return false;
-      const now = Date.now(), p = [EXS.pos[0], EXS.pos[1]], okGps = EXS.pos[2] <= 250; let mud = false;
+      const now = Date.now(), p = [EXS.pos[0], EXS.pos[1]], okGps = EXS.pos[2] <= 250 && now - EXS.pos[3] <= 90000; let mud = false;   // só leitura recente comprova presença
       EXS.paradas.forEach(q => {
         const d = hav(p, [q.la, q.lo]);
-        if (q.st === 'pend' && okGps && d <= EXR) { q.st = q.tp === 'p' || !q.pm ? 'ok' : 'no'; q.c = hhmm(now); q.cT = now; q.d = Math.round(d); q.m = 'g'; mud = true; }
-        if ((q.st === 'no' || (q.st === 'ok' && q.cT && !q.s)) && okGps && d > EXSAI) { q.s = hhmm(now); q.sT = now; if (q.st === 'no') q.st = (now - q.cT) >= 0.8*q.pm*60000 ? 'ok' : 'parcial'; mud = true; }
-        if (q.st === 'no' && now - q.cT >= q.pm*60000) { q.st = 'ok'; mud = true; }   // permanência cumprida (ainda no ponto)
+        if (q.st === 'pend' && okGps && d <= EXR) { exChegou(q, now, p, EXS.pos[2], d, 'g'); mud = true; }
+        // presença no ponto só conta com leitura de GPS (tela travada = sem leituras = permanência não comprovada)
+        if (q.cT && !q.s && okGps && d <= EXSAI) { q.vT = now; q.pr = Math.round((q.vT - q.cT)/60000); }
+        if ((q.st === 'no' || (q.st === 'ok' && q.cT && !q.s)) && okGps && d > EXSAI) { q.s = hhmm(now); q.sT = now; exFechaPerm(q); mud = true; }
+        if (q.st === 'no' && q.pr >= q.pm) { q.st = 'ok'; mud = true; }   // permanência cumprida e comprovada (ainda no ponto)
       });
       if (mud) exSave();
       return mud;
     }
-    /** Chegada/saída manual (sem GPS ou GPS impreciso): registra a distância do último GPS, para a auditoria. */
+    /** Registra a chegada com a posição GPS do momento (o servidor confere a distância de novo). */
+    function exChegou(q, now, p, acc, d, modo) {
+      q.st = q.tp === 'p' || !q.pm ? 'ok' : 'no'; q.c = hhmm(now); q.cT = now; q.vT = now; q.pr = 0;
+      q.d = Math.round(d); q.m = modo; q.gp = [+p[0].toFixed(5), +p[1].toFixed(5), Math.round(acc)];
+    }
+    /** Situação final de um ponto base: permanência comprovada pelo GPS (não pelo relógio). */
+    function exFechaPerm(q) { if (q.st === 'no') q.st = !q.pm || (q.pr || 0) >= 0.8*q.pm ? 'ok' : 'parcial'; }
+    /**
+     * "Cheguei": só aceita com uma leitura de GPS feita agora, a até 400 m do ponto e com boa precisão.
+     * Sem GPS, a chegada pode ser registrada com justificativa, mas fica NÃO COMPROVADA e não conta como cumprida.
+     */
     function exManual(i, tipo) {
       const q = EXS && EXS.paradas[i]; if (!q) return;
-      const now = Date.now(), d = EXS.pos ? Math.round(hav([EXS.pos[0], EXS.pos[1]], [q.la, q.lo])) : 0;
-      if (tipo === 'c') { if (d > 2000 && !confirm('O último GPS está a '+km(d)+' deste ponto. Registrar a chegada mesmo assim? A distância fica registrada para a auditoria.')) return;
-        q.st = q.tp === 'p' || !q.pm ? 'ok' : 'no'; q.c = hhmm(now); q.cT = now; q.d = d; q.m = 'm'; }
-      else { q.s = hhmm(now); q.sT = now; if (q.st === 'no') q.st = (now - q.cT) >= 0.8*q.pm*60000 ? 'ok' : 'parcial'; }
-      exSave(); exEnviar(); exDesenhar(); renderPanel();
+      if (tipo === 's') { const now = Date.now(); q.s = hhmm(now); q.sT = now; exFechaPerm(q); exSave(); exEnviar(); exDesenhar(); renderPanel(); return; }
+      const semGps = motivo => {
+        const j = prompt('Não foi possível comprovar a chegada pelo GPS ('+motivo+').\n\nSe precisar registrar mesmo assim, descreva o motivo. O ponto ficará como NÃO COMPROVADO e não conta como cumprido:');
+        if (!j || !j.trim()) return;
+        const now = Date.now(); q.st = 'nc'; q.c = hhmm(now); q.cT = now; q.m = 'j'; q.j = j.trim().slice(0, 200); q.d = 0; delete q.gp;
+        exSave(); exEnviar(); exDesenhar(); renderPanel();
+      };
+      const confere = (p, acc) => {
+        const d = hav(p, [q.la, q.lo]), now = Date.now();
+        if (q.st !== 'pend') { renderPanel(); return; }          // o próprio GPS já registrou a chegada
+        if (acc > 250) return alert('GPS impreciso agora (±'+Math.round(acc)+' m). Aguarde alguns segundos em céu aberto e tente de novo.');
+        if (d > EXMAN) return alert('Chegada não registrada: você está a '+km(d)+' de "'+q.n+'". A chegada só é aceita a até '+EXMAN+' m do ponto.');
+        exChegou(q, now, p, acc, d, 'b'); exSave(); exEnviar(); exDesenhar(); renderPanel();
+      };
+      // leitura contínua do GPS de no máximo 60 s vale como prova; sem ela, pede uma leitura nova
+      if (EXS.pos && Date.now() - EXS.pos[3] <= 60000) return confere([EXS.pos[0], EXS.pos[1]], EXS.pos[2]);
+      if (!navigator.geolocation) return semGps('aparelho sem GPS');
+      loading(true, 'Conferindo sua posição pelo GPS...');
+      navigator.geolocation.getCurrentPosition(pos => {
+        loading(false); exPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        confere([pos.coords.latitude, pos.coords.longitude], pos.coords.accuracy);
+      }, err => { loading(false); semGps(err.code === 1 ? 'permissão de localização negada' : err.code === 3 ? 'o GPS não respondeu a tempo' : 'sem sinal de GPS'); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
     }
     /** Próximo ponto e orientação de horário: adiantar, manter ou segurar o ritmo. */
     function exConselho() {
@@ -2150,12 +2179,13 @@
       const a = EXS.paradas.filter(q => q.cT && (q.hi || q.pcT)).map(q => (q.cT - (q.hi ? hmToMs(q.hi, q.cT) : q.pcT))/60000);
       return a.length ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : null;
     }
+    function exPayload(q) { const o = { st: q.st, c: q.c, s: q.s, d: q.d, m: q.m, pr: q.pr || 0 }; if (q.gp) o.gp = q.gp; if (q.j) o.j = q.j; return o; }
     function exEnviar(fim) {
       if (!EXS) return Promise.resolve();
       EXLAST = Date.now();
       const c = exConselho(), atraso = fim ? exAtrasoMedio() : (c && c.folga != null ? -c.folga : exAtrasoMedio());
       const payload = { id: EXS.id, pos: EXS.pos ? EXS.pos.slice(0,3) : null, atraso, km: +EXS.km.toFixed(1),
-        paradas: EXS.paradas.map(q => ({ st: q.st, c: q.c, s: q.s, d: q.d, m: q.m })) };
+        paradas: EXS.paradas.map(exPayload) };
       const mudou = JSON.stringify(payload.paradas) !== EXS.ultEnv;
       if (fim || mudou) payload.trilha = encPoly(EXS.trilha.concat(EXS.pos ? [[EXS.pos[0], EXS.pos[1]]] : []));
       if (fim) payload.fim = true;
@@ -2167,7 +2197,7 @@
       const pend = EXS.paradas.filter(q => q.st === 'pend').length;
       if (!confirm(pend ? 'Encerrar com '+pend+' ponto(s) não cumprido(s)?' : 'Encerrar o patrulhamento?')) return;
       const now = Date.now();
-      EXS.paradas.forEach(q => { if (q.st === 'pend') q.st = 'nao'; else if (q.st === 'no') { q.s = hhmm(now); q.st = (now - q.cT) >= 0.8*q.pm*60000 ? 'ok' : 'parcial'; } });
+      EXS.paradas.forEach(q => { if (q.st === 'pend') q.st = 'nao'; else if (q.st === 'no') { q.s = hhmm(now); exFechaPerm(q); } });
       loading(true, 'Encerrando o patrulhamento...');
       const fimEx = EXS;
       exEnviar(true).then(() => {
@@ -2182,15 +2212,16 @@
     function exReenviarPendente() {
       let p = null; try { p = JSON.parse(localStorage.getItem('rpExecPend') || 'null'); } catch (e) {}
       if (!p) return;
-      run('execAtualizar', { id: p.id, fim: true, atraso: null, km: +p.km.toFixed(1), trilha: encPoly(p.trilha), paradas: p.paradas.map(q => ({ st: q.st, c: q.c, s: q.s, d: q.d, m: q.m })) })
+      run('execAtualizar', { id: p.id, fim: true, atraso: null, km: +p.km.toFixed(1), trilha: encPoly(p.trilha), paradas: p.paradas.map(exPayload) })
         .then(r => { if (r && r.ok) try { localStorage.removeItem('rpExecPend'); } catch (e) {} }).catch(() => {});
     }
-    const EXST = { pend:['⬜','pendente'], no:['🔵','no ponto'], ok:['✅','cumprido'], parcial:['🟡','parcial'], nao:['❌','não cumprido'] };
+    const EXST = { pend:['⬜','pendente'], no:['🔵','no ponto'], ok:['✅','cumprido'], parcial:['🟡','parcial'], nao:['❌','não cumprido'], nc:['⚠️','não comprovado'] };
     function exChip(st) { const x = EXST[st] || EXST.pend; return '<span class="ex-chip ex-'+st+'">'+x[0]+' '+x[1]+'</span>'; }
     function exParadaTxt(q) {
       return (q.tp === 'b' ? 'Base de operação' : q.tp === 'o' ? 'Posto de operação' : 'Passagem')+(q.op ? ' · '+esc(q.op) : '')+
         (q.hi ? ' · <b>'+q.hi+(q.hf ? '–'+q.hf : '')+'</b>' : ' · chegada prevista '+esc(q.pc))+(q.pm && !q.hi ? ' · permanência '+minTxt(q.pm) : '')+
-        (q.c ? '<br>Chegada '+q.c+(q.s ? ' · saída '+q.s : '')+(q.m === 'm' ? ' · <i>registro manual'+(q.d ? ' a '+km(q.d) : '')+'</i>' : '') : '');
+        (q.c ? '<br>Chegada '+q.c+(q.s ? ' · saída '+q.s : '')+(q.pm && q.st !== 'nc' ? ' · permanência comprovada '+minTxt(q.pr || 0) : '')+
+          (q.m === 'b' ? ' · <i>botão Cheguei com GPS a '+km(q.d)+'</i>' : '')+(q.j ? ' · <i>sem GPS: “'+esc(q.j)+'”</i>' : '')+(q.inv ? ' · <b style="color:#b91c1c">rejeitado pelo servidor: '+esc(q.inv)+'</b>' : '') : '');
     }
     /** Bloco de execução no cartão programa. */
     function execHtml() {
@@ -2206,7 +2237,7 @@
         return '<form class="ex-box g-form no-print" onsubmit="exIniciar(event)"><b>Iniciar patrulhamento</b>'+
           '<label>Viatura (prefixo)<input id="exViat" value="'+esc(pre.viatura||'')+'" maxlength="30" required></label>'+
           '<label>Responsável (posto/graduação, nome, nº PM)<input id="exResp" value="'+esc(pre.resp||'')+'" maxlength="60" required></label>'+
-          '<small class="muted">Mantenha esta tela aberta durante o patrulhamento: o GPS marca a chegada (a até '+EXR+' m) e a saída de cada ponto. Sem GPS, use os botões Cheguei/Saí.</small>'+
+          '<small class="muted">Mantenha esta tela aberta durante o patrulhamento: o GPS marca a chegada (a até '+EXR+' m) e a saída de cada ponto, e só conta a permanência enquanto confirma a viatura no local. O botão Cheguei também confere o GPS (a até '+EXMAN+' m).</small>'+
           '<div class="btn-row"><button class="btn-sm gm" type="submit">▶ Iniciar</button><button class="btn-sm ghost" type="button" onclick="EXF=false;renderPanel()">Cancelar</button></div></form>';
       }
       const n = EXS.paradas.length, ok = EXS.paradas.filter(q => q.st === 'ok').length, par = EXS.paradas.filter(q => q.st === 'parcial').length, c = exConselho(), now = Date.now();
@@ -2229,8 +2260,8 @@
         '<div class="ex-bar"><i style="width:'+Math.round(100*ok/n)+'%"></i></div><small>'+ok+' de '+n+' cumprido(s)'+(par?' · '+par+' parcial(is)':'')+' · '+fmt(EXS.km,1)+' km'+
         (semGps ? ' · <b style="color:#b91c1c">sem GPS recente</b>' : ' · GPS ±'+EXS.pos[2]+' m')+(EXS.pend ? ' · <b>sem sinal: dados guardados, reenvio automático</b>' : '')+'</small>'+guia+
         EXS.paradas.map((q,i) => '<div class="ex-pt"><div class="num ex-'+q.st+'">'+(i+1)+'</div><div><b>'+esc(q.n)+'</b> '+exChip(q.st)+'<br><small>'+exParadaTxt(q)+'</small></div><div class="ex-act">'+
-          (q.st === 'pend' ? '<button class="btn-sm ghost" type="button" onclick="exManual('+i+',\'c\')">Cheguei</button>' : '')+
-          ((q.st === 'no' || (q.cT && !q.s && q.tp !== 'p')) ? '<button class="btn-sm ghost" type="button" onclick="exManual('+i+',\'s\')">Saí</button>' : '')+
+          (q.st === 'pend' ? '<button class="btn-sm ghost" type="button" onclick="exManual('+i+',\'c\')" title="Confere a posição pelo GPS agora">Cheguei</button>' : '')+
+          ((q.st === 'no' || (q.cT && !q.s && q.tp !== 'p' && q.st !== 'nc')) ? '<button class="btn-sm ghost" type="button" onclick="exManual('+i+',\'s\')">Saí</button>' : '')+
           (q.st === 'pend' ? '<a class="btn-sm wz" target="_blank" rel="noopener" href="'+wazeUrl({lat:q.la,lng:q.lo})+'">Waze</a>' : '')+'</div></div>').join('')+
         '<div class="btn-row"><button class="btn-sm" type="button" onclick="exEnviar().then(renderPanel)">⟳ Enviar agora</button><button class="btn-sm danger ghost" type="button" onclick="exEncerrar()">■ Encerrar patrulhamento</button></div></div>';
     }
@@ -2303,7 +2334,7 @@
       if (!AUD || !AUD.linhas) return;
       const cab = ['data','inicio','fim','status','viatura','responsavel','cia','pelotao','grupamento','fonte','titulo','n_pontos','cumpridos','parciais','atraso_med_min','km','pontos'];
       const linhas = AUD.linhas.map(o => { let p = []; try { p = JSON.parse(o.paradas || '[]'); } catch (e) {}
-        return cab.slice(0,-1).map(k => k === 'status' && naoEncerrada(o) ? 'não encerrada' : ['pelotao','grupamento'].includes(k) ? ultimo(o[k]) : o[k]).concat([p.map((q,i) => (i+1)+'. '+q.n+' ['+(EXST[q.st]||EXST.pend)[1]+(q.c?' '+q.c:'')+(q.s?'-'+q.s:'')+(q.m==='m'?' manual':'')+']').join(' | ')]); });
+        return cab.slice(0,-1).map(k => k === 'status' && naoEncerrada(o) ? 'não encerrada' : ['pelotao','grupamento'].includes(k) ? ultimo(o[k]) : o[k]).concat([p.map((q,i) => (i+1)+'. '+q.n+' ['+(EXST[q.st]||EXST.pend)[1]+(q.c?' '+q.c:'')+(q.s?'-'+q.s:'')+(q.m==='b'?' botão Cheguei':'')+(q.j?' sem GPS: '+q.j:'')+(q.inv?' REJEITADO: '+q.inv:'')+']').join(' | ')]); });
       const csv = [cab].concat(linhas).map(r => r.map(x => '"'+String(x == null ? '' : x).replace(/"/g,'""')+'"').join(';')).join('\r\n');
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'}));
       a.download = 'auditoria_rotas_'+AUD.de+'_'+AUD.ate+'.csv'; document.body.appendChild(a); a.click(); a.remove();
@@ -2315,11 +2346,12 @@
       if (!a.linhas) return h + '<p class="muted">Carregando…</p>';
       const L_ = a.linhas, np = L_.reduce((s,o) => s + (+o.n_pontos||0), 0), ok = L_.reduce((s,o) => s + (+o.cumpridos||0), 0), par = L_.reduce((s,o) => s + (+o.parciais||0), 0);
       const enc = L_.filter(o => o.status === 'encerrada').length, ne = L_.filter(naoEncerrada).length;
-      h += '<div class="g-box"><b>'+L_.length+'</b> patrulhamento(s) · <b>'+(np ? Math.round(100*ok/np) : 0)+'%</b> dos pontos cumpridos'+(par ? ' ('+par+' parciais)' : '')+'<br>'+enc+' encerrado(s)'+(ne ? ' · <b style="color:#b91c1c">'+ne+' não encerrado(s)</b>' : '')+(a.truncado ? '<br><small>Mostrando os 3.000 mais recentes de '+a.total+'.</small>' : '')+'</div>';
+      const ncDe = o => { try { return JSON.parse(o.paradas || '[]').filter(q => q.st === 'nc').length; } catch (e) { return 0; } }, nc = L_.reduce((s,o) => s + ncDe(o), 0);
+      h += '<div class="g-box"><b>'+L_.length+'</b> patrulhamento(s) · <b>'+(np ? Math.round(100*ok/np) : 0)+'%</b> dos pontos cumpridos'+(par ? ' ('+par+' parciais)' : '')+(nc ? ' · <b style="color:#6b21a8">'+nc+' não comprovado(s)</b>' : '')+'<br>'+enc+' encerrado(s)'+(ne ? ' · <b style="color:#b91c1c">'+ne+' não encerrado(s)</b>' : '')+(a.truncado ? '<br><small>Mostrando os 3.000 mais recentes de '+a.total+'.</small>' : '')+'</div>';
       return h + (L_.length ? L_.slice().reverse().map(o => { const pct = +o.n_pontos ? Math.round(100*(+o.cumpridos)/(+o.n_pontos)) : 0, stt = o.status === 'encerrada' ? ['vig','encerrado'] : naoEncerrada(o) ? ['pausado','não encerrado'] : ['prog','em andamento'];
         return '<div class="g-plan"><div class="g-plan-top"><b>'+dataBR(o.data)+' '+esc(o.inicio)+(o.fim?'–'+esc(o.fim):'')+' · 🚓 '+esc(o.viatura)+'</b><span class="g-st '+stt[0]+'">'+stt[1]+'</span></div>'+
           '<small>'+esc(o.responsavel)+' · '+esc(escopoTxt(o))+' · '+(o.fonte === 'gestor' ? 'rota do gestor: '+esc(o.titulo) : 'rota do sistema')+'<br>'+
-          '<b>'+o.cumpridos+'/'+o.n_pontos+'</b> cumprido(s) ('+pct+'%)'+(+o.parciais ? ' · '+o.parciais+' parcial(is)' : '')+' · '+fmt(+o.km||0,1)+' km'+(o.atraso_med_min !== '' ? ' · '+atrasoTxt(o.atraso_med_min)+' em média' : '')+'</small>'+
+          '<b>'+o.cumpridos+'/'+o.n_pontos+'</b> cumprido(s) ('+pct+'%)'+(+o.parciais ? ' · '+o.parciais+' parcial(is)' : '')+(ncDe(o) ? ' · <b style="color:#6b21a8">'+ncDe(o)+' não comprovado(s)</b>' : '')+' · '+fmt(+o.km||0,1)+' km'+(o.atraso_med_min !== '' ? ' · '+atrasoTxt(o.atraso_med_min)+' em média' : '')+'</small>'+
           '<div class="btn-row"><button class="btn-sm ghost" type="button" onclick="gAuditVer(\''+esc(o.id)+'\')">Ver no mapa</button></div></div>'; }).join('')
         : '<p class="muted">Nenhum patrulhamento no período.</p>');
     }

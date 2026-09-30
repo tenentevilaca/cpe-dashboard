@@ -27,8 +27,9 @@ As colunas são achadas pelo cabeçalho ou pelo conteúdo. RPM e Cia só aceitam
 
 ## Funcionalidades
 - **Cumprimento da rota**: o efetivo inicia o patrulhamento no cartão programa; o GPS marca chegada/saída de cada ponto
-  (300 m / 600 m), com permanência cumprida ou parcial, orientação adiantado/no horário/atrasado e registro manual
-  (Cheguei/Saí). Funciona sem sinal (reenvio automático) e retoma após recarregar.
+  (300 m / 600 m), com permanência comprovada pelo GPS (tela travada não conta), orientação adiantado/no horário/atrasado.
+  "Cheguei" só aceita com GPS a até 400 m; o servidor revalida cada chegada (≤ 500 m, boa precisão) e marca "não
+  comprovado" o que não passar; sem GPS, só com justificativa (não conta como cumprido). Funciona sem sinal (reenvio automático) e retoma após recarregar.
 - **Acompanhamento e auditoria** (Gestão): patrulhamentos ao vivo na área do gestor (posição via cache, sem gravar na
   planilha) e auditoria por período (cumprimento, atraso, km, trajeto no mapa, CSV). Aba oculta `_EXECUCOES` com uma
   linha (~2 KB) por patrulhamento; gatilho mensal arquiva o que tem mais de 3 meses em planilhas anuais.

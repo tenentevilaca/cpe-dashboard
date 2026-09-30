@@ -1927,8 +1927,25 @@ const EXEC = {
   RETENCAO_MESES: 3,    // meses mantidos nesta planilha; o restante vai para o arquivo anual
   LIVE_S: 21600,        // posição ao vivo no cache (renovada a cada envio)
   MAX_PARADAS: 25,
-  MAX_TRILHA: 4000      // caracteres da trilha (polilinha codificada; ~1 ponto a cada 3 min)
+  MAX_TRILHA: 4000,     // caracteres da trilha (polilinha codificada; ~1 ponto a cada 3 min)
+  TOL_CHEGADA_M: 500,   // o servidor só aceita chegada com GPS a até esta distância do ponto
+  TOL_PRECISAO_M: 300   // e com precisão do GPS melhor que isto
 };
+
+/**
+ * Validação no servidor (não depende do aparelho): chegada só vale com a posição GPS do momento da chegada
+ * perto do ponto e com boa precisão. Caso contrário o ponto fica "nc" (não comprovado) e não conta como cumprido.
+ */
+function validaParada_(ref, x) {
+  if (!ref || ['ok', 'parcial', 'no'].indexOf(x.st) < 0) return x;
+  const gp = x.gp;
+  const dist = gp ? Math.round(distM_([gp[0], gp[1]], [ref.la, ref.lo])) : null;
+  if (dist === null || dist > EXEC.TOL_CHEGADA_M || gp[2] > EXEC.TOL_PRECISAO_M) {
+    x.st = 'nc';
+    x.inv = dist === null ? 'sem posição GPS na chegada' : dist > EXEC.TOL_CHEGADA_M ? 'GPS a ' + dist + ' m do ponto' : 'GPS impreciso (±' + gp[2] + ' m)';
+  } else { x.d = dist; delete x.inv; }
+  return x;
+}
 
 function execSheet_() { return gestaoSheet_(EXEC.SHEET, EXEC.COLS); }
 function execAppend_(sh, obj) {
@@ -1995,16 +2012,21 @@ function execAtualizar(d) {
   d = d || {};
   const id = execId_(d.id); if (!id) return { ok: false, motivo: 'Execução inválida.' };
   const cache = CacheService.getScriptCache(), now = Date.now();
-  const st = (d.paradas || []).slice(0, EXEC.MAX_PARADAS).map(p => ({
-    st: ['ok', 'parcial', 'pend', 'nao', 'no'].indexOf(p.st) >= 0 ? p.st : 'pend', c: horaOk_(p.c) ? p.c : '', s: horaOk_(p.s) ? p.s : '',
-    d: Math.max(0, Math.min(99999, Math.round(Number(p.d) || 0))), m: p.m === 'm' ? 'm' : p.m === 'g' ? 'g' : '' }));
+  const st = (d.paradas || []).slice(0, EXEC.MAX_PARADAS).map(p => {
+    const x = { st: ['ok', 'parcial', 'pend', 'nao', 'no', 'nc'].indexOf(p.st) >= 0 ? p.st : 'pend', c: horaOk_(p.c) ? p.c : '', s: horaOk_(p.s) ? p.s : '',
+      d: Math.max(0, Math.min(99999, Math.round(Number(p.d) || 0))), m: ['g', 'b', 'j'].indexOf(p.m) >= 0 ? p.m : '',
+      pr: Math.max(0, Math.min(1440, Math.round(Number(p.pr) || 0))) };   // pr = permanência comprovada pelo GPS (min)
+    if (Array.isArray(p.gp) && isFinite(Number(p.gp[0])) && isFinite(Number(p.gp[1]))) x.gp = [round_(Number(p.gp[0]), 5), round_(Number(p.gp[1]), 5), Math.round(Number(p.gp[2]) || 9999)];
+    if (p.j) x.j = limpa_(p.j, 200);   // justificativa de chegada sem GPS
+    return x;
+  });
   const atraso = d.atraso === null || d.atraso === undefined || !isFinite(Number(d.atraso)) ? null : Math.round(Number(d.atraso));
   const km = round_(Math.max(0, Math.min(2000, Number(d.km) || 0)), 1);
   let live = null; try { live = JSON.parse(cache.get('live_' + id) || 'null'); } catch (e) { live = null; }
   if (live) {
     live.t = now; live.atraso = atraso; live.km = km;
     if (d.pos && isFinite(Number(d.pos[0])) && isFinite(Number(d.pos[1]))) live.pos = [round_(Number(d.pos[0]), 5), round_(Number(d.pos[1]), 5), Math.round(Number(d.pos[2]) || 0)];
-    st.forEach((x, i) => { if (live.paradas[i]) Object.assign(live.paradas[i], x); });
+    st.forEach((x, i) => { if (live.paradas[i]) Object.assign(live.paradas[i], validaParada_(live.paradas[i], Object.assign({}, x))); });
     if (d.fim) live.fim = true;
     const refresh = !d.fim && now - (live.idxT || live.t0) > 3600e3;
     if (refresh) live.idxT = now;
@@ -2017,7 +2039,7 @@ function execAtualizar(d) {
       const sh = execSheet_(), r = execRow_(sh, id); if (!r) return false;
       const o = execObj_(sh.getRange(r, 1, 1, EXEC.COLS.length).getValues()[0]);
       let paradas = []; try { paradas = JSON.parse(o.paradas || '[]'); } catch (e) { paradas = []; }
-      st.forEach((x, i) => { if (paradas[i]) Object.assign(paradas[i], x); });
+      st.forEach((x, i) => { if (paradas[i]) { const v = validaParada_(paradas[i], Object.assign({}, x)); if (!v.inv) delete paradas[i].inv; Object.assign(paradas[i], v); } });
       o.paradas = JSON.stringify(paradas);
       o.cumpridos = paradas.filter(p => p.st === 'ok').length; o.parciais = paradas.filter(p => p.st === 'parcial').length;
       if (atraso !== null) o.atraso_med_min = atraso;

@@ -551,9 +551,10 @@
           <ul>
             <li>⬜ <b>pendente</b>;</li>
             <li>🔵 <b>no ponto</b>;</li>
-            <li>✅ <b>cumprido</b>: passagem registrada, ou permanência de pelo menos 80% do tempo previsto;</li>
+            <li>✅ <b>cumprido</b>: passagem registrada, ou permanência <b>comprovada pelo GPS</b> de pelo menos 80% do tempo previsto;</li>
             <li>🟡 <b>parcial</b>: saiu antes;</li>
-            <li>❌ <b>não cumprido</b>: não visitado até o encerramento.</li>
+            <li>❌ <b>não cumprido</b>: não visitado até o encerramento;</li>
+            <li>⚠️ <b>não comprovado</b>: chegada registrada sem prova de GPS (ver abaixo). <b>Não conta como cumprido.</b></li>
           </ul>
           <p>A barra mostra o progresso, os km percorridos e a precisão do GPS.</p>
           <p><b>Orientação de horário.</b> Ao iniciar, o aplicativo monta a previsão de chegada em cada ponto: tempo de deslocamento de cada trecho, horários do gestor (se chegar antes, aguarda) e permanência de cada posto. Durante o patrulhamento ele compara com a chegada estimada no próximo ponto:</p>
@@ -563,7 +564,13 @@
             <li>🔴 <b>Atrasado</b>: siga direto e, se possível, reduza a permanência nos próximos pontos.</li>
           </ul>
           <p>No ponto base, aparece também “permaneça até HH:MM”.</p>
-          <p><b>Sem GPS</b> (aparelho sem permissão ou sem sinal), use os botões <span class="ui">Cheguei</span> e <span class="ui">Saí</span>. O registro fica marcado como manual, com a distância do último GPS, para a auditoria.</p>
+          <p><b>O militar não consegue marcar chegada sem estar no ponto.</b></p>
+          <ul>
+            <li>O botão <span class="ui">Cheguei</span> confere o GPS na hora. Ele só registra se a viatura estiver a até <b>400 m</b> do ponto, com boa precisão. Longe do ponto, a chegada é recusada e aparece a distância.</li>
+            <li>A <b>permanência só conta enquanto o GPS confirma a viatura no local</b>. Se a tela for travada, o tempo sem leitura não é contado. Chegar, travar o celular e ir embora resulta em ponto <b>parcial</b>, não em cumprido.</li>
+            <li>O <b>servidor confere de novo</b> cada chegada com a posição GPS registrada naquele momento. Se a posição estiver a mais de 500 m do ponto, faltar ou for imprecisa, o ponto fica <b>não comprovado</b> e a auditoria mostra “rejeitado pelo servidor” e o motivo. Isso vale mesmo que alguém altere o aplicativo no aparelho.</li>
+            <li><b>Sem GPS</b> (permissão negada ou sem sinal), a chegada só pode ser registrada com uma <b>justificativa escrita</b>. Ela fica como ⚠️ não comprovada, com o texto visível na auditoria e no CSV.</li>
+          </ul>
           <p><b>Sem internet</b>, os dados ficam guardados no aparelho e são reenviados sozinhos quando o sinal volta. Recarregar a página ou fechar e abrir de novo retoma o patrulhamento.</p>
           <p>Ao terminar, clique em <span class="ui">■ Encerrar patrulhamento</span>.</p>
         </div>
