@@ -8,7 +8,7 @@ Painel que lê a aba **BADE SE DADOS** da planilha RAD e mostra:
 - **Dashboard visual**: indicadores (ordens, notas fiscais, valor aprovado, impostos, líquido, diferença),
   total por imposto, impostos por unidade, notas por alíquota, top 10 estabelecimentos e matriz alíquota × unidade.
 - **Filtros**: imposto, situação (com retenção / sem retenção / com diferença), alíquota, unidade,
-  optante Simples, responsável ISSQN e busca livre.
+  município, optante Simples, responsável ISSQN e busca livre.
 - **Tabela final** com todas as notas (ordenável e exportável em CSV).
 
 ## Como instalar

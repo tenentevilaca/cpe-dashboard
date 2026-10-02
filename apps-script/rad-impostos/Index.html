@@ -186,6 +186,10 @@
         <select id="fUnidade"><option value="">Todas</option></select>
       </div>
       <div class="f">
+        <label for="fMunicipio">Município</label>
+        <select id="fMunicipio"><option value="">Todos</option></select>
+      </div>
+      <div class="f">
         <label for="fSimples">Optante Simples</label>
         <select id="fSimples">
           <option value="">Todos</option><option value="Sim">Sim</option><option value="Não">Não</option>
@@ -347,6 +351,7 @@ function filtrar() {
   var sit = document.getElementById('fSituacao').value;
   var aliq = document.getElementById('fAliquota').value;
   var uni = document.getElementById('fUnidade').value;
+  var mun = document.getElementById('fMunicipio').value;
   var simp = document.getElementById('fSimples').value;
   var resp = document.getElementById('fResp').value;
   var q = document.getElementById('fBusca').value.trim().toLowerCase();
@@ -354,6 +359,7 @@ function filtrar() {
 
   return NOTAS.filter(function (n) {
     if (uni && n.unidade !== uni) return false;
+    if (mun && n.cidade !== mun) return false;
     if (simp && n.simples !== simp) return false;
     if (resp && (n.respIss || '(vazio)') !== resp) return false;
     if (q && n.busca.indexOf(q) < 0) return false;
@@ -387,15 +393,16 @@ function montarFiltros() {
   });
 
   preencher('fUnidade', unicos(NOTAS.map(function (n) { return n.unidade; })));
+  preencher('fMunicipio', unicos(NOTAS.map(function (n) { return n.cidade; })));
   preencher('fResp', unicos(NOTAS.map(function (n) { return n.respIss || '(vazio)'; })));
   montarAliquotas();
 
-  ['fSituacao', 'fAliquota', 'fUnidade', 'fSimples', 'fResp'].forEach(function (id) {
+  ['fSituacao', 'fAliquota', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp'].forEach(function (id) {
     document.getElementById(id).onchange = render;
   });
   document.getElementById('fBusca').oninput = render;
   document.getElementById('btnLimpar').onclick = function () {
-    ['fSituacao', 'fAliquota', 'fUnidade', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
+    ['fSituacao', 'fAliquota', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
       var el = document.getElementById(id); el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
     });
     state.imposto = 'todos';
@@ -407,7 +414,7 @@ function montarFiltros() {
 function unicos(arr) { return arr.filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
 function preencher(id, valores) {
   var el = document.getElementById(id);
-  el.innerHTML = '<option value="">' + (id === 'fResp' ? 'Todos' : 'Todas') + '</option>' +
+  el.innerHTML = '<option value="">' + (id === 'fResp' || id === 'fMunicipio' ? 'Todos' : 'Todas') + '</option>' +
     valores.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('');
 }
 function montarAliquotas() {
