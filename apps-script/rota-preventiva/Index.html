@@ -126,6 +126,11 @@
     .ex-chip{font-size:.64rem;font-weight:800;padding:1px 6px;border-radius:9px;background:#e2e8f0;white-space:nowrap}.ex-chip.ex-ok{background:#dcfce7;color:#166534}.ex-chip.ex-no{background:#dbeafe;color:#1e40af}.ex-chip.ex-parcial{background:#fef3c7;color:#92400e}.ex-chip.ex-nao{background:#fee2e2;color:#991b1b}.ex-chip.ex-nc{background:#f3e8ff;color:#6b21a8}
     .g-plan.sel{border-color:#0f766e;box-shadow:0 0 0 2px #0f766e33}
     .g-nav button{font-size:.66rem}
+    .stale-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:470;background:#fef3c7;color:#78350f;border:2px solid #f59e0b;border-radius:10px;padding:8px 12px;font-size:.78rem;box-shadow:0 4px 14px #0004;max-width:min(620px,calc(100% - 120px))}
+    .stale-bar[hidden]{display:none}.stale-bar button{margin-left:6px;border:0;border-radius:6px;background:#b45309;color:#fff;font-weight:800;padding:4px 10px;cursor:pointer}
+    .btn-action.pulse{animation:pulseBtn 1.2s ease-in-out infinite;box-shadow:0 0 0 3px #f59e0b}
+    @keyframes pulseBtn{50%{box-shadow:0 0 0 7px #f59e0b55}}
+    @media(max-width:820px){.stale-bar{left:8px;right:8px;transform:none;max-width:none}}
     .preview-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:460;background:#111827;color:#fff;border-radius:20px;padding:6px 8px 6px 14px;font-size:.74rem;font-weight:700;display:flex;gap:10px;align-items:center;box-shadow:0 4px 14px #0005;white-space:nowrap}
     .preview-bar[hidden]{display:none}.preview-bar button{border:0;border-radius:14px;background:var(--gold);color:#111827;font-weight:800;padding:5px 10px;cursor:pointer}
     .cp-head{border:2px solid var(--navy);border-radius:10px;padding:8px 10px;margin-bottom:8px}.cp-head h3{margin:0}
@@ -344,6 +349,7 @@
     <div class="map-wrap">
       <div id="map" aria-label="Mapa de pontos preditivos"></div>
       <div class="welcome only-usuario" id="welcome"><b>📋 Cartão programa</b><br>1. Escolha a sua <b>Cia</b> (e, se quiser, pelotão, grupamento, município e horário).<br>2. Clique em <b>Gerar cartão programa</b>.<br><small>A rota do dia aparece no mapa e no cartão. <b>Gestores</b>: entrem em <b>🛡 Gestão</b> para ver todas as opções (predição, síntese, rodovias, modelo, alertas e variáveis).</small></div>
+      <div class="stale-bar" id="staleBar" hidden></div>
       <div class="preview-bar" id="previewBar" hidden>👁 Ambiente do efetivo (visualização) <button type="button" onclick="gVoltarGestao()">↩ Voltar à Gestão</button></div>
       <section class="insight only-gestor" id="insight" aria-label="Síntese da fração">
         <header id="insightHead"><span id="insightTitle">Síntese da área</span><span>▾</span></header>
@@ -1089,6 +1095,7 @@
         else if (window.innerHeight < 800) toggleFiltros(false);   // notebook: mais espaço para o mapa
         RESULT = res; ROUTE = null; CURRENT = null; L_access.clearLayers();
         GPLANO = res && res.planoGestor || null; VER_SISTEMA = false;
+        GERADO_COM = chaveFiltros(); marcarDesatualizado();
         if (!gestorAtivo()) { MODE = 'rota'; ABRIR_ROTA = true; }
         if (PEND_DIA) { const d = PEND_DIA; PEND_DIA = null; AGUARDA_DIA = true;
           const fim = () => { AGUARDA_DIA = false; if (PRED.length) { buildRoute(); renderInsight(); } };
@@ -1746,6 +1753,17 @@
       return run('planoDoDia', Object.assign({}, selection(), data ? {data} : {})).then(r => {
         GPLANO = r; VER_SISTEMA = false; buildRoute(); renderInsight(); if ($('panel').classList.contains('open')) renderPanel();
       }).catch(()=>{});
+    }
+
+    /* ---------- filtros alterados depois da análise: o mapa ainda mostra o resultado anterior ---------- */
+    let GERADO_COM = null;
+    function chaveFiltros() { const tw = timeWindow(); return JSON.stringify([selection(), tw.start, tw.end]); }
+    function marcarDesatualizado() {
+      if (!RESULT || !GERADO_COM) return;
+      const velho = chaveFiltros() !== GERADO_COM;
+      $('btnGerar').classList.toggle('pulse', velho);
+      $('staleBar').hidden = !velho;
+      if (velho) $('staleBar').innerHTML = '⚠ O mapa ainda mostra <b>'+esc(RESULT.area)+'</b> ('+esc(RESULT.janela)+'). Você mudou os filtros: clique em <b>'+esc($('btnGerar').textContent.trim())+'</b> para atualizar. <button type="button" onclick="processRoute()">Atualizar agora</button>';
     }
 
     /* ---------- dois ambientes: efetivo (cartão programa) × gestão (todas as opções) ---------- */
@@ -2743,7 +2761,8 @@
     function clearFilters() { LEVELS.forEach(l => $(SEL[l]).value='TODOS'); refreshOptions(0); $('selectTurno').value='TODOS'; $('divCustomHora').hidden=true; }
     let tmr = null;
     function onRadius() { $('lblRaio').textContent = km(radius()); clearTimeout(tmr); tmr = setTimeout(() => { if (RESULT) analyze(false); }, 200); }
-    LEVELS.forEach((l,i) => $(SEL[l]).addEventListener('change', () => refreshOptions(i)));
+    LEVELS.forEach((l,i) => $(SEL[l]).addEventListener('change', () => { refreshOptions(i); marcarDesatualizado(); }));
+    ['selectTurno','horaIni','horaFim'].forEach(id => $(id).addEventListener('change', marcarDesatualizado));
     $('rangeRaio').addEventListener('input', onRadius);
     $('rangeRaio').addEventListener('change', () => { if (RESULT) { clearTimeout(tmr); analyze(true); } });
     $('selectTurno').addEventListener('change', e => { $('divCustomHora').hidden = e.target.value !== 'CUSTOM'; });
