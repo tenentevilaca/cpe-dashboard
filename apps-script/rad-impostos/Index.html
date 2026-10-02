@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Impostos — RAD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f1;
+    --surface: #fcfcfb;
+    --surface-2: #f0efec;
+    --border: #e2e1dc;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --muted: #7d7c77;
+    --grid: #e8e7e2;
+    --accent: #2a78d6;
+    --icms: #2a78d6;
+    --irpeca: #eb6834;
+    --irserv: #1baf7a;
+    --iss: #eda100;
+    --ok: #0f7b3e;
+    --ok-bg: #e3f3e8;
+    --bad: #b42318;
+    --bad-bg: #fdecea;
+    --warn: #8a5a00;
+    --warn-bg: #fdf3dc;
+    --hl: #eef4fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #33332f;
+      --text: #ffffff; --text-2: #c3c2b7; --muted: #8f8e86; --grid: #2c2c29;
+      --accent: #3987e5; --icms: #3987e5; --irpeca: #d95926; --irserv: #199e70; --iss: #c98500;
+      --ok: #5fd08e; --ok-bg: #16301f; --bad: #ff8a80; --bad-bg: #3a1a17;
+      --warn: #f2c04f; --warn-bg: #352a10; --hl: #1d2a3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #33332f;
+    --text: #ffffff; --text-2: #c3c2b7; --muted: #8f8e86; --grid: #2c2c29;
+    --accent: #3987e5; --icms: #3987e5; --irpeca: #d95926; --irserv: #199e70; --iss: #c98500;
+    --ok: #5fd08e; --ok-bg: #16301f; --bad: #ff8a80; --bad-bg: #3a1a17;
+    --warn: #f2c04f; --warn-bg: #352a10; --hl: #1d2a3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+  h2 { font-size: 15px; margin: 0 0 2px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Filtros */
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px; margin-bottom: 16px; position: sticky; top: 0; z-index: 5;
+  }
+  @media (max-width: 900px) { .filters { position: static; } }
+  .f { display: flex; flex-direction: column; gap: 4px; min-width: 140px; flex: 1 1 140px; }
+  .f.search { flex: 2 1 220px; }
+  .f label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
+  .f select, .f input {
+    font: inherit; font-size: 13px; padding: 7px 9px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); border-radius: 999px; padding: 5px 12px;
+    font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .chip .dot { width: 10px; height: 10px; border-radius: 3px; }
+  .chip[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+
+  /* KPIs */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .kpi .l { font-size: 12px; color: var(--text-2); }
+  .kpi .v { font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -.01em; }
+  .kpi .d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; min-width: 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .grid2 .card { margin-bottom: 0; }
+  .grid2 + .grid2, .grid2 + .card, .card + .grid2 { margin-top: 16px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .chart-box { position: relative; height: 280px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .tabs .chip { padding: 3px 10px; font-size: 12px; }
+
+  /* Tabelas */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; vertical-align: middle; }
+  th { background: var(--surface-2); color: var(--text-2); font-weight: 600; font-size: 12px; position: sticky; top: 0; }
+  td.n, th.n { text-align: right; }
+  td.wrap { white-space: normal; min-width: 160px; max-width: 240px; }
+  #tblCategorias th { white-space: normal; }
+  tbody tr:hover { background: var(--surface-2); }
+  tfoot td { font-weight: 600; background: var(--surface-2); border-bottom: 0; }
+  th.sort { cursor: pointer; user-select: none; }
+  th.sort:hover { color: var(--text); }
+  th .arr { color: var(--muted); font-size: 10px; margin-left: 3px; }
+  .cat { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .cat i { width: 10px; height: 10px; border-radius: 3px; }
+  td.hl, th.hl { background: var(--hl); }
+  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .tag.ok { color: var(--ok); background: var(--ok-bg); }
+  .tag.bad { color: var(--bad); background: var(--bad-bg); }
+  .tag.warn { color: var(--warn); background: var(--warn-bg); }
+  .neg { color: var(--bad); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .table-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .big-table { max-height: 620px; overflow: auto; }
+
+  .chart-tip {
+    position: absolute; pointer-events: none; background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12); opacity: 0; transition: opacity .1s; z-index: 10; white-space: nowrap;
+  }
+  .chart-tip b { display: block; margin-bottom: 3px; }
+  .chart-tip .row { display: flex; align-items: center; gap: 6px; }
+  .chart-tip .row i { width: 8px; height: 8px; border-radius: 2px; }
+
+  #loading { padding: 60px 0; text-align: center; color: var(--text-2); }
+  .empty { padding: 24px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Painel de Impostos — RAD</h1>
+      <div class="sub" id="origem">Carregando dados…</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="btnTema" title="Alternar tema claro/escuro">◐ Tema</button>
+      <button class="btn" id="btnAtualizar">↻ Atualizar dados</button>
+    </div>
+  </header>
+
+  <div id="loading">Carregando notas da planilha…</div>
+
+  <main id="app" hidden>
+    <!-- Filtros -->
+    <section class="filters" aria-label="Filtros">
+      <div class="chips" id="chipsImposto" role="group" aria-label="Imposto"></div>
+      <div class="f">
+        <label for="fSituacao">Situação do imposto</label>
+        <select id="fSituacao">
+          <option value="todas">Todas as notas</option>
+          <option value="com">Com retenção</option>
+          <option value="sem">Sem retenção</option>
+          <option value="div">Com diferença</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="fAliquota">Alíquota</label>
+        <select id="fAliquota"><option value="">Todas</option></select>
+      </div>
+      <div class="f">
+        <label for="fUnidade">Unidade</label>
+        <select id="fUnidade"><option value="">Todas</option></select>
+      </div>
+      <div class="f">
+        <label for="fSimples">Optante Simples</label>
+        <select id="fSimples">
+          <option value="">Todos</option><option value="Sim">Sim</option><option value="Não">Não</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="fResp">Responsável ISSQN</label>
+        <select id="fResp"><option value="">Todos</option></select>
+      </div>
+      <div class="f search">
+        <label for="fBusca">Buscar</label>
+        <input id="fBusca" type="search" placeholder="Placa, estabelecimento, NF, cidade…">
+      </div>
+      <button class="btn" id="btnLimpar">Limpar filtros</button>
+    </section>
+
+    <!-- KPIs -->
+    <section class="kpis" id="kpis"></section>
+
+    <!-- Diferenças por categoria -->
+    <section class="card">
+      <h2>Diferenças de imposto por categoria</h2>
+      <p class="hint">Valor informado na planilha × valor recalculado (base × alíquota). Base da peça = Valor a Pagar Peça + ICMS + IRRF; base do serviço = Valor Serviço + IRRF + ISSQN (quando o tomador retém).</p>
+      <div class="tbl-wrap">
+        <table id="tblCategorias">
+          <thead><tr>
+            <th>Imposto</th>
+            <th class="n">Notas com retenção</th>
+            <th class="n">Notas sem retenção</th>
+            <th>Alíquotas encontradas</th>
+            <th class="n">Base de cálculo</th>
+            <th class="n">Valor informado</th>
+            <th class="n">Valor recalculado</th>
+            <th class="n">Diferença</th>
+            <th class="n">Notas com diferença</th>
+            <th class="n">Alíquota efetiva</th>
+            <th class="n">Simples (Sim)</th>
+            <th class="n">Simples (Não)</th>
+            <th class="n">% do total</th>
+          </tr></thead>
+          <tbody></tbody>
+          <tfoot></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- Gráficos -->
+    <div class="grid2">
+      <section class="card">
+        <h2>Total retido por imposto</h2>
+        <p class="hint">Soma dos valores informados nas notas filtradas.</p>
+        <div class="chart-box" style="height:240px"><canvas id="chImposto"></canvas></div>
+      </section>
+      <section class="card">
+        <h2>Impostos por unidade</h2>
+        <p class="hint">Valor retido de cada imposto em cada unidade.</p>
+        <div class="legend" id="lgUnidade"></div>
+        <div class="chart-box" style="height:222px"><canvas id="chUnidade"></canvas></div>
+      </section>
+    </div>
+    <div class="grid2">
+      <section class="card">
+        <h2>Notas por alíquota</h2>
+        <p class="hint">Quantidade de notas em cada alíquota do imposto escolhido.</p>
+        <div class="tabs" id="tabsAliq"></div>
+        <div class="chart-box" style="height:250px"><canvas id="chAliquota"></canvas></div>
+      </section>
+      <section class="card">
+        <h2>Maiores retenções por estabelecimento</h2>
+        <p class="hint" id="hintEstab">Top 10 pelo total de impostos.</p>
+        <div class="chart-box" style="height:282px"><canvas id="chEstab"></canvas></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Alíquota × unidade</h2>
+      <p class="hint" id="hintMatriz">Quantidade de notas por alíquota em cada unidade.</p>
+      <div class="tbl-wrap"><table id="tblMatriz"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    </section>
+
+    <!-- Tabela final -->
+    <section class="card">
+      <div class="table-tools">
+        <div>
+          <h2>Notas</h2>
+          <div class="hint" style="margin:0" id="contTabela"></div>
+        </div>
+        <button class="btn primary" id="btnCsv">⬇ Exportar CSV</button>
+      </div>
+      <div class="tbl-wrap big-table">
+        <table id="tblNotas"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="chart-tip" id="tip"></div>
+
+<script>
+/* ---------------- Configuração ---------------- */
+var IMPOSTOS = [
+  { id: 'icms',   nome: 'ICMS',          cor: '--icms',   valor: 'icms',   aliq: 'pIcms',   base: 'basePeca', calc: 'cIcms' },
+  { id: 'irPeca', nome: 'IRRF Peça',     cor: '--irpeca', valor: 'irPeca', aliq: 'pIrPeca', base: 'basePeca', calc: 'cIrPeca' },
+  { id: 'irServ', nome: 'IRRF Serviço',  cor: '--irserv', valor: 'irServ', aliq: 'pIrServ', base: 'baseServ', calc: 'cIrServ' },
+  { id: 'iss',    nome: 'ISSQN',         cor: '--iss',    valor: 'iss',    aliq: 'pIss',    base: 'baseServ', calc: 'cIss' }
+];
+var TOLERANCIA = 0.05; // R$ — diferenças de arredondamento abaixo disso são ignoradas
+
+var state = { imposto: 'todos', aliqTab: 'iss', sort: { key: 'aprovado', dir: -1 } };
+var NOTAS = [];
+var charts = {};
+
+/* ---------------- Utilidades ---------------- */
+var brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+var int = new Intl.NumberFormat('pt-BR');
+function R(v) { return brl.format(v || 0); }
+function Rk(v) {
+  var a = Math.abs(v);
+  if (a >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi';
+  if (a >= 1e3) return 'R$ ' + (v / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil';
+  return R(v);
+}
+function P(v) { return (v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '%'; }
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function r2(v) { return Math.round(v * 100) / 100; }
+function imp(id) { for (var i = 0; i < IMPOSTOS.length; i++) if (IMPOSTOS[i].id === id) return IMPOSTOS[i]; }
+function impostosAtivos() { return state.imposto === 'todos' ? IMPOSTOS : [imp(state.imposto)]; }
+
+/* ---------------- Preparação dos dados ---------------- */
+function preparar(n) {
+  n.issRetido = n.respIss.toUpperCase() === 'TOMADOR' ? n.iss : 0;
+  n.basePeca = r2(n.vPeca + n.icms + n.irPeca);
+  n.baseServ = r2(n.vServ + n.irServ + n.issRetido);
+  // ICMS desonerado vem como texto na alíquota: usa a alíquota implícita para não acusar diferença falsa.
+  n.pIcmsEfetiva = n.icmsObs && n.basePeca ? r2(n.icms / n.basePeca * 100) : n.pIcms;
+  n.cIcms = n.icmsObs ? n.icms : r2(n.basePeca * n.pIcms / 100);
+  n.cIrPeca = r2(n.basePeca * n.pIrPeca / 100);
+  n.cIss = r2(n.baseServ * n.pIss / 100);
+  n.cIrServ = r2(n.baseServ * n.pIrServ / 100);
+  n.dIcms = r2(n.icms - n.cIcms);
+  n.dIrPeca = r2(n.irPeca - n.cIrPeca);
+  n.dIss = r2(n.iss - n.cIss);
+  n.dIrServ = r2(n.irServ - n.cIrServ);
+  n.totalImp = r2(n.icms + n.irPeca + n.irServ + n.issRetido);
+  n.cLiquido = r2(n.aprovado - n.totalImp);
+  n.dLiquido = r2(n.liquido - n.cLiquido);
+  n.temDif = [n.dIcms, n.dIrPeca, n.dIss, n.dIrServ, n.dLiquido].some(function (d) { return Math.abs(d) > TOLERANCIA; });
+  n.nNfs = (n.nfPeca ? 1 : 0) + (n.nfServ ? 1 : 0);
+  n.busca = [n.placa, n.estab, n.cidade, n.nfPeca, n.nfServ, n.cnpj, n.os, n.modelo, n.resp].join(' ').toLowerCase();
+  return n;
+}
+function dif(n, t) { return n['d' + t.id.charAt(0).toUpperCase() + t.id.slice(1)]; }
+function aliqDe(n, t) { return t.id === 'icms' ? n.pIcmsEfetiva : n[t.aliq]; }
+function rotuloAliq(n, t) { return t.id === 'icms' && n.icmsObs ? 'Desonerado' : P(n[t.aliq]); }
+
+/* ---------------- Filtros ---------------- */
+function filtrar() {
+  var sit = document.getElementById('fSituacao').value;
+  var aliq = document.getElementById('fAliquota').value;
+  var uni = document.getElementById('fUnidade').value;
+  var simp = document.getElementById('fSimples').value;
+  var resp = document.getElementById('fResp').value;
+  var q = document.getElementById('fBusca').value.trim().toLowerCase();
+  var ativos = impostosAtivos();
+
+  return NOTAS.filter(function (n) {
+    if (uni && n.unidade !== uni) return false;
+    if (simp && n.simples !== simp) return false;
+    if (resp && (n.respIss || '(vazio)') !== resp) return false;
+    if (q && n.busca.indexOf(q) < 0) return false;
+    if (aliq && state.imposto !== 'todos' && rotuloAliq(n, ativos[0]) !== aliq) return false;
+    if (sit === 'com' && !ativos.some(function (t) { return n[t.valor] > 0; })) return false;
+    if (sit === 'sem' && ativos.some(function (t) { return n[t.valor] > 0; })) return false;
+    if (sit === 'div') {
+      var temDif = ativos.some(function (t) { return Math.abs(dif(n, t)) > TOLERANCIA; }) ||
+                   (state.imposto === 'todos' && Math.abs(n.dLiquido) > TOLERANCIA);
+      if (!temDif) return false;
+    }
+    return true;
+  });
+}
+
+function montarFiltros() {
+  var chips = document.getElementById('chipsImposto');
+  var opts = [{ id: 'todos', nome: 'Todos os impostos' }].concat(IMPOSTOS);
+  chips.innerHTML = opts.map(function (o) {
+    return '<button class="chip" data-imp="' + o.id + '" aria-pressed="' + (state.imposto === o.id) + '">' +
+      (o.cor ? '<i class="dot" style="background:var(' + o.cor + ')"></i>' : '') + esc(o.nome) + '</button>';
+  }).join('');
+  chips.querySelectorAll('.chip').forEach(function (b) {
+    b.onclick = function () {
+      state.imposto = b.dataset.imp;
+      if (state.imposto !== 'todos') state.aliqTab = state.imposto;
+      chips.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+      montarAliquotas();
+      render();
+    };
+  });
+
+  preencher('fUnidade', unicos(NOTAS.map(function (n) { return n.unidade; })));
+  preencher('fResp', unicos(NOTAS.map(function (n) { return n.respIss || '(vazio)'; })));
+  montarAliquotas();
+
+  ['fSituacao', 'fAliquota', 'fUnidade', 'fSimples', 'fResp'].forEach(function (id) {
+    document.getElementById(id).onchange = render;
+  });
+  document.getElementById('fBusca').oninput = render;
+  document.getElementById('btnLimpar').onclick = function () {
+    ['fSituacao', 'fAliquota', 'fUnidade', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
+      var el = document.getElementById(id); el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
+    });
+    state.imposto = 'todos';
+    chips.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.imp === 'todos'); });
+    montarAliquotas();
+    render();
+  };
+}
+function unicos(arr) { return arr.filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
+function preencher(id, valores) {
+  var el = document.getElementById(id);
+  el.innerHTML = '<option value="">' + (id === 'fResp' ? 'Todos' : 'Todas') + '</option>' +
+    valores.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('');
+}
+function montarAliquotas() {
+  var el = document.getElementById('fAliquota');
+  if (state.imposto === 'todos') {
+    el.innerHTML = '<option value="">Escolha um imposto</option>';
+    el.disabled = true;
+    return;
+  }
+  el.disabled = false;
+  var t = imp(state.imposto);
+  var vals = {};
+  NOTAS.forEach(function (n) { vals[rotuloAliq(n, t)] = aliqDe(n, t); });
+  var ks = Object.keys(vals).sort(function (a, b) { return vals[a] - vals[b]; });
+  preencher('fAliquota', ks);
+}
+
+/* ---------------- Render ---------------- */
+function render() {
+  var dados = filtrar();
+  renderKpis(dados);
+  renderCategorias(dados);
+  renderGraficos(dados);
+  renderMatriz(dados);
+  renderTabela(dados);
+}
+
+function soma(arr, k) { return r2(arr.reduce(function (s, n) { return s + (typeof k === 'function' ? k(n) : n[k]); }, 0)); }
+
+function renderKpis(d) {
+  var ativos = impostosAtivos();
+  var totImp = soma(d, function (n) { return ativos.reduce(function (s, t) { return s + n[t.valor]; }, 0); });
+  var nDif = d.filter(function (n) { return n.temDif; }).length;
+  var difTot = soma(d, function (n) { return ativos.reduce(function (s, t) { return s + dif(n, t); }, 0); });
+  var aprov = soma(d, 'aprovado');
+  var k = [
+    { l: 'Ordens filtradas', v: int.format(d.length), d: 'de ' + int.format(NOTAS.length) + ' na base' },
+    { l: 'Notas fiscais', v: int.format(soma(d, 'nNfs')), d: int.format(d.filter(function (n) { return n.nfPeca; }).length) + ' de peça · ' + int.format(d.filter(function (n) { return n.nfServ; }).length) + ' de serviço' },
+    { l: 'Valor aprovado', v: Rk(aprov), d: R(aprov) },
+    { l: state.imposto === 'todos' ? 'Impostos informados' : imp(state.imposto).nome + ' informado', v: Rk(totImp), d: aprov ? P(totImp / aprov * 100) + ' do aprovado' : '—' },
+    { l: 'Valor líquido', v: Rk(soma(d, 'liquido')), d: R(soma(d, 'liquido')) },
+    { l: 'Diferença (informado − recalculado)', v: R(difTot), d: nDif ? nDif + ' ordem(ns) com diferença' : 'Nenhuma diferença encontrada', cls: Math.abs(difTot) > TOLERANCIA ? 'neg' : '' }
+  ];
+  document.getElementById('kpis').innerHTML = k.map(function (x) {
+    return '<div class="kpi"><div class="l">' + esc(x.l) + '</div><div class="v ' + (x.cls || '') + '">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>';
+  }).join('');
+}
+
+function renderCategorias(d) {
+  var totalGeral = soma(d, function (n) { return n.icms + n.irPeca + n.irServ + n.iss; });
+  var linhas = IMPOSTOS.map(function (t) {
+    var com = d.filter(function (n) { return n[t.valor] > 0; });
+    var aliqs = {};
+    com.forEach(function (n) { aliqs[rotuloAliq(n, t)] = aliqDe(n, t); });
+    var lista = Object.keys(aliqs).sort(function (a, b) { return aliqs[a] - aliqs[b]; });
+    var base = soma(com, t.base);
+    var inf = soma(d, t.valor);
+    var calc = soma(d, t.calc);
+    var nd = d.filter(function (n) { return Math.abs(dif(n, t)) > TOLERANCIA; }).length;
+    return {
+      t: t, com: com.length, sem: d.length - com.length, aliqs: lista, base: base, inf: inf, calc: calc,
+      dif: r2(inf - calc), nd: nd, efetiva: base ? inf / base * 100 : 0,
+      sim: soma(d.filter(function (n) { return n.simples === 'Sim'; }), t.valor),
+      nao: soma(d.filter(function (n) { return n.simples !== 'Sim'; }), t.valor),
+      pct: totalGeral ? inf / totalGeral * 100 : 0
+    };
+  });
+  var tb = document.querySelector('#tblCategorias tbody');
+  tb.innerHTML = linhas.map(function (x) {
+    var sel = state.imposto === x.t.id;
+    return '<tr' + (sel ? ' style="background:var(--hl)"' : '') + '>' +
+      '<td><span class="cat"><i style="background:var(' + x.t.cor + ')"></i>' + esc(x.t.nome) + '</span>' +
+        (x.t.id === 'iss' ? '<div class="muted" style="font-size:11px">retido pelo tomador: ' + R(soma(d, 'issRetido')) + '</div>' : '') + '</td>' +
+      '<td class="n">' + x.com + '</td><td class="n">' + x.sem + '</td>' +
+      '<td class="wrap">' + (x.aliqs.length ? esc(x.aliqs.join(' · ')) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="n">' + R(x.base) + '</td><td class="n"><b>' + R(x.inf) + '</b></td><td class="n">' + R(x.calc) + '</td>' +
+      '<td class="n">' + tagDif(x.dif) + '</td>' +
+      '<td class="n">' + (x.nd ? '<span class="neg">' + x.nd + '</span>' : '0') + '</td>' +
+      '<td class="n">' + P(x.efetiva) + '</td><td class="n">' + R(x.sim) + '</td><td class="n">' + R(x.nao) + '</td>' +
+      '<td class="n">' + P(x.pct) + '</td></tr>';
+  }).join('');
+  var tInf = soma(linhas, 'inf'), tCalc = soma(linhas, 'calc');
+  document.querySelector('#tblCategorias tfoot').innerHTML = '<tr><td>Total</td><td></td><td></td><td></td><td></td>' +
+    '<td class="n">' + R(tInf) + '</td><td class="n">' + R(tCalc) + '</td><td class="n">' + tagDif(r2(tInf - tCalc)) + '</td>' +
+    '<td class="n">' + d.filter(function (n) { return n.temDif; }).length + '</td><td></td>' +
+    '<td class="n">' + R(soma(linhas, 'sim')) + '</td><td class="n">' + R(soma(linhas, 'nao')) + '</td><td class="n">100%</td></tr>';
+}
+function tagDif(v) {
+  return Math.abs(v) > TOLERANCIA ? '<span class="tag bad">⚠ ' + R(v) + '</span>' : '<span class="tag ok">✓ ' + R(0) + '</span>';
+}
+
+/* ---------------- Gráficos ---------------- */
+var tipEl;
+function tooltipExterno(fmt) {
+  return function (ctx) {
+    var tm = ctx.tooltip;
+    if (!tm || tm.opacity === 0) { tipEl.style.opacity = 0; return; }
+    var pts = tm.dataPoints || [];
+    var html = '<b>' + esc(pts.length ? pts[0].label : '') + '</b>' + pts.map(function (p) {
+      return '<div class="row"><i style="background:' + p.dataset.backgroundColor + '"></i>' +
+        (pts.length > 1 || p.dataset.label ? esc(p.dataset.label) + ': ' : '') + '<span>' + esc(fmt(p.raw)) + '</span></div>';
+    }).join('');
+    tipEl.innerHTML = html;
+    var r = ctx.chart.canvas.getBoundingClientRect();
+    var x = r.left + window.scrollX + tm.caretX + 12, y = r.top + window.scrollY + tm.caretY - 10;
+    if (x + 220 > window.innerWidth + window.scrollX) x -= 240;
+    tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px'; tipEl.style.opacity = 1;
+  };
+}
+function opcoesBase(fmtEixo, fmtTip, horizontal) {
+  var grid = css('--grid'), txt = css('--text-2');
+  var eixoValor = { grid: { color: grid }, border: { display: false }, ticks: { color: txt, callback: function (v) { return fmtEixo(v); }, maxTicksLimit: 6 }, beginAtZero: true };
+  var eixoCat = { grid: { display: false }, border: { color: grid }, ticks: { color: txt, autoSkip: false } };
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+    indexAxis: horizontal ? 'y' : 'x',
+    layout: { padding: horizontal ? { right: 96 } : { top: 18 } },
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false }, tooltip: { enabled: false, external: tooltipExterno(fmtTip) } },
+    scales: horizontal ? { x: eixoValor, y: eixoCat } : { x: eixoCat, y: eixoValor },
+    datasets: { bar: { borderRadius: 4, borderSkipped: 'start', maxBarThickness: 36, borderColor: css('--surface'), borderWidth: 0 } }
+  };
+}
+function desenhar(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), cfg);
+}
+
+function renderGraficos(d) {
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.font.size = 12;
+  var ativos = impostosAtivos();
+
+  // 1) Total por imposto
+  desenhar('chImposto', {
+    type: 'bar',
+    data: {
+      labels: IMPOSTOS.map(function (t) { return t.nome; }),
+      datasets: [{
+        label: 'Informado',
+        data: IMPOSTOS.map(function (t) { return soma(d, t.valor); }),
+        backgroundColor: IMPOSTOS.map(function (t) {
+          var c = css(t.cor);
+          return state.imposto === 'todos' || state.imposto === t.id ? c : c + '40';
+        })
+      }]
+    },
+    options: opcoesBase(Rk, R, true),
+    plugins: [rotulosFim(R)]
+  });
+
+  // 2) Por unidade (barras agrupadas)
+  var unidades = unicos(d.map(function (n) { return n.unidade; }));
+  document.getElementById('lgUnidade').innerHTML = ativos.map(function (t) {
+    return '<span><i style="background:var(' + t.cor + ')"></i>' + esc(t.nome) + '</span>';
+  }).join('');
+  var o2 = opcoesBase(Rk, R, false);
+  o2.datasets.bar.borderWidth = { left: 1, right: 1 };
+  desenhar('chUnidade', {
+    type: 'bar',
+    data: {
+      labels: unidades,
+      datasets: ativos.map(function (t) {
+        return {
+          label: t.nome, backgroundColor: css(t.cor),
+          data: unidades.map(function (u) { return soma(d.filter(function (n) { return n.unidade === u; }), t.valor); })
+        };
+      })
+    },
+    options: o2
+  });
+
+  // 3) Notas por alíquota
+  var tabs = document.getElementById('tabsAliq');
+  tabs.innerHTML = IMPOSTOS.map(function (t) {
+    return '<button class="chip" data-t="' + t.id + '" aria-pressed="' + (state.aliqTab === t.id) + '"><i class="dot" style="background:var(' + t.cor + ')"></i>' + esc(t.nome) + '</button>';
+  }).join('');
+  tabs.querySelectorAll('.chip').forEach(function (b) { b.onclick = function () { state.aliqTab = b.dataset.t; renderGraficos(filtrar()); }; });
+  var ta = imp(state.aliqTab);
+  var grupos = agruparAliq(d, ta);
+  desenhar('chAliquota', {
+    type: 'bar',
+    data: {
+      labels: grupos.map(function (g) { return g.rot; }),
+      datasets: [{ label: 'Notas', backgroundColor: css(ta.cor), data: grupos.map(function (g) { return g.qtd; }), valores: grupos.map(function (g) { return g.valor; }) }]
+    },
+    options: (function () {
+      var o = opcoesBase(function (v) { return Number.isInteger(v) ? v : ''; }, function (v) { return int.format(v) + ' nota(s)'; }, false);
+      o.plugins.tooltip.external = function (ctx) {
+        tooltipExterno(function (v) { return int.format(v) + ' nota(s)'; })(ctx);
+        var p = ctx.tooltip.dataPoints && ctx.tooltip.dataPoints[0];
+        if (p && ctx.tooltip.opacity) tipEl.innerHTML += '<div class="muted">Valor retido: ' + R(grupos[p.dataIndex].valor) + '</div>';
+      };
+      return o;
+    })(),
+    plugins: [rotulosFim(function (v) { return int.format(v); })]
+  });
+
+  // 4) Top estabelecimentos
+  var porEst = {};
+  d.forEach(function (n) {
+    var v = ativos.reduce(function (s, t) { return s + n[t.valor]; }, 0);
+    porEst[n.estab] = (porEst[n.estab] || 0) + v;
+  });
+  var top = Object.keys(porEst).map(function (k) { return { k: k, v: r2(porEst[k]) }; })
+    .filter(function (x) { return x.v > 0; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 10);
+  document.getElementById('hintEstab').textContent = 'Top 10 pelo total de ' + (state.imposto === 'todos' ? 'impostos' : imp(state.imposto).nome) + ' informado.';
+  desenhar('chEstab', {
+    type: 'bar',
+    data: {
+      labels: top.map(function (x) { return x.k.length > 28 ? x.k.slice(0, 27) + '…' : x.k; }),
+      datasets: [{ label: '', backgroundColor: state.imposto === 'todos' ? css('--accent') : css(imp(state.imposto).cor), data: top.map(function (x) { return x.v; }) }]
+    },
+    options: opcoesBase(Rk, R, true),
+    plugins: [rotulosFim(R)]
+  });
+}
+function agruparAliq(d, t) {
+  var g = {};
+  d.forEach(function (n) {
+    var k = rotuloAliq(n, t);
+    if (!g[k]) g[k] = { rot: k, ord: t.id === 'icms' && n.icmsObs ? 999 : n[t.aliq], qtd: 0, valor: 0 };
+    g[k].qtd++; g[k].valor += n[t.valor];
+  });
+  return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return a.ord - b.ord; });
+}
+// Rótulo direto no fim de cada barra (gráficos de série única).
+function rotulosFim(fmt) {
+  return {
+    id: 'rotulosFim',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx, horiz = chart.options.indexAxis === 'y';
+      ctx.save();
+      ctx.fillStyle = css('--text-2');
+      ctx.font = '500 11px Inter, system-ui, sans-serif';
+      chart.getDatasetMeta(0).data.forEach(function (bar, i) {
+        var v = chart.data.datasets[0].data[i];
+        if (!v) return;
+        if (horiz) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(fmt(v), bar.x + 6, bar.y); }
+        else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(fmt(v), bar.x, bar.y - 4); }
+      });
+      ctx.restore();
+    }
+  };
+}
+
+/* ---------------- Matriz alíquota × unidade ---------------- */
+function renderMatriz(d) {
+  var t = imp(state.imposto === 'todos' ? state.aliqTab : state.imposto);
+  document.getElementById('hintMatriz').textContent = 'Quantidade de notas por alíquota de ' + t.nome + ' em cada unidade (valor retido abaixo).';
+  var grupos = agruparAliq(d, t);
+  var unidades = unicos(d.map(function (n) { return n.unidade; }));
+  var cel = function (u, g) {
+    var f = d.filter(function (n) { return (u == null || n.unidade === u) && (g == null || rotuloAliq(n, t) === g.rot); });
+    if (!f.length) return '<td class="n muted">—</td>';
+    return '<td class="n">' + f.length + '<div class="muted" style="font-size:11px">' + R(soma(f, t.valor)) + '</div></td>';
+  };
+  document.querySelector('#tblMatriz thead').innerHTML = '<tr><th>Unidade</th>' +
+    grupos.map(function (g) { return '<th class="n">' + esc(g.rot) + '</th>'; }).join('') + '<th class="n">Total</th></tr>';
+  document.querySelector('#tblMatriz tbody').innerHTML = unidades.map(function (u) {
+    return '<tr><td><b>' + esc(u) + '</b></td>' + grupos.map(function (g) { return cel(u, g); }).join('') + cel(u, null) + '</tr>';
+  }).join('') || '<tr><td class="empty">Nenhuma nota nos filtros atuais.</td></tr>';
+  document.querySelector('#tblMatriz tfoot').innerHTML = unidades.length ? '<tr><td>Total</td>' + grupos.map(function (g) { return cel(null, g); }).join('') + cel(null, null) + '</tr>' : '';
+}
+
+/* ---------------- Tabela de notas ---------------- */
+var COLUNAS = [
+  { k: 'placa', t: 'Placa' },
+  { k: 'unidade', t: 'Unidade' },
+  { k: 'estab', t: 'Estabelecimento' },
+  { k: 'cidade', t: 'Cidade' },
+  { k: 'simples', t: 'Simples' },
+  { k: 'nfPeca', t: 'NF Peça' },
+  { k: 'basePeca', t: 'Base Peça', m: 1 },
+  { k: 'pIcms', t: '% ICMS', p: 1, imp: 'icms', f: function (n) { return n.icmsObs ? 'Deson. (' + P(n.pIcmsEfetiva) + ')' : P(n.pIcms); } },
+  { k: 'icms', t: 'ICMS', m: 1, imp: 'icms' },
+  { k: 'pIrPeca', t: '% IRRF Peça', p: 1, imp: 'irPeca' },
+  { k: 'irPeca', t: 'IRRF Peça', m: 1, imp: 'irPeca' },
+  { k: 'nfServ', t: 'NF Serviço' },
+  { k: 'baseServ', t: 'Base Serviço', m: 1 },
+  { k: 'pIss', t: '% ISSQN', p: 1, imp: 'iss' },
+  { k: 'iss', t: 'ISSQN', m: 1, imp: 'iss' },
+  { k: 'respIss', t: 'Resp. ISSQN', imp: 'iss' },
+  { k: 'pIrServ', t: '% IRRF Serv.', p: 1, imp: 'irServ' },
+  { k: 'irServ', t: 'IRRF Serviço', m: 1, imp: 'irServ' },
+  { k: 'totalImp', t: 'Total retido', m: 1 },
+  { k: 'aprovado', t: 'Valor Aprovado', m: 1 },
+  { k: 'liquido', t: 'Valor Líquido', m: 1 },
+  { k: 'difSel', t: 'Diferença', m: 1 },
+  { k: 'data', t: 'Aprovação' },
+  { k: 'resp', t: 'Responsável' }
+];
+function difSel(n) {
+  var ativos = impostosAtivos();
+  var v = ativos.reduce(function (s, t) { return s + dif(n, t); }, 0);
+  if (state.imposto === 'todos') v += n.dLiquido;
+  return r2(v);
+}
+function renderTabela(d) {
+  d.forEach(function (n) { n.difSel = difSel(n); });
+  var s = state.sort;
+  d = d.slice().sort(function (a, b) {
+    var x = a[s.key], y = b[s.key];
+    if (s.key === 'data') { x = dataOrd(x); y = dataOrd(y); }
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * s.dir;
+    return String(x).localeCompare(String(y), 'pt-BR', { numeric: true }) * s.dir;
+  });
+  var hl = function (c) { return c.imp && state.imposto === c.imp ? ' hl' : ''; };
+  document.querySelector('#tblNotas thead').innerHTML = '<tr>' + COLUNAS.map(function (c) {
+    return '<th class="sort' + (c.m || c.p ? ' n' : '') + hl(c) + '" data-k="' + c.k + '">' + esc(c.t) +
+      '<span class="arr">' + (s.key === c.k ? (s.dir > 0 ? '▲' : '▼') : '') + '</span></th>';
+  }).join('') + '</tr>';
+  document.querySelectorAll('#tblNotas th.sort').forEach(function (th) {
+    th.onclick = function () {
+      var k = th.dataset.k;
+      state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (typeof NOTAS[0][k] === 'number' ? -1 : 1) };
+      renderTabela(filtrar());
+    };
+  });
+  document.querySelector('#tblNotas tbody').innerHTML = d.length ? d.map(function (n) {
+    return '<tr>' + COLUNAS.map(function (c) {
+      var v = n[c.k], h;
+      if (c.f) h = esc(c.f(n));
+      else if (c.k === 'difSel') h = Math.abs(v) > TOLERANCIA ? '<span class="tag bad">⚠ ' + R(v) + '</span>' : '<span class="tag ok">✓</span>';
+      else if (c.k === 'simples') h = v === 'Sim' ? '<span class="tag warn">Simples</span>' : esc(v);
+      else if (c.m) h = v ? R(v) : '<span class="muted">' + R(0) + '</span>';
+      else if (c.p) h = v ? P(v) : '<span class="muted">0%</span>';
+      else h = esc(v);
+      return '<td class="' + (c.m || c.p ? 'n' : '') + hl(c) + '"' + (c.k === 'estab' ? ' title="' + esc(n.cnpj) + '"' : '') + '>' + h + '</td>';
+    }).join('') + '</tr>';
+  }).join('') : '<tr><td class="empty" colspan="' + COLUNAS.length + '">Nenhuma nota nos filtros atuais.</td></tr>';
+  document.querySelector('#tblNotas tfoot').innerHTML = d.length ? '<tr>' + COLUNAS.map(function (c, i) {
+    if (i === 0) return '<td>Total</td>';
+    if (c.m) { var t = soma(d, c.k); return '<td class="n' + hl(c) + '">' + (c.k === 'difSel' ? tagDif(t) : R(t)) + '</td>'; }
+    return '<td class="' + hl(c).trim() + '"></td>';
+  }).join('') + '</tr>' : '';
+  document.getElementById('contTabela').textContent = d.length + ' ordem(ns) · ' + soma(d, 'nNfs') + ' nota(s) fiscal(is). Clique no cabeçalho para ordenar.';
+  window._tabelaAtual = d;
+}
+function dataOrd(s) { var m = /(\d{2})\/(\d{2})\/(\d{4})\s*(\d{2})?:?(\d{2})?/.exec(s || ''); return m ? m[3] + m[2] + m[1] + (m[4] || '00') + (m[5] || '00') : ''; }
+
+function exportarCsv() {
+  var d = window._tabelaAtual || [];
+  var linhas = [COLUNAS.map(function (c) { return c.t; })].concat(d.map(function (n) {
+    return COLUNAS.map(function (c) {
+      var v = c.f ? c.f(n) : n[c.k];
+      return typeof v === 'number' ? String(v).replace('.', ',') : v;
+    });
+  }));
+  var csv = '﻿' + linhas.map(function (l) {
+    return l.map(function (v) { v = String(v == null ? '' : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';');
+  }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'notas_impostos' + (state.imposto === 'todos' ? '' : '_' + state.imposto) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------------- Inicialização ---------------- */
+function carregar() {
+  document.getElementById('loading').hidden = false;
+  document.getElementById('loading').textContent = 'Carregando notas da planilha…';
+  var ok = function (res) {
+    NOTAS = res.notas.map(preparar);
+    document.getElementById('origem').textContent = res.planilha + ' · aba “' + res.aba + '” · ' + NOTAS.length + ' registros · atualizado em ' + res.atualizadoEm;
+    document.getElementById('loading').hidden = true;
+    document.getElementById('app').hidden = false;
+    montarFiltros();
+    render();
+  };
+  var erro = function (e) { document.getElementById('loading').textContent = 'Erro ao carregar: ' + (e && e.message ? e.message : e); };
+  if (window.google && google.script && google.script.run) {
+    google.script.run.withSuccessHandler(ok).withFailureHandler(erro).getDados();
+  } else if (window.DADOS_DEMO) {
+    ok(window.DADOS_DEMO); // pré-visualização fora do Apps Script
+  } else {
+    erro('abra este painel pelo Google Apps Script.');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  tipEl = document.getElementById('tip');
+  document.getElementById('btnAtualizar').onclick = carregar;
+  document.getElementById('btnCsv').onclick = exportarCsv;
+  document.getElementById('btnTema').onclick = function () {
+    var root = document.documentElement;
+    var escuro = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = escuro ? 'light' : 'dark';
+    if (NOTAS.length) render();
+  };
+  carregar();
+});
+</script>
+</body>
+</html>
