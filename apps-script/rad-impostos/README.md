@@ -11,7 +11,13 @@ Painel que lê a aba **BADE SE DADOS** da planilha RAD e mostra:
   município, optante Simples, responsável ISSQN e busca livre.
 - **Tabela final** com todas as notas (ordenável e exportável em CSV).
 
-## Como instalar
+## Opção 1 — sem internet/Google (arquivo .xlsx no computador)
+
+Dê dois cliques em `painel-impostos.html` (abre no Chrome/Edge) e escolha ou arraste o arquivo .xlsx.
+A planilha é lida só no navegador, nada é enviado. Para outra planilha, use **↻ Atualizar dados**.
+(Precisa de internet apenas para carregar as bibliotecas de gráfico e de leitura de Excel.)
+
+## Opção 2 — Google Sheets + Apps Script
 
 1. Abra a planilha no Google Sheets (se for .xlsx, use *Arquivo › Salvar como Planilhas Google*).
 2. *Extensões › Apps Script*.
