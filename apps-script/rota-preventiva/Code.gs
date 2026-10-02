@@ -41,7 +41,7 @@ const CFG = {
   VOLUME_SHEETS: ['VOLUME_TRAFEGO', 'VOLUME TRAFEGO', 'Volume de tráfego', 'VMD'],
   HIST_TRANSITO: '_HIST_TRANSITO',   // amostras do índice de lentidão (Google) para formar histórico
   DICTIONARY_SHEETS: ['Mapa Frações', 'Mapa Fracoes', 'Dicionário', 'Dicionario'],
-  CACHE_PREFIX: 'rota_preventiva_v9_',
+  CACHE_PREFIX: 'rota_preventiva_v10_',
   CACHE_SECONDS: 1800,
   HEADER_SCAN_ROWS: 15,
   SAMPLE_ROWS: 300,
@@ -880,6 +880,12 @@ function diagnosticarPlanilha() {
   report.push('Frações com código: ' + Object.keys(ctx.codeToFrac).length);
   const rows = planoRows_(SpreadsheetApp.getActiveSpreadsheet(), ctx);
   if (rows.length) { const c = resumoCalibracao_(rows, planoCache_().map); report.push('Plano rodoviário: ' + c.trechos + ' trechos · calibrados ' + c.ok + ' · revisar ' + c.revisar + ' · falha ' + c.falha + ' · sem calibrar ' + c.semCalibrar); }
+  if (municipiosMG_()) {
+    const fu = Object.keys(MUNI_.fundidos), rj = Object.keys(MUNI_.rejeitados);
+    report.push('Municípios: lista oficial do IBGE (' + Object.keys(MUNI_.mapa).length + ' em MG) · ' + (ctx.options.cidade || []).length + ' no filtro.');
+    if (fu.length) report.push('Grafias unificadas no nome oficial (' + fu.length + '): ' + fu.map(x => x + ' → ' + MUNI_.fundidos[x]).join('; '));
+    if (rj.length) report.push('Nomes descartados por não serem municípios de MG (' + rj.length + '): ' + rj.join('; '));
+  } else report.push('Municípios: lista oficial do IBGE indisponível (sem acesso a servicodados.ibge.gov.br); os nomes são usados como estão na planilha.');
   const ifrv = findSheet_(SpreadsheetApp.getActiveSpreadsheet(), CFG.IFRV_SHEETS);
   if (ifrv) {
     const tb = readTable_(ifrv, { fracCodes: ctx.codeToFrac }), nc = naturezaCols_(tb), cnt = { 1: 0, 2: 0, 3: 0, '-1': 0 };
@@ -1428,12 +1434,84 @@ function ordinal_(n, type) {
   const name = type === 'rpm' ? 'RPM' : type === 'cia' ? 'Cia PMRv' : type === 'pelotao' ? 'Pelotão' : 'Grupamento';
   return (n < 10 ? '0' : '') + n + (female ? 'ª' : 'º') + ' ' + name;
 }
-/** Município: sem "/MG", sem código, com maiúsculas corretas. */
+/**
+ * Município: sem "/MG", sem código, com o NOME OFICIAL do IBGE (853 municípios de MG).
+ * Grafias diferentes ("Sao Joao del Rei", "SÃO JOÃO DEL-REI", "Brasópolis") viram o nome oficial;
+ * nomes que não são municípios de MG são descartados (e listados em diagnosticarPlanilha).
+ */
 function cityName_(raw) {
   const s = cellStr_(raw).replace(/\s*[-/(]\s*MG\s*\)?$/i, '').trim();
   if (isJunk_(s) || isOpaque_(s) || /^\d/.test(s) || hierCount_(s) > 0) return '';
   if (!/[A-Za-zÀ-ú]{2,}/.test(s)) return '';
-  return s === s.toUpperCase() || s === s.toLowerCase() ? titleCase_(s) : s;
+  const local = s === s.toUpperCase() || s === s.toLowerCase() ? titleCase_(s) : s;
+  const of = municipioOficial_(s);
+  return of === null ? local : of;   // null = lista oficial indisponível: mantém o nome como veio
+}
+
+/* ---------- lista oficial de municípios de MG (IBGE) ---------- */
+const MUNI_ = { mapa: null, memo: Object.create(null), fundidos: Object.create(null), rejeitados: Object.create(null) };
+const MUNI_SHEET = '_MUNICIPIOS_MG';
+// nomes antigos ou populares que não se resolvem pela grafia
+const MUNI_ALIAS = { itabirinhademantena: 'Itabirinha', saotomedasletras: 'São Thomé das Letras', brasopolis: 'Brazópolis',
+  donaeusebia: 'Dona Euzébia', gouvea: 'Gouveia', piui: 'Piumhi' };
+function muniKey_(s) { return key_(s).replace(/[^a-z0-9]/g, ''); }
+/** Mapa chave → nome oficial. Busca no IBGE uma vez e guarda na aba oculta _MUNICIPIOS_MG. */
+function municipiosMG_() {
+  if (MUNI_.mapa !== null) return MUNI_.mapa;
+  let nomes = cacheGet_('muni_mg');
+  if (!nomes) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sh = ss.getSheetByName(MUNI_SHEET);
+    if (sh && sh.getLastRow() > 800) nomes = sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues().map(r => String(r[0])).filter(Boolean);
+    if (!nomes) {
+      try {
+        const r = UrlFetchApp.fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/31/municipios', { muteHttpExceptions: true });
+        const lista = r.getResponseCode() === 200 ? JSON.parse(r.getContentText()) : [];
+        if (lista.length > 800) {
+          nomes = lista.map(m => m.nome);
+          try {   // guarda na planilha para não depender do IBGE nas próximas vezes
+            if (!sh) { sh = ss.insertSheet(MUNI_SHEET); sh.hideSheet(); }
+            sh.getRange(1, 1, lista.length + 1, 2).setValues([['codigo_ibge', 'municipio']].concat(lista.map(m => [String(m.id), m.nome])));
+          } catch (e) { /* sem permissão de escrita: usa só o cache */ }
+        }
+      } catch (e) { nomes = null; }
+    }
+    if (nomes) cacheSet_('muni_mg', nomes, 21600);
+  }
+  if (!nomes || !nomes.length) { MUNI_.mapa = false; return false; }
+  const mapa = Object.create(null);
+  nomes.forEach(n => { mapa[muniKey_(n)] = n; });
+  MUNI_.mapa = mapa;
+  return mapa;
+}
+function distEd_(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) { cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (cur[j] < best) best = cur[j]; }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+/** Nome oficial, '' se não for município de MG, ou null se a lista oficial não estiver disponível. */
+function municipioOficial_(s) {
+  const mapa = municipiosMG_();
+  if (!mapa) return null;
+  const k = muniKey_(s);
+  if (k in MUNI_.memo) return MUNI_.memo[k];
+  let of = mapa[k] || (MUNI_ALIAS[k] && mapa[muniKey_(MUNI_ALIAS[k])]) || '';
+  if (!of && k.length >= 5) {   // erro de digitação: a única cidade oficial a 1 (ou 2, nomes longos) letras de distância
+    const max = k.length >= 9 ? 2 : 1;
+    let best = '', bd = max + 1, empate = false;
+    Object.keys(mapa).forEach(m => { const d = distEd_(k, m, max); if (d < bd) { bd = d; best = mapa[m]; empate = false; } else if (d === bd && d <= max) empate = true; });
+    if (best && bd <= max && !empate) of = best;
+  }
+  if (of && muniKey_(of) !== k) MUNI_.fundidos[cellStr_(s)] = of;
+  if (!of) MUNI_.rejeitados[cellStr_(s)] = 1;
+  MUNI_.memo[k] = of;
+  return of;
 }
 /** "2º Pel PMRv - Sete Lagoas" → "Sete Lagoas". */
 function sedeFromText_(raw) {
