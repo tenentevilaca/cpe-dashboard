@@ -23,9 +23,16 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
    *Configurações do projeto › Mostrar "appsscript.json"*, cole o `appsscript.json` desta pasta.
 5. Salve, recarregue a planilha e abra **📊 Painel de Impostos › Abrir painel** (autorize na 1ª vez).
 
-O texto dos PDFs é lido pelo OCR do Google Drive (funciona também com PDF escaneado) e guardado na aba oculta
-`_cache_pdf`, então só a primeira leitura de cada PDF é demorada. Primeiro são lidos os PDFs com o número da nota
-no nome do arquivo; o botão **🔎 Procurar em todos os PDFs** lê os demais.
+Localização das notas (automática, ao abrir o painel):
+1. PDFs já lidos antes vêm do cache (aba oculta `_cache_pdf_v2`);
+2. depois são lidos os PDFs com o nº da nota ou da OS no nome do arquivo;
+3. se ainda faltar nota, os demais PDFs — a leitura para assim que todas forem localizadas.
+
+Enquanto localiza, o botão de download mostra ⏳ e fica bloqueado; é liberado ao final.
+
+**Economia de dados:** o RAD é convertido em tabela no servidor (≈ 4× menor que o .xls); dos PDFs o painel
+recebe só os números procurados (dezenas de bytes por PDF, nunca o texto); o .zip é gravado na subpasta
+`Notas tomador (painel)` e baixado direto do Drive (o .zip anterior vai para a lixeira); sem fontes externas.
 
 Sem pasta configurada, o painel usa a aba `BADE SE DADOS` da planilha (formato consolidado antigo).
 

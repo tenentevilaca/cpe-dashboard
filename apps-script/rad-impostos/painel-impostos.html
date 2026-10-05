@@ -5,8 +5,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Painel de Impostos — RAD</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
@@ -53,7 +51,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font: 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
     font-variant-numeric: tabular-nums;
   }
   .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; }
@@ -159,6 +157,9 @@
   td.checks .tag { margin: 1px 2px 1px 0; font-size: 11px; }
   td a { color: var(--accent); }
   .btn:disabled { opacity: .5; cursor: default; }
+  .btn.busy:disabled { opacity: .85; cursor: progress; }
+  .ampulheta { display: inline-block; animation: girar 2s linear infinite; }
+  @keyframes girar { 0%, 40% { transform: rotate(0); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
   .empty { padding: 24px; text-align: center; color: var(--muted); }
 </style>
 </head>
@@ -301,7 +302,6 @@
           <div class="hint" style="margin:0">Notas de serviço do RAD com responsável <b>TOMADOR</b> localizadas entre os PDFs pelo <b>número da nota + número da OS</b> encontrados no texto do PDF. CNPJ, valor do ISSQN e “Retido pelo Tomador” são conferências extras. Segue os filtros acima.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" id="btnVarrer" hidden title="Lê todos os PDFs, inclusive os que não têm o número da nota no nome">🔎 Procurar em todos os PDFs</button>
           <button class="btn primary" id="btnZip" disabled>⬇ Baixar notas encontradas (.zip)</button>
         </div>
       </div>
@@ -591,7 +591,7 @@ function desenhar(id, cfg) {
 }
 
 function renderGraficos(d) {
-  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
   Chart.defaults.font.size = 12;
   var ativos = impostosAtivos();
 
@@ -696,7 +696,7 @@ function rotulosFim(fmt) {
       var ctx = chart.ctx, horiz = chart.options.indexAxis === 'y';
       ctx.save();
       ctx.fillStyle = css('--text-2');
-      ctx.font = '500 11px Inter, system-ui, sans-serif';
+      ctx.font = '500 11px system-ui, sans-serif';
       chart.getDatasetMeta(0).data.forEach(function (bar, i) {
         var v = chart.data.datasets[0].data[i];
         if (!v) return;
@@ -828,7 +828,7 @@ function exportarCsv() {
  *  - Navegador (offline): arquivos escolhidos no computador (.xls do RAD, .xlsx consolidado e PDFs).
  */
 var MODO = window.google && google.script && google.script.run ? 'appsscript' : 'offline';
-var PDFS = [];        // [{id, nome, caminho, url, file?, texto (null = ainda não lido)}]
+var PDFS = [];        // [{id, nome, caminho, lido (impressão já no cache do servidor), file? (offline), fp (null = ainda não lida)}]
 var FONTE = {};       // informações da última carga
 var NF = { lista: [], buscando: false };
 
@@ -884,7 +884,7 @@ function exibir(notas) {
   document.getElementById('app').hidden = false;
   montarFiltros();
   render();
-  if (PDFS.length) buscarNotas(false);
+  buscarNotas();
 }
 function erroCarga(e) {
   var l = document.getElementById('loading');
@@ -929,7 +929,8 @@ function lerRadGrade(grade, nomeArquivo) {
       var m = !periodo && /Período:\s*(.+)$/i.exec(v); if (m) periodo = m[1];
     });
     if (normCab(l[0]) === 'placa') { cab = l; return; }
-    if (cab && l[0] && !/^qtd de os/i.test(l[0])) linhas.push(l);
+    // Linhas de dados: ao menos 8 células preenchidas (descarta cabeçalhos de página e a linha de totais).
+    if (cab && l[0] && !/^qtd de os/i.test(l[0]) && l.filter(String).length >= 8) linhas.push(l);
   });
   if (!cab) throw new Error('“' + nomeArquivo + '” não parece um RAD (cabeçalho "Placa" não encontrado).');
   var sigla = orgao.replace(/^\d+\s*[ºª°A-Z]?\s+/i, '').trim() || orgao;
@@ -1073,15 +1074,15 @@ function lerArquivos(files) {
       if (pdfs.length) {
         // PDFs novos se somam aos já abertos (permite abrir RADs e notas em etapas).
         var ja = {};
-        PDFS.forEach(function (p) { ja[p.nome + p.file.size] = 1; });
+        PDFS.forEach(function (p) { if (p.file) ja[p.nome + p.file.size] = 1; });
         pdfs.forEach(function (f, i) {
-          if (!ja[f.name + f.size]) PDFS.push({ id: 'local' + Date.now() + '_' + i, nome: f.name, caminho: '', file: f, texto: null });
+          if (!ja[f.name + f.size]) PDFS.push({ id: 'local' + Date.now() + '_' + i, nome: f.name, caminho: '', file: f, fp: null });
         });
       }
       if (!notas.length && !NOTAS.length) throw new Error('nenhum RAD ou planilha de dados entre os arquivos escolhidos.');
       if (!notas.length) { // só PDFs: mantém os dados já carregados
         l.hidden = true;
-        buscarNotas(false);
+        buscarNotas();
         return;
       }
       FONTE = { modo: 'offline', origem: origem.join(' + ') || 'Arquivos locais', atualizadoEm: '', avisos: avisos };
@@ -1104,41 +1105,75 @@ function ehTomador(n) {
   return n.nfServ && (n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0));
 }
 function digitos(s) { return String(s || '').replace(/\D/g, ''); }
-function semZeros(s) { return digitos(s).replace(/^0+/, ''); }
-function contemNumero(texto, numero) {
-  var n = semZeros(numero);
-  if (!n) return false;
-  return new RegExp('(^|[^\\d.,/])0*' + n + '(?![\\d]|[.,]\\d)').test(texto);
-}
+function semZeros(s) { return digitos(s).replace(/^0+(?=\d)/, ''); }
 function brNum(v) { return (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function palavrasEstab(estab) {
   return normCab(estab).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 3 && ['ltda', 'eireli', 'me', 'epp', 'the', 'dos', 'das', 'and'].indexOf(w) < 0; });
 }
+function urlPdf(p) { return p.url || (p.file ? '' : 'https://drive.google.com/file/d/' + p.id + '/view'); }
 
-/** Verifica um PDF contra uma nota do RAD. */
+/** O que o painel procura nos PDFs: nº das notas e OS, CNPJs e valores de ISSQN das notas de tomador. */
+function chavesBusca() {
+  var i = {}, c = {}, v = {};
+  NOTAS.filter(ehTomador).forEach(function (n) {
+    i[semZeros(n.nfServ)] = 1;
+    if (n.os) i[semZeros(n.os)] = 1;
+    if (digitos(n.cnpj)) c[digitos(n.cnpj)] = 1;
+    if (n.iss > 0) v[brNum(n.iss)] = 1;
+  });
+  return { i: Object.keys(i), c: Object.keys(c), v: Object.keys(v) };
+}
+
+/* Mesmas regras do Code.gs (impressao_ / filtrarImpressao_), usadas no modo offline. */
+function impressao(texto) {
+  texto = String(texto || '');
+  var i = {}, j = {}, v = {};
+  (texto.match(/\d[\d.,\/\-]*\d|\d/g) || []).forEach(function (tok) {
+    if (/^\d+$/.test(tok)) i[tok.replace(/^0+(?=\d)/, '')] = 1;
+    else if (/^\d{1,3}(\.\d{3})*,\d{2}$/.test(tok)) v[tok] = 1;
+    var d = tok.replace(/\D/g, '');
+    if (d.length >= 6) j[d] = 1;
+  });
+  var n = semAcento(texto).toLowerCase();
+  return {
+    i: Object.keys(i), j: Object.keys(j), v: Object.keys(v),
+    tom: /retido pelo tomador|iss(qn)? retido.{0,40}sim|tomador.{0,30}respons/.test(n) ? 1 : 0,
+    len: texto.replace(/\s/g, '').length
+  };
+}
+function filtrarImpressao(fp, chaves) {
+  var I = {}, V = {};
+  chaves.i.forEach(function (x) { I[x] = 1; });
+  chaves.v.forEach(function (x) { V[x] = 1; });
+  var out = { i: fp.i.filter(function (x) { return I[x]; }), c: [], v: fp.v.filter(function (x) { return V[x]; }), tom: fp.tom, len: fp.len };
+  chaves.i.forEach(function (x) {
+    if (x.length >= 6 && out.i.indexOf(x) < 0 && fp.j.some(function (t) { return t.indexOf(x) > -1; })) out.i.push(x);
+  });
+  chaves.c.forEach(function (x) { if (fp.j.some(function (t) { return t.indexOf(x) > -1; })) out.c.push(x); });
+  return out;
+}
+
+/** Verifica um PDF contra uma nota do RAD. ID da nota = número da NF + número da OS. */
 function conferir(n, pdf) {
   var nomeArq = normCab(pdf.nome);
-  var numsArq = (pdf.nome.match(/\d+/g) || []).map(function (x) { return x.replace(/^0+/, ''); });
+  var numsArq = (pdf.nome.match(/\d+/g) || []).map(function (x) { return x.replace(/^0+(?=\d)/, ''); });
   var pal = palavrasEstab(n.estab);
+  var fp = pdf.fp;
   var r = {
     nomeNumero: numsArq.indexOf(semZeros(n.nfServ)) > -1,
     nomeOs: !!n.os && numsArq.indexOf(semZeros(n.os)) > -1,
     nomeEstab: pal.length > 0 && pal.some(function (w) { return nomeArq.indexOf(w) > -1; }),
-    lido: pdf.texto != null && pdf.texto.replace(/\s/g, '').length > 30
+    lido: !!fp && fp.len > 30
   };
   if (r.lido) {
-    var t = pdf.texto, tn = normCab(t);
-    r.cnpj = digitos(t).indexOf(digitos(n.cnpj)) > -1;
-    r.numero = contemNumero(t, n.nfServ);
-    r.os = !!n.os && digitos(t).indexOf(digitos(n.os)) > -1;
-    r.placa = !!n.placa && tn.replace(/[\s-]/g, '').indexOf(normCab(n.placa).replace(/[\s-]/g, '')) > -1;
-    r.tomador = /retido pelo tomador|retencao do issqn\s*retido|iss(qn)? retido.{0,40}sim|tomador.{0,30}respons/.test(tn);
-    r.valorIss = n.iss > 0 && t.indexOf(brNum(n.iss)) > -1;
-    r.servico = /nfs-?e|nota fiscal de servic|danfse|issqn/.test(tn);
+    r.numero = fp.i.indexOf(semZeros(n.nfServ)) > -1;
+    r.os = !!n.os && fp.i.indexOf(semZeros(n.os)) > -1;
+    r.cnpj = fp.c.indexOf(digitos(n.cnpj)) > -1;
+    r.tomador = !!fp.tom;
+    r.valorIss = n.iss > 0 && fp.v.indexOf(brNum(n.iss)) > -1;
   }
-  // ID da nota = número da NF + número da OS (a nota não traz o nome da unidade).
   r.confirmada = !!(r.lido && r.numero && r.os);
-  // Só um dos dois no texto: aceita como "parcial" apenas se o CNPJ do prestador também estiver no PDF.
+  // Só um dos dois no texto: aceita como "conferir" apenas se o CNPJ do prestador também estiver no PDF.
   r.parcial = !!(r.lido && !r.confirmada && (r.numero || r.os) && r.cnpj);
   r.pontos = (r.confirmada ? 100 : 0) + (r.parcial ? 50 : 0) + (r.numero ? 15 : 0) + (r.os ? 15 : 0) + (r.cnpj ? 10 : 0) +
              (r.tomador ? 5 : 0) + (r.valorIss ? 5 : 0) + (r.nomeNumero ? 10 : 0) + (r.nomeOs ? 10 : 0) + (r.nomeEstab ? 3 : 0);
@@ -1150,7 +1185,7 @@ function casarNotas(notas) {
     var melhor = null;
     PDFS.forEach(function (p) {
       var r = conferir(n, p);
-      // PDF com texto: precisa do Nº + OS (ou de um deles + CNPJ). Sem texto: Nº no nome do arquivo + OS ou estabelecimento.
+      // PDF lido: precisa do Nº + OS (ou de um deles + CNPJ). PDF sem texto: Nº no nome do arquivo + OS ou estabelecimento.
       var ok = r.lido ? (r.confirmada || r.parcial) : (r.nomeNumero && (r.nomeOs || r.nomeEstab));
       if (!ok) return;
       if (!melhor || r.pontos > melhor.r.pontos) melhor = { pdf: p, r: r };
@@ -1160,62 +1195,67 @@ function casarNotas(notas) {
   });
 }
 
-/** PDFs ainda sem texto que podem ser a nota: primeiro os que têm o número no nome do arquivo. */
-function pdfsParaLer(completa) {
-  var alvo = NOTAS.filter(ehTomador);
-  var nums = {};
-  alvo.forEach(function (n) { nums[semZeros(n.nfServ)] = 1; if (n.os) nums[semZeros(n.os)] = 1; });
-  return PDFS.filter(function (p) {
-    if (p.texto != null) return false;
-    if (completa) return true;
-    return (p.nome.match(/\d+/g) || []).some(function (x) { return nums[x.replace(/^0+/, '')]; });
-  });
-}
-
-function buscarNotas(completa) {
-  if (NF.buscando) return;
-  var fila = pdfsParaLer(completa);
-  var st = document.getElementById('nfStatus');
-  if (!fila.length) { renderNotasTomador(); return; }
-  NF.buscando = true;
+/**
+ * Localiza as notas automaticamente:
+ *  1) busca no cache os PDFs já lidos (resposta pequena: só os números procurados);
+ *  2) lê os PDFs que têm nº da nota ou OS no nome do arquivo;
+ *  3) se ainda faltar nota, lê os demais PDFs — para assim que todas forem localizadas.
+ */
+function buscarNotas() {
+  if (NF.buscando || !PDFS.length) { renderNotasTomador(); return; }
+  var chaves = chavesBusca();
+  if (!chaves.i.length) { renderNotasTomador(); return; }
+  NF.buscando = true; NF.erros = []; NF.lidos = 0;
+  NF.total = PDFS.filter(function (p) { return !p.fp; }).length;
   renderNotasTomador();
-  var total = fila.length, feitos = 0;
-  var progresso = function () { st.textContent = 'Lendo PDFs… ' + feitos + ' de ' + total; };
-  progresso();
 
-  var passo;
+  var faltam = function () { return casarNotas(NOTAS).some(function (x) { return x.status === 'nao' || x.status === 'nome'; }); };
+  var nums = {};
+  chaves.i.forEach(function (x) { nums[x] = 1; });
+  var porNome = function (p) { return (p.nome.match(/\d+/g) || []).some(function (x) { return nums[x.replace(/^0+(?=\d)/, '')]; }); };
+
+  var etapa1 = Promise.resolve();
   if (MODO === 'appsscript') {
-    // Lotes pequenos: o progresso anda a cada poucos PDFs e as notas já encontradas podem ser baixadas durante a leitura.
-    var LOTE = 4, ids = fila.map(function (p) { return p.id; }), erros = NF.erros = [];
-    passo = (function proximo() {
-      if (!ids.length) return Promise.resolve();
-      var agora = ids.splice(0, LOTE);
-      return chamar('lerTextosPdf', agora).then(function (res) {
-        PDFS.forEach(function (p) { if (res.textos.hasOwnProperty(p.id)) { p.texto = res.textos[p.id]; feitos++; } });
-        Object.keys(res.erros || {}).forEach(function (id) { erros.push(res.erros[id]); });
-        ids = res.pendentes.concat(ids);
-        progresso();
-        if (erros.length) st.textContent += ' · ' + erros.length + ' PDF(s) com erro de leitura: ' + erros[0];
-        renderNotasTomador(true);
-        return proximo();
-      });
-    })();
-  } else {
-    passo = carregarScript(LIB.pdf, function () { return window.pdfjsLib; }).then(function () {
+    var emCache = PDFS.filter(function (p) { return p.lido && !p.fp; }).map(function (p) { return p.id; });
+    if (emCache.length) etapa1 = chamar('impressoesCache', emCache, chaves).then(function (fps) {
+      PDFS.forEach(function (p) { if (fps[p.id]) { p.fp = fps[p.id]; NF.lidos++; } });
+      renderNotasTomador();
+    });
+  }
+
+  var lerFila = function (fila) {
+    if (MODO === 'appsscript') {
+      var LOTE = 5, ids = fila.map(function (p) { return p.id; });
+      return (function proximo() {
+        if (!ids.length || !faltam()) return Promise.resolve();
+        var agora = ids.splice(0, LOTE);
+        return chamar('lerImpressoesPdf', agora, chaves).then(function (res) {
+          PDFS.forEach(function (p) { if (res.fps[p.id]) { p.fp = res.fps[p.id]; NF.lidos++; } });
+          Object.keys(res.erros || {}).forEach(function (id) { NF.erros.push(res.erros[id]); });
+          ids = res.pendentes.concat(ids);
+          renderNotasTomador();
+          return proximo();
+        });
+      })();
+    }
+    return carregarScript(LIB.pdf, function () { return window.pdfjsLib; }).then(function () {
       pdfjsLib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
       return fila.reduce(function (pr, p) {
         return pr.then(function () {
-          return textoPdfLocal(p.file).then(function (t) { p.texto = t; }, function () { p.texto = ''; })
-            .then(function () { feitos++; progresso(); });
+          if (!faltam()) return;
+          return textoPdfLocal(p.file).then(function (t) { p.fp = filtrarImpressao(impressao(t), chaves); },
+                                            function () { p.fp = { i: [], c: [], v: [], tom: 0, len: 0 }; })
+            .then(function () { NF.lidos++; renderNotasTomador(); });
         });
       }, Promise.resolve());
     });
-  }
-  passo.catch(function (e) { alert('Erro ao ler PDFs: ' + (e && e.message || e)); })
-    .then(function () {
-      NF.buscando = false; renderNotasTomador();
-      if ((NF.erros || []).length) st.textContent = NF.erros.length + ' PDF(s) não puderam ser lidos. Primeiro erro: ' + NF.erros[0];
-    });
+  };
+
+  etapa1
+    .then(function () { return lerFila(PDFS.filter(function (p) { return !p.fp && porNome(p); })); })
+    .then(function () { return lerFila(PDFS.filter(function (p) { return !p.fp; })); })
+    .catch(function (e) { NF.erros.push(String(e && e.message || e)); })
+    .then(function () { NF.buscando = false; renderNotasTomador(); });
 }
 
 function textoPdfLocal(file) {
@@ -1236,33 +1276,45 @@ var STATUS_NF = {
   nome: { rot: 'Encontrada pelo nome do arquivo', cls: 'warn', ic: '≈' },
   nao: { rot: 'Não encontrada', cls: 'bad', ic: '✕' }
 };
-function renderNotasTomador(parcial) {
+function renderNotasTomador() {
   var lista = casarNotas(filtrar());
   NF.lista = lista;
   var cont = { ok: 0, parcial: 0, nome: 0, nao: 0 };
   lista.forEach(function (x) { cont[x.status]++; });
-  var semTexto = PDFS.filter(function (p) { return p.texto == null; }).length;
+  var semLeitura = PDFS.filter(function (p) { return !p.fp; }).length;
   document.getElementById('nfResumo').innerHTML =
     '<span class="tag">' + lista.length + ' nota(s) de serviço com ISSQN retido pelo tomador</span>' +
     ['ok', 'parcial', 'nome', 'nao'].map(function (k) { return '<span class="tag ' + STATUS_NF[k].cls + '">' + STATUS_NF[k].ic + ' ' + cont[k] + ' ' + STATUS_NF[k].rot + '</span>'; }).join('') +
-    '<span class="tag">' + PDFS.length + ' PDF(s) na fonte' + (semTexto ? ' · ' + semTexto + ' ainda não lido(s)' : '') + '</span>';
+    '<span class="tag">' + PDFS.length + ' PDF(s) na fonte' + (semLeitura ? ' · ' + semLeitura + ' não precisaram ser lidos' : '') + '</span>';
+
   var baixaveis = lista.filter(function (x) { return x.pdf; }).length;
   var bz = document.getElementById('btnZip');
-  bz.disabled = !baixaveis || NF.zipando;
-  bz.textContent = NF.zipando ? 'Gerando .zip…' : '⬇ Baixar ' + baixaveis + ' nota(s) encontrada(s) (.zip)';
-  document.getElementById('btnVarrer').hidden = !(cont.nao && semTexto);
-  document.getElementById('btnVarrer').disabled = NF.buscando;
-  if (!NF.buscando) document.getElementById('nfStatus').textContent = PDFS.length ? '' :
-    (MODO === 'offline' ? 'Abra também os PDFs das notas (botão “Abrir arquivos…”).' : 'Configure a pasta do Drive para buscar os PDFs.');
+  bz.disabled = NF.buscando || NF.zipando || !baixaveis;
+  bz.classList.toggle('busy', !!(NF.buscando || NF.zipando));
+  bz.textContent = NF.buscando ? '⏳ Localizando notas… ' + (NF.lidos || 0) + ' de ' + (NF.total || 0) + ' PDFs'
+                 : NF.zipando ? '⏳ Gerando .zip…'
+                 : '⬇ Baixar ' + baixaveis + ' nota(s) encontrada(s) (.zip)';
+
+  var st = document.getElementById('nfStatus');
+  if (NF.buscando) st.innerHTML = '<span class="ampulheta">⏳</span> Localizando as notas nos PDFs. O download é liberado ao final. (Na primeira vez cada PDF leva alguns segundos; depois fica guardado.)';
+  else if (NF.zipLink) st.innerHTML = '✅ <a href="' + esc(NF.zipLink.url) + '" target="_blank" rel="noopener">Clique aqui se o download do arquivo ' + esc(NF.zipLink.nome) + ' não começar</a>';
+  else if ((NF.erros || []).length) st.textContent = '⚠ ' + NF.erros.length + ' PDF(s) não puderam ser lidos. Primeiro erro: ' + NF.erros[0];
+  else if (!PDFS.length) st.textContent = MODO === 'offline' ? 'Abra também os PDFs das notas (botão “Abrir arquivos…”).' : 'Nenhum PDF encontrado na pasta de notas.';
+  else if (cont.nao) st.textContent = cont.nao + ' nota(s) não encontrada(s) em nenhum dos ' + PDFS.length + ' PDFs — o PDF dela pode não estar na pasta de notas.';
+  else st.textContent = '';
 
   var ck = function (v, rot) { return v === undefined ? '' : '<span class="tag ' + (v ? 'ok' : 'bad') + '">' + (v ? '✓' : '✕') + ' ' + rot + '</span>'; };
   document.querySelector('#tblNf tbody').innerHTML = lista.length ? lista.map(function (x) {
     var n = x.n, s = STATUS_NF[x.status];
-    var arq = x.pdf ? (x.pdf.url ? '<a href="' + esc(x.pdf.url) + '" target="_blank" rel="noopener">' + esc(x.pdf.nome) + '</a>'
-                                 : '<a href="#" data-local="' + esc(x.pdf.id) + '">' + esc(x.pdf.nome) + '</a>') : '<span class="muted">—</span>';
-    if (x.pdf && x.pdf.caminho) arq += '<div class="muted" style="font-size:11px">📁 ' + esc(x.pdf.caminho.replace(/\/$/, '')) + '</div>';
+    var arq = '<span class="muted">—</span>';
+    if (x.pdf) {
+      var u = urlPdf(x.pdf);
+      arq = u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(x.pdf.nome) + '</a>'
+              : '<a href="#" data-local="' + esc(x.pdf.id) + '">' + esc(x.pdf.nome) + '</a>';
+      if (x.pdf.caminho) arq += '<div class="muted" style="font-size:11px">📁 ' + esc(x.pdf.caminho.replace(/\/$/, '')) + '</div>';
+    }
     var conf = x.pdf ? (x.r.lido ? ck(x.r.numero, 'Nº NF') + ck(x.r.os, 'OS') + ck(x.r.cnpj, 'CNPJ') + ck(x.r.valorIss, 'Valor ISS') + ck(x.r.tomador, 'Retido tomador')
-                                 : '<span class="muted">PDF sem texto legível — só o nome do arquivo confere</span>') : '';
+                                 : '<span class="muted">' + (x.pdf.fp ? 'PDF sem texto legível — só o nome do arquivo confere' : 'Ainda não lido') + '</span>') : '';
     return '<tr><td><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +
       '<td>' + esc(n.unidade) + '</td><td title="' + esc(n.cnpj) + '">' + esc(n.estab) + '<div class="muted" style="font-size:11px">' + esc(n.cnpj) + '</div></td>' +
       '<td>' + esc(n.cidade) + '</td><td><b>' + esc(n.nfServ) + '</b></td><td>' + esc(n.os) + '</td><td>' + esc(n.placa) + '</td>' +
@@ -1285,8 +1337,7 @@ function nomeZip() {
   return 'notas_tomador' + (uni ? '_' + uni : '') + '_' + d.getFullYear() + dois(d.getMonth() + 1) + dois(d.getDate()) + '.zip';
 }
 function nomeNoZip(x) {
-  var base = ['NF' + x.n.nfServ, 'OS' + x.n.os, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_');
-  return base + '.pdf';
+  return ['NF' + x.n.nfServ, 'OS' + x.n.os, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_') + '.pdf';
 }
 function baixarBlob(blob, nome) {
   var a = document.createElement('a');
@@ -1296,28 +1347,24 @@ function baixarBlob(blob, nome) {
 }
 function baixarZip() {
   var itens = NF.lista.filter(function (x) { return x.pdf; });
-  if (!itens.length) return;
-  NF.zipando = true;
-  renderNotasTomador(true);
-  var fim = function () { NF.zipando = false; renderNotasTomador(true); };
+  if (!itens.length || NF.buscando) return;
+  NF.zipando = true; NF.zipLink = null;
+  renderNotasTomador();
+  var fim = function () { NF.zipando = false; renderNotasTomador(); };
   var nome = nomeZip();
-  // Relação das notas incluída no .zip
-  var csv = '﻿Status;Unidade;Estabelecimento;CNPJ;NF Serviço;OS;Placa;% ISSQN;ISSQN;Arquivo original;Arquivo no zip\n' + itens.map(function (x) {
-    return [STATUS_NF[x.status].rot, x.n.unidade, x.n.estab, x.n.cnpj, x.n.nfServ, x.n.os, x.n.placa, brNum(x.n.pIss), brNum(x.n.iss), x.pdf.nome, nomeNoZip(x)]
+  var csv = '﻿Status;Unidade;Estabelecimento;CNPJ;NF Serviço;OS;Placa;% ISSQN;ISSQN;Arquivo original;Pasta;Arquivo no zip\n' + itens.map(function (x) {
+    return [STATUS_NF[x.status].rot, x.n.unidade, x.n.estab, x.n.cnpj, x.n.nfServ, x.n.os, x.n.placa, brNum(x.n.pIss), brNum(x.n.iss), x.pdf.nome, x.pdf.caminho || '', nomeNoZip(x)]
       .map(function (v) { v = String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';');
   }).join('\n');
 
   if (MODO === 'appsscript') {
-    chamar('gerarZip', itens.map(function (x) { return { id: x.pdf.id, nome: nomeNoZip(x) }; }), nome).then(function (res) {
-      if (res.base64) {
-        var bin = atob(res.base64), u8 = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-        baixarBlob(new Blob([u8], { type: 'application/zip' }), res.nome);
-      } else {
-        window.open(res.url, '_blank');
-      }
-      baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), nome.replace('.zip', '_relacao.csv'));
-    }).catch(function (e) { alert('Erro ao gerar o .zip: ' + (e && e.message || e)); }).then(fim);
+    // O .zip é montado e gravado no Drive; o navegador baixa direto de lá (sem trafegar pelo painel).
+    chamar('gerarZip', itens.map(function (x) { return { id: x.pdf.id, nome: nomeNoZip(x) }; }), nome, csv).then(function (res) {
+      NF.zipLink = res;
+      var a = document.createElement('a');
+      a.href = res.url; a.target = '_blank'; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+    }).catch(function (e) { NF.erros = ['Erro ao gerar o .zip: ' + (e && e.message || e)]; }).then(fim);
   } else {
     carregarScript(LIB.zip, function () { return window.JSZip; }).then(function () {
       var zip = new JSZip(), usados = {};
@@ -1329,7 +1376,7 @@ function baixarZip() {
       zip.file('relacao_notas.csv', csv);
       return zip.generateAsync({ type: 'blob' });
     }).then(function (blob) { baixarBlob(blob, nome); })
-      .catch(function (e) { alert('Erro ao gerar o .zip: ' + (e && e.message || e)); }).then(fim);
+      .catch(function (e) { NF.erros = ['Erro ao gerar o .zip: ' + (e && e.message || e)]; }).then(fim);
   }
 }
 
@@ -1364,7 +1411,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   document.getElementById('btnCsv').onclick = exportarCsv;
   document.getElementById('btnZip').onclick = baixarZip;
-  document.getElementById('btnVarrer').onclick = function () { buscarNotas(true); };
   document.getElementById('btnTema').onclick = function () {
     var root = document.documentElement;
     var escuro = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;

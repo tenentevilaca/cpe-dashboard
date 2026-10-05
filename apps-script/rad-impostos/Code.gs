@@ -7,8 +7,11 @@
  *     - Notas: notas fiscais em PDF (inclusive em subpastas).
  *  2. Se as duas constantes estiverem vazias: a aba ABA_DADOS desta planilha.
  *
- * O texto dos PDFs é extraído pelo OCR do Google Drive (serviço avançado "Drive API")
- * e guardado na aba oculta "_cache_pdf" para não ser lido de novo.
+ * O texto dos PDFs é extraído pelo OCR do Google Drive (serviço avançado "Drive API") e reduzido a uma
+ * "impressão digital" (números, CNPJs e valores encontrados), guardada na aba oculta "_cache_pdf_v2".
+ *
+ * Economia de dados: o RAD é convertido em tabela no servidor, e o painel recebe só os números das notas
+ * que interessam (nunca o texto inteiro dos PDFs). O .zip é gravado no Drive e baixado direto de lá.
  */
 
 // Pastas do Google Drive (podem ser trocadas pelo botão "📁 Pastas do Drive" no painel).
@@ -19,7 +22,7 @@ var PASTA_NOTAS_PADRAO = '1ylX_cDzvczSj3wxz2fNKYUMfdngg5aBm';  // PDFs das notas
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
 
 var ABA_DADOS = 'BADE SE DADOS';
-var ABA_CACHE = '_cache_pdf';
+var ABA_CACHE = '_cache_pdf_v2';
 var PASTA_ZIP = 'Notas tomador (painel)';
 var LIMITE_SEGUNDOS = 240; // cada chamada de leitura de PDFs para antes de 4 min (o Apps Script corta em 6)
 
@@ -115,19 +118,16 @@ function getFontes() {
     var nome = arq.getName();
     var mime = arq.getMimeType();
     if (mime === MimeType.PDF || /\.pdf$/i.test(nome)) {
-      var atualizado = arq.getLastUpdated().getTime();
       var c = cache[id];
-      pdfs.push({
-        id: id, nome: nome, caminho: caminho, url: arq.getUrl(), tamanho: arq.getSize(), atualizado: atualizado,
-        texto: c && c.atualizado === atualizado ? c.texto : null
-      });
+      // "lido": já tem impressão no cache (o painel busca só os números que precisa com impressoesCache).
+      pdfs.push({ id: id, nome: nome, caminho: caminho, lido: !!(c && c.atualizado === arq.getLastUpdated().getTime()) });
     } else if (IGNORAR_RADS.test(nome)) {
       consolidados.push(caminho + nome); // planilha consolidada: os dados já estão nos RADs das unidades
     } else if (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
                /\.(xlsx|xlsm|xls|html?)$/i.test(nome) || /rad/i.test(nome)) {
       try {
         var rad = lerRadArquivo_(arq, mime);
-        if (rad) { rad.id = id; rad.nome = caminho + nome; rads.push(rad); }
+        if (rad) { rad.nome = caminho + nome; rads.push(rad); }
         else ignorados.push(caminho + nome);
       } catch (e) {
         ignorados.push(caminho + nome + ' (erro: ' + (e && e.message || e) + ')');
@@ -139,8 +139,7 @@ function getFontes() {
 
   var nomes = [pastaRads && 'RADs: “' + pastaRads.getName() + '”', pastaNotas && 'Notas: “' + pastaNotas.getName() + '”'].filter(String);
   return {
-    modo: 'drive', origem: nomes.join(' · '), pastaRadsUrl: pastaRads && pastaRads.getUrl(), pastaNotasUrl: pastaNotas && pastaNotas.getUrl(),
-    atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados
+    modo: 'drive', origem: nomes.join(' · '), atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados
   };
 }
 
@@ -163,8 +162,30 @@ function lerRadArquivo_(arq, mime) {
     finally { DriveApp.getFileById(tmp.id).setTrashed(true); }
   }
   var html = blob.getDataAsString('UTF-8');
-  if (/title-rad|Sint(&eacute;|é)tico da Despesa|<table/i.test(html) && /Placa/i.test(html)) return { html: html };
+  if (/title-rad|Sint(&eacute;|é)tico da Despesa|<table/i.test(html) && /Placa/i.test(html)) return { grade: gradeDoHtml_(html) };
   return null;
+}
+
+/** Converte as tabelas do RAD (HTML) em linhas de células de texto — bem menor que o HTML original. */
+function gradeDoHtml_(html) {
+  html = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '');
+  var grade = [];
+  (html.match(/<tr[\s>][\s\S]*?<\/tr>/gi) || []).forEach(function (tr) {
+    var cels = (tr.match(/<t[dh][\s>][\s\S]*?<\/t[dh]>/gi) || []).map(function (td) {
+      return decodificar_(td.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    });
+    if (cels.some(String)) grade.push(cels);
+  });
+  return grade;
+}
+
+function decodificar_(s) {
+  var marcas = { acute: '\u0301', grave: '\u0300', circ: '\u0302', tilde: '\u0303', uml: '\u0308', cedil: '\u0327' };
+  var nomes = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", ordm: 'º', ordf: 'ª', deg: '°' };
+  return s.replace(/&([a-zA-Z])(acute|grave|circ|tilde|uml|cedil);/g, function (_, l, m) { return (l + marcas[m]).normalize('NFC'); })
+    .replace(/&#x([0-9a-f]+);/gi, function (_, h) { return String.fromCharCode(parseInt(h, 16)); })
+    .replace(/&#(\d+);/g, function (_, d) { return String.fromCharCode(+d); })
+    .replace(/&([a-z]+);/gi, function (m, n) { return nomes.hasOwnProperty(n.toLowerCase()) ? nomes[n.toLowerCase()] : m; });
 }
 
 /** Procura a aba com a tabela do RAD (cabeçalho "Placa"); prefere a aba ABA_DADOS. */
@@ -201,29 +222,79 @@ function listarArquivos_(pasta, caminho, cb) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Chamado pelo painel com uma lista de IDs de PDF. Extrai o texto de cada um até o limite de tempo
- * e devolve { textos: {id: texto}, pendentes: [ids não processados] }.
+ * Impressão digital do texto de uma nota: só o que serve para identificá-la.
+ *  i: números inteiros "soltos" (nº da nota, OS…), sem zeros à esquerda
+ *  j: sequências numéricas formatadas/longas, só dígitos (CNPJ, chave de acesso, datas…)
+ *  v: valores em reais no formato 1.234,56
+ *  tom: 1 se o texto diz que o ISSQN é retido pelo tomador
+ *  len: tamanho do texto (0 = PDF sem texto legível)
  */
-function lerTextosPdf(ids) {
+function impressao_(texto) {
+  texto = String(texto || '');
+  var i = {}, j = {}, v = {};
+  (texto.match(/\d[\d.,\/\-]*\d|\d/g) || []).forEach(function (tok) {
+    if (/^\d+$/.test(tok)) i[tok.replace(/^0+(?=\d)/, '')] = 1;
+    else if (/^\d{1,3}(\.\d{3})*,\d{2}$/.test(tok)) v[tok] = 1;
+    var d = tok.replace(/\D/g, '');
+    if (d.length >= 6) j[d] = 1;
+  });
+  var n = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return {
+    i: Object.keys(i), j: Object.keys(j), v: Object.keys(v),
+    tom: /retido pelo tomador|iss(qn)? retido.{0,40}sim|tomador.{0,30}respons/.test(n) ? 1 : 0,
+    len: texto.replace(/\s/g, '').length
+  };
+}
+
+/**
+ * Reduz a impressão ao que o painel procura (chaves: {i: nºs de nota e OS, c: CNPJs, v: valores}).
+ * Assim cada PDF ocupa poucos bytes na resposta.
+ */
+function filtrarImpressao_(fp, chaves) {
+  var I = {}, V = {};
+  (chaves.i || []).forEach(function (x) { I[x] = 1; });
+  (chaves.v || []).forEach(function (x) { V[x] = 1; });
+  var out = { i: fp.i.filter(function (x) { return I[x]; }), c: [], v: fp.v.filter(function (x) { return V[x]; }), tom: fp.tom, len: fp.len };
+  (chaves.i || []).forEach(function (x) {
+    if (x.length >= 6 && out.i.indexOf(x) < 0 && fp.j.some(function (t) { return t.indexOf(x) > -1; })) out.i.push(x);
+  });
+  (chaves.c || []).forEach(function (x) {
+    if (fp.j.some(function (t) { return t.indexOf(x) > -1; })) out.c.push(x);
+  });
+  return out;
+}
+
+/** Chamado pelo painel: impressões já guardadas no cache, filtradas pelas chaves. */
+function impressoesCache(ids, chaves) {
+  var cache = lerCache_(), out = {};
+  ids.forEach(function (id) { if (cache[id]) out[id] = filtrarImpressao_(cache[id].fp, chaves); });
+  return out;
+}
+
+/**
+ * Chamado pelo painel com um lote de IDs de PDF: lê cada um (OCR) até o limite de tempo.
+ * Devolve { fps: {id: impressão filtrada}, pendentes: [ids não processados], erros: {id: msg} }.
+ */
+function lerImpressoesPdf(ids, chaves) {
   var inicio = Date.now();
   var cache = lerCache_();
-  var textos = {}, pendentes = [], erros = {};
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i];
-    if ((Date.now() - inicio) / 1000 > LIMITE_SEGUNDOS) { pendentes = ids.slice(i); break; }
+  var fps = {}, pendentes = [], erros = {}, novos = [];
+  for (var k = 0; k < ids.length; k++) {
+    var id = ids[k];
+    if ((Date.now() - inicio) / 1000 > LIMITE_SEGUNDOS) { pendentes = ids.slice(k); break; }
     try {
       var arq = DriveApp.getFileById(id);
       var atualizado = arq.getLastUpdated().getTime();
-      if (cache[id] && cache[id].atualizado === atualizado) { textos[id] = cache[id].texto; continue; }
-      var texto = extrairTexto_(arq);
-      textos[id] = texto;
-      gravarCache_(id, atualizado, texto);
+      var fp = cache[id] && cache[id].atualizado === atualizado ? cache[id].fp : null;
+      if (!fp) { fp = impressao_(extrairTexto_(arq)); novos.push([id, atualizado, JSON.stringify(fp)]); }
+      fps[id] = filtrarImpressao_(fp, chaves);
     } catch (e) {
       erros[id] = String(e && e.message || e);
-      textos[id] = '';
+      fps[id] = { i: [], c: [], v: [], tom: 0, len: 0 };
     }
   }
-  return { textos: textos, pendentes: pendentes, erros: erros };
+  gravarCache_(novos, cache);
+  return { fps: fps, pendentes: pendentes, erros: erros };
 }
 
 /** Converte o PDF em Google Docs (com OCR) só para ler o texto, e apaga a cópia em seguida. */
@@ -245,8 +316,10 @@ function abaCache_() {
   var aba = ss.getSheetByName(ABA_CACHE);
   if (!aba) {
     aba = ss.insertSheet(ABA_CACHE);
-    aba.getRange(1, 1, 1, 3).setValues([['id', 'atualizado', 'texto']]);
+    aba.getRange(1, 1, 1, 3).setValues([['id', 'atualizado', 'impressao']]);
     aba.hideSheet();
+    var antiga = ss.getSheetByName('_cache_pdf'); // versão anterior guardava o texto inteiro
+    if (antiga) ss.deleteSheet(antiga);
   }
   return aba;
 }
@@ -257,19 +330,21 @@ function lerCache_() {
   var mapa = {};
   if (n < 2) return mapa;
   aba.getRange(2, 1, n - 1, 3).getValues().forEach(function (l, i) {
-    mapa[l[0]] = { atualizado: Number(l[1]), texto: String(l[2]), linha: i + 2 };
+    try { mapa[l[0]] = { atualizado: Number(l[1]), fp: JSON.parse(l[2]), linha: i + 2 }; } catch (e) {}
   });
   return mapa;
 }
 
-function gravarCache_(id, atualizado, texto) {
-  var aba = abaCache_();
-  texto = String(texto || '').slice(0, 45000); // limite de 50 mil caracteres por célula
-  var ids = aba.getLastRow() > 1 ? aba.getRange(2, 1, aba.getLastRow() - 1, 1).getValues() : [];
-  for (var i = 0; i < ids.length; i++) {
-    if (ids[i][0] === id) { aba.getRange(i + 2, 2, 1, 2).setValues([[atualizado, texto]]); return; }
-  }
-  aba.appendRow([id, atualizado, texto]);
+/** Grava várias impressões de uma vez (atualiza as existentes e acrescenta as novas). */
+function gravarCache_(linhas, cache) {
+  if (!linhas.length) return;
+  var aba = abaCache_(), novas = [];
+  linhas.forEach(function (l) {
+    var c = cache[l[0]];
+    if (c && c.linha) aba.getRange(c.linha, 2, 1, 2).setValues([[l[1], l[2]]]);
+    else novas.push(l);
+  });
+  if (novas.length) aba.getRange(aba.getLastRow() + 1, 1, novas.length, 3).setValues(novas);
 }
 
 /* ------------------------------------------------------------------ */
@@ -277,10 +352,11 @@ function gravarCache_(id, atualizado, texto) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Junta os PDFs num .zip. Até ~8 MB devolve o arquivo direto (base64) para o navegador baixar;
- * acima disso salva o .zip na subpasta PASTA_ZIP e devolve o link.
+ * Junta os PDFs (e a relação em CSV) num .zip gravado na subpasta PASTA_ZIP da pasta de notas.
+ * O navegador baixa o arquivo direto do Drive, sem passar pelo painel (menos dados trafegados).
+ * Os .zip gerados antes são enviados para a lixeira.
  */
-function gerarZip(itens, nomeZip) {
+function gerarZip(itens, nomeZip, csv) {
   var usados = {};
   var blobs = itens.map(function (it) {
     var blob = DriveApp.getFileById(it.id).getBlob();
@@ -288,15 +364,16 @@ function gerarZip(itens, nomeZip) {
     if (usados[nome]) nome = nome.replace(/(\.pdf)?$/i, '_' + (++usados[nome]) + '.pdf'); else usados[nome] = 1;
     return blob.setName(nome);
   });
+  if (csv) blobs.push(Utilities.newBlob(csv, 'text/csv', 'relacao_notas.csv'));
   var zip = Utilities.zip(blobs, nomeZip);
-  var bytes = zip.getBytes();
-  if (bytes.length < 8 * 1024 * 1024) return { nome: nomeZip, base64: Utilities.base64Encode(bytes) };
 
   var pasta = abrirPasta_(idsPastas_().notas, 'notas');
   var destinos = pasta.getFoldersByName(PASTA_ZIP);
   var destino = destinos.hasNext() ? destinos.next() : pasta.createFolder(PASTA_ZIP);
+  var antigos = destino.getFiles();
+  while (antigos.hasNext()) { var a = antigos.next(); if (/\.zip$/i.test(a.getName())) a.setTrashed(true); }
   var arq = destino.createFile(zip);
-  return { nome: nomeZip, url: 'https://drive.google.com/uc?export=download&id=' + arq.getId(), driveUrl: arq.getUrl() };
+  return { nome: nomeZip, url: 'https://drive.google.com/uc?export=download&id=' + arq.getId(), tamanho: arq.getSize() };
 }
 
 /* ------------------------------------------------------------------ */
