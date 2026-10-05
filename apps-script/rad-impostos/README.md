@@ -1,44 +1,47 @@
-# Painel de Impostos — RAD (Google Apps Script)
+# Painel de Impostos — RAD
 
-Painel que lê a aba **BADE SE DADOS** da planilha RAD e mostra:
+Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e as **notas fiscais em PDF** e mostra:
 
-- **Diferenças de imposto por categoria** (ICMS, IRRF Peça, IRRF Serviço, ISSQN): notas com/sem retenção,
-  alíquotas encontradas, base de cálculo, valor informado × valor recalculado, diferença, alíquota efetiva
-  e divisão Simples × não Simples.
-- **Dashboard visual**: indicadores (ordens, notas fiscais, valor aprovado, impostos, líquido, diferença),
-  total por imposto, impostos por unidade, notas por alíquota, top 10 estabelecimentos e matriz alíquota × unidade.
-- **Filtros**: imposto, situação (com retenção / sem retenção / com diferença), alíquota, unidade,
-  município, optante Simples, responsável ISSQN e busca livre.
-- **Tabela final** com todas as notas (ordenável e exportável em CSV).
+- **Diferenças de imposto por categoria** (ICMS, IRRF Peça, IRRF Serviço, ISSQN): valor informado × recalculado, alíquotas, base, Simples × não Simples.
+- **Dashboard visual** com indicadores, gráficos e a matriz alíquota × unidade.
+- **Filtros**: imposto, situação, alíquota, unidade, município, optante Simples, responsável ISSQN e busca livre.
+- **Notas fiscais com ISSQN retido pelo tomador**: para cada nota de serviço do RAD com responsável TOMADOR,
+  localiza o PDF correspondente e confere no texto do PDF o CNPJ do prestador, o número da nota, a OS,
+  o valor do ISSQN e a expressão "Retido pelo Tomador". Botão **Baixar notas encontradas (.zip)** (inclui `relacao_notas.csv`).
+- **Tabela final** com todas as ordens (ordenável, exporta CSV).
 
-## Opção 1 — sem internet/Google (arquivo .xlsx no computador)
+## Opção 1 — Google Drive + Apps Script (recomendado)
 
-Dê dois cliques em `painel-impostos.html` (abre no Chrome/Edge) e escolha ou arraste o arquivo .xlsx.
-A planilha é lida só no navegador, nada é enviado. Para outra planilha, use **↻ Atualizar dados**.
-(Precisa de internet apenas para carregar as bibliotecas de gráfico e de leitura de Excel.)
+1. Coloque numa pasta do Google Drive os RADs exportados do sistema (`RelatorioSinteticoDaDespesaRAD*.xls`, um por unidade)
+   e os PDFs das notas (podem estar em subpastas).
+2. Crie uma Planilha Google (pode ser em branco) › **Extensões › Apps Script**.
+3. Cole `Code.gs`; crie o arquivo HTML `Index` e cole `Index.html`.
+4. Ative o serviço avançado do Drive: em **Serviços (+)** adicione **Drive API** (v3) — ou, em
+   *Configurações do projeto › Mostrar "appsscript.json"*, cole o `appsscript.json` desta pasta.
+5. Salve, recarregue a planilha e abra **📊 Painel de Impostos › Abrir painel** (autorize na 1ª vez).
+6. No painel, clique em **📁 Pasta do Drive** e cole o link da pasta.
 
-## Opção 2 — Google Sheets + Apps Script
+O texto dos PDFs é lido pelo OCR do Google Drive (funciona também com PDF escaneado) e guardado na aba oculta
+`_cache_pdf`, então só a primeira leitura de cada PDF é demorada. Primeiro são lidos os PDFs com o número da nota
+no nome do arquivo; o botão **🔎 Procurar em todos os PDFs** lê os demais.
 
-1. Abra a planilha no Google Sheets (se for .xlsx, use *Arquivo › Salvar como Planilhas Google*).
-2. *Extensões › Apps Script*.
-3. Substitua o conteúdo de `Code.gs` pelo arquivo `Code.gs` desta pasta.
-4. Clique em **+ › HTML**, nomeie como `Index` e cole o conteúdo de `Index.html`.
-5. (Opcional) *Configurações do projeto › Mostrar arquivo de manifesto* e cole `appsscript.json`.
-6. Salve, recarregue a planilha e use o menu **📊 Painel de Impostos › Abrir painel**
-   (na primeira vez o Google pede autorização).
+Sem pasta configurada, o painel usa a aba `BADE SE DADOS` da planilha (formato consolidado antigo).
 
-Para abrir em tela cheia no navegador: *Implantar › Nova implantação › App da Web* e use a URL gerada.
+## Opção 2 — Sem Google (arquivos no computador)
 
-## Regras de cálculo
+Abra `painel-impostos.html` no Chrome/Edge, clique em **Escolher arquivos…** e selecione de uma vez os RADs (.xls)
+e os PDFs das notas. Nada é enviado para a internet (só as bibliotecas de gráfico/PDF/ZIP são baixadas).
+PDFs escaneados (imagem, sem texto) só são localizados pelo nome do arquivo nessa opção.
 
-| Item | Fórmula |
+## Regras
+
+| Item | Regra |
 |---|---|
+| Unidade | Campo "Nome Órgão / Entidade" do RAD (ex.: `25A BPMAMB` → `BPMAMB`) |
+| RAD repetido | Ordens repetidas (mesma OS/NF/placa) são ignoradas e o painel avisa |
+| Nota de tomador | NF Serviço com Responsável ISSQN = TOMADOR (ou vazio com ISSQN retido > 0) |
+| Nota "encontrada e conferida" | PDF contém o CNPJ do prestador **e** o número da NF ou a OS |
+| Nota "encontrada pelo nome" | Nome do arquivo tem o número da NF e o nome do estabelecimento, mas o texto não pôde ser lido |
 | Base peça | Valor a Pagar Peça + ICMS + IRRF peça |
-| Base serviço | Valor Serviço + IRRF serviço + ISSQN (só quando o responsável é o **TOMADOR**) |
-| Imposto recalculado | Base × alíquota |
+| Base serviço | Valor Serviço + IRRF serviço + ISSQN retido pelo tomador |
 | Líquido recalculado | Valor Aprovado − ICMS − IRRF peça − IRRF serviço − ISSQN retido |
-
-- "ICMS DESONERADO" na coluna `% ICMS` é tratado como desonerado; a alíquota efetiva é mostrada entre parênteses.
-- Diferenças até R$ 0,05 (arredondamento) são ignoradas — ajuste `TOLERANCIA` no `Index.html`.
-- Se a aba mudar de nome, ajuste `ABA_DADOS` no `Code.gs`. As colunas são localizadas pelo nome do cabeçalho
-  (as colunas repetidas `% IRRF`/`IRRF` são lidas na ordem: 1ª = peça, 2ª = serviço).

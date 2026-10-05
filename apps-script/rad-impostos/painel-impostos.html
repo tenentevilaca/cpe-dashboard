@@ -153,6 +153,12 @@
   .drop.over { border-color: var(--accent); background: var(--hl); }
   .drop h2 { color: var(--text); font-size: 17px; margin-bottom: 6px; }
   .drop p { margin: 0 0 16px; }
+  .avisos { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
+  .nf-resumo { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .nf-resumo .tag:not(.ok):not(.bad):not(.warn) { background: var(--surface-2); color: var(--text-2); }
+  td.checks .tag { margin: 1px 2px 1px 0; font-size: 11px; }
+  td a { color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: default; }
   .empty { padding: 24px; text-align: center; color: var(--muted); }
 </style>
 </head>
@@ -163,20 +169,24 @@
       <h1>Painel de Impostos — RAD</h1>
       <div class="sub" id="origem">Nenhuma planilha carregada</div>
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="btnTema" title="Alternar tema claro/escuro">◐ Tema</button>
+      <button class="btn" id="btnPasta" title="Pasta do Google Drive com os RADs e as notas">📁 Pasta do Drive</button>
+      <button class="btn" id="btnAbrir" title="Abrir RADs, planilha ou PDFs das notas">📂 Abrir arquivos…</button>
       <button class="btn" id="btnAtualizar">↻ Atualizar dados</button>
     </div>
   </header>
 
   <div id="loading">Carregando notas da planilha…</div>
   <div id="drop" class="drop" hidden>
-    <h2>Abra a planilha RAD (.xlsx)</h2>
-    <p>Escolha o arquivo ou arraste-o para cá. Ele é lido só no seu navegador — nada é enviado para a internet.</p>
-    <button class="btn primary" id="btnArquivo">Escolher arquivo…</button>
-    <input type="file" id="inArquivo" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+    <h2>Abra os RADs das unidades e as notas fiscais</h2>
+    <p>Selecione de uma vez os arquivos <b>RelatorioSinteticoDaDespesaRAD*.xls</b> de cada unidade e os <b>PDFs das notas</b> (ou arraste-os para cá).
+      Também aceita a planilha consolidada (.xlsx). Tudo é lido só no seu navegador — nada é enviado para a internet.</p>
+    <button class="btn primary" id="btnArquivo">Escolher arquivos…</button>
+    <input type="file" id="inArquivo" accept=".xls,.xlsx,.xlsm,.html,.htm,.pdf" multiple hidden>
   </div>
 
+  <div id="avisos" class="avisos" hidden></div>
   <main id="app" hidden>
     <!-- Filtros -->
     <section class="filters" aria-label="Filtros">
@@ -283,6 +293,28 @@
       <div class="tbl-wrap"><table id="tblMatriz"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
     </section>
 
+    <!-- Notas fiscais: ISSQN retido pelo tomador -->
+    <section class="card" id="secNf">
+      <div class="table-tools">
+        <div>
+          <h2>Notas fiscais com ISSQN retido pelo tomador</h2>
+          <div class="hint" style="margin:0">Notas de serviço do RAD com responsável <b>TOMADOR</b> localizadas entre os PDFs: confere CNPJ do prestador, número da nota, OS, valor do ISSQN e “Retido pelo Tomador” no texto do PDF. Segue os filtros acima.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="btnVarrer" hidden title="Lê todos os PDFs, inclusive os que não têm o número da nota no nome">🔎 Procurar em todos os PDFs</button>
+          <button class="btn primary" id="btnZip" disabled>⬇ Baixar notas encontradas (.zip)</button>
+        </div>
+      </div>
+      <div class="nf-resumo" id="nfResumo"></div>
+      <div class="hint" id="nfStatus"></div>
+      <div class="tbl-wrap big-table" style="max-height:480px">
+        <table id="tblNf"><thead><tr>
+          <th>Situação</th><th>Unidade</th><th>Estabelecimento</th><th>Cidade</th><th>NF Serviço</th><th>OS</th><th>Placa</th>
+          <th class="n">% ISSQN</th><th class="n">ISSQN</th><th>Resp. no RAD</th><th>Arquivo</th><th>Conferência no PDF</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
     <!-- Tabela final -->
     <section class="card">
       <div class="table-tools">
@@ -334,7 +366,8 @@ function impostosAtivos() { return state.imposto === 'todos' ? IMPOSTOS : [imp(s
 
 /* ---------------- Preparação dos dados ---------------- */
 function preparar(n) {
-  n.issRetido = n.respIss.toUpperCase() === 'TOMADOR' ? n.iss : 0;
+  n.respIss = String(n.respIss || '').toUpperCase();
+  n.issRetido = n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0) ? n.iss : 0;
   n.basePeca = r2(n.vPeca + n.icms + n.irPeca);
   n.baseServ = r2(n.vServ + n.irServ + n.issRetido);
   // ICMS desonerado vem como texto na alíquota: usa a alíquota implícita para não acusar diferença falsa.
@@ -453,6 +486,7 @@ function render() {
   renderGraficos(dados);
   renderMatriz(dados);
   renderTabela(dados);
+  renderNotasTomador();
 }
 
 function soma(arr, k) { return r2(arr.reduce(function (s, n) { return s + (typeof k === 'function' ? k(n) : n[k]); }, 0)); }
@@ -786,30 +820,66 @@ function exportarCsv() {
   document.body.appendChild(a); a.click(); a.remove();
 }
 
-/* ---------------- Inicialização ---------------- */
+/* ---------------- Carga de dados ---------------- */
+/*
+ * Fontes aceitas:
+ *  - Apps Script com pasta do Drive: RADs (.xls) de todas as unidades + PDFs das notas;
+ *  - Apps Script sem pasta: aba "BADE SE DADOS" da planilha;
+ *  - Navegador (offline): arquivos escolhidos no computador (.xls do RAD, .xlsx consolidado e PDFs).
+ */
+var MODO = window.google && google.script && google.script.run ? 'appsscript' : 'offline';
+var PDFS = [];        // [{id, nome, caminho, url, file?, texto (null = ainda não lido)}]
+var FONTE = {};       // informações da última carga
+var NF = { lista: [], buscando: false };
+
+function chamar(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (ok, erro) {
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(erro);
+    r[fn].apply(r, args);
+  });
+}
+
 function carregar() {
   var loading = document.getElementById('loading');
-  loading.hidden = false;
-  loading.textContent = 'Carregando notas da planilha…';
-  if (window.google && google.script && google.script.run) {
-    google.script.run.withSuccessHandler(exibir).withFailureHandler(erroCarga).getDados();
-  } else if (window.DADOS_DEMO) {
-    exibir(window.DADOS_DEMO); // pré-visualização
-  } else {
-    // Modo offline: abre o .xlsx direto do computador.
+  if (MODO === 'offline') {
     loading.hidden = true;
     if (NOTAS.length) document.getElementById('inArquivo').click();
     else document.getElementById('drop').hidden = false;
+    return;
   }
+  loading.hidden = false;
+  loading.textContent = 'Lendo os RADs e as notas…';
+  chamar('getFontes').then(function (res) {
+    var notas, avisos = [];
+    if (res.modo === 'drive') {
+      var r = notasDosRads(res.rads.map(function (x) { return { nome: x.nome, html: x.html }; }));
+      notas = r.notas; avisos = r.avisos;
+      PDFS = res.pdfs;
+    } else {
+      notas = linhasParaNotas(res.cab, res.linhas, '');
+      PDFS = [];
+    }
+    FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos, pastaUrl: res.pastaUrl };
+    exibir(notas);
+  }).catch(erroCarga);
 }
-function exibir(res) {
-  NOTAS = res.notas.map(preparar);
-  document.getElementById('origem').textContent = res.planilha + ' · aba “' + res.aba + '” · ' + NOTAS.length + ' registros · atualizado em ' + res.atualizadoEm;
+
+function exibir(notas) {
+  NOTAS = notas.map(preparar);
+  var unidades = unicos(NOTAS.map(function (n) { return n.unidade; }));
+  document.getElementById('origem').textContent = (FONTE.origem || '') + ' · ' + NOTAS.length + ' ordens · ' +
+    (unidades.length ? unidades.length + ' unidade(s): ' + unidades.join(', ') : '') +
+    (PDFS.length ? ' · ' + PDFS.length + ' PDF(s)' : '') + (FONTE.atualizadoEm ? ' · atualizado em ' + FONTE.atualizadoEm : '');
+  var av = document.getElementById('avisos');
+  av.innerHTML = (FONTE.avisos || []).map(function (a) { return '<div>⚠ ' + esc(a) + '</div>'; }).join('');
+  av.hidden = !(FONTE.avisos || []).length;
   document.getElementById('loading').hidden = true;
   document.getElementById('drop').hidden = true;
   document.getElementById('app').hidden = false;
   montarFiltros();
   render();
+  if (PDFS.length) buscarNotas(false);
 }
 function erroCarga(e) {
   var l = document.getElementById('loading');
@@ -817,45 +887,62 @@ function erroCarga(e) {
   l.textContent = 'Erro ao carregar: ' + (e && e.message ? e.message : e);
 }
 
-/* ---------------- Modo offline (arquivo .xlsx local) ---------------- */
-var ABA_DADOS = 'BADE SE DADOS';
-function carregarSheetJS(cb) {
-  if (window.XLSX) return cb();
-  var sc = document.createElement('script');
-  sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-  sc.onload = cb;
-  sc.onerror = function () { erroCarga('não foi possível carregar o leitor de Excel (verifique a internet).'); };
-  document.head.appendChild(sc);
-}
-function lerArquivo(file) {
-  if (!file) return;
-  var l = document.getElementById('loading');
-  l.hidden = false; l.textContent = 'Lendo ' + file.name + '…';
-  carregarSheetJS(function () {
-    var fr = new FileReader();
-    fr.onload = function () {
-      try { exibir(converterPlanilha(XLSX.read(fr.result, { type: 'array', cellDates: true }), file.name)); }
-      catch (e) { erroCarga(e); document.getElementById('drop').hidden = false; }
-    };
-    fr.readAsArrayBuffer(file);
-  });
-}
-function converterPlanilha(wb, nomeArquivo) {
-  var nomeAba = wb.SheetNames.filter(function (n) { return n === ABA_DADOS; })[0];
-  var linhas;
-  if (nomeAba) linhas = XLSX.utils.sheet_to_json(wb.Sheets[nomeAba], { header: 1, raw: true, defval: '' });
-  else {
-    for (var i = 0; i < wb.SheetNames.length; i++) {
-      var t = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], { header: 1, raw: true, defval: '' });
-      if (t.length && String(t[0][0]).trim().toLowerCase() === 'placa') { nomeAba = wb.SheetNames[i]; linhas = t; break; }
-    }
-  }
-  if (!linhas) throw new Error('não encontrei a aba de dados (cabeçalho começando por "Placa").');
+/* ---------------- Leitura do RAD (.xls exportado do sistema = HTML) ---------------- */
+function semAcento(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function normCab(s) { return semAcento(s).toLowerCase().replace(/\s+/g, ' ').trim(); }
 
-  var cab = linhas[0];
-  var col = function (nome, oc) {
-    oc = oc || 1; var achou = 0, alvo = nome.toLowerCase();
-    for (var i = 0; i < cab.length; i++) if (String(cab[i]).trim().toLowerCase() === alvo && ++achou === oc) return i;
+function lerRadHtml(html, nomeArquivo) {
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  var tds = Array.prototype.slice.call(doc.querySelectorAll('td, th'));
+  var orgao = '', periodo = '';
+  for (var i = 0; i < tds.length; i++) {
+    var t = tds[i].textContent.replace(/\s+/g, ' ').trim();
+    if (!orgao && /^Nome Órgão \/ Entidade:?$/i.test(t) && tds[i + 1]) orgao = tds[i + 1].textContent.replace(/\s+/g, ' ').trim();
+    if (!orgao && /^Código Órgão \/ Entidade:?$/i.test(t) && tds[i + 1]) orgao = tds[i + 1].textContent.replace(/\s+/g, ' ').trim();
+    if (!periodo) { var m = /Período:\s*(.+)$/i.exec(t); if (m) periodo = m[1]; }
+  }
+  var cab = null, linhas = [];
+  doc.querySelectorAll('tr').forEach(function (tr) {
+    var cels = Array.prototype.map.call(tr.children, function (td) { return td.textContent.replace(/\s+/g, ' ').trim(); });
+    if (tr.classList.contains('tb-cabecalho') || normCab(cels[0]) === 'placa') { cab = cels; return; }
+    if (!cab || tr.classList.contains('rad-totais') || cels.length !== cab.length) return;
+    linhas.push(cels);
+  });
+  if (!cab) throw new Error('“' + nomeArquivo + '” não parece um RAD (tabela com "Placa" não encontrada).');
+  // "25A BPMAMB" -> "BPMAMB"
+  var sigla = orgao.replace(/^\d+\s*[ºª°A-Z]?\s+/i, '').trim() || orgao;
+  return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo };
+}
+
+/** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. */
+function notasDosRads(rads) {
+  var notas = [], vistas = {}, avisos = [], porUnidade = {};
+  rads.forEach(function (r) {
+    var rad;
+    try { rad = lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
+    var novas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade).filter(function (n) {
+      var k = [n.os, n.nfPeca, n.nfServ, n.placa].join('|');
+      if (vistas[k]) return false;
+      vistas[k] = 1; return true;
+    });
+    if (!novas.length && rad.linhas.length) avisos.push('“' + r.nome + '” repete um RAD já lido (' + rad.unidade + ') e foi ignorado.');
+    porUnidade[rad.unidade] = rad.periodo;
+    notas = notas.concat(novas);
+  });
+  var periodos = unicos(Object.keys(porUnidade).map(function (u) { return porUnidade[u]; }));
+  if (periodos.length > 1) avisos.push('Os RADs têm períodos diferentes: ' + periodos.join(' | '));
+  return { notas: notas, avisos: avisos };
+}
+
+/** Converte cabeçalho + linhas (RAD ou planilha consolidada) no formato usado pelo painel. */
+function linhasParaNotas(cab, linhas, unidadePadrao) {
+  var cabN = cab.map(normCab);
+  var col = function (nomes, oc) {
+    nomes = [].concat(nomes).map(normCab); oc = oc || 1;
+    for (var j = 0; j < nomes.length; j++) {
+      var achou = 0;
+      for (var i = 0; i < cabN.length; i++) if (cabN[i] === nomes[j] && ++achou === oc) return i;
+    }
     return -1;
   };
   var num = function (v) {
@@ -875,28 +962,346 @@ function converterPlanilha(wb, nomeArquivo) {
     cnpj: col('CNPJ'), estab: col('Estabelecimento'), cidade: col('Endereço Estabelecimento'), simples: col('Optante Simples'),
     nfPeca: col('NF Peça'), pIcms: col('% ICMS'), icms: col('Valor ICMS Deduzido'), pIrPeca: col('% IRRF', 1), irPeca: col('IRRF', 1),
     vPeca: col('Valor a Pagar Peça'), nfServ: col('NF Serviço'), pIss: col('% ISSQN'), iss: col('Valor ISSQN Retido'),
-    respIss: col('Responsável ISSQN'), pIrServ: col('% IRRF', 2), irServ: col('IRRF', 2), vServ: col('Valor Serviço'),
-    aprovado: col('Valor Aprovado'), liquido: col('Valor Liquido'), adm: col('Valor Adm'),
+    respIss: col('Responsável ISSQN'), pIrServ: col('% IRRF', 2), irServ: col('IRRF', 2),
+    vServ: col(['Valor Serviço', 'Valor a Pagar Serviço']), aprovado: col(['Valor Aprovado', 'Valor Total Aprovado']),
+    liquido: col(['Valor Liquido', 'Valor Total Líquido']), adm: col(['Valor Adm', 'Valor Taxa Administração']),
     data: col('Data Aprovação Pré-Faturamento'), resp: col('Responsável Aprovação Pré-Faturamento')
   };
   var g = function (l, k) { return c[k] < 0 ? '' : l[c[k]]; };
   var notas = [];
-  for (var r = 1; r < linhas.length; r++) {
-    var l = linhas[r];
-    if (!txt(g(l, 'placa')) && !txt(g(l, 'estab'))) continue;
+  linhas.forEach(function (l) {
+    if (!txt(g(l, 'placa')) && !txt(g(l, 'estab'))) return;
     var pi = g(l, 'pIcms');
+    var piNum = typeof pi === 'number' || /^[\d.,\s]*$/.test(txt(pi));
     notas.push({
-      placa: txt(g(l, 'placa')), unidade: txt(g(l, 'unidade')), modelo: txt(g(l, 'modelo')), os: txt(g(l, 'os')),
+      placa: txt(g(l, 'placa')), unidade: txt(g(l, 'unidade')) || unidadePadrao, modelo: txt(g(l, 'modelo')), os: txt(g(l, 'os')),
       cnpj: txt(g(l, 'cnpj')), estab: txt(g(l, 'estab')), cidade: txt(g(l, 'cidade')), simples: txt(g(l, 'simples')),
-      nfPeca: txt(g(l, 'nfPeca')), pIcms: typeof pi === 'number' ? pi : num(pi), icmsObs: typeof pi === 'number' || txt(pi) === '' ? '' : txt(pi),
+      nfPeca: txt(g(l, 'nfPeca')), pIcms: num(pi), icmsObs: piNum ? '' : txt(pi),
       icms: num(g(l, 'icms')), pIrPeca: num(g(l, 'pIrPeca')), irPeca: num(g(l, 'irPeca')), vPeca: num(g(l, 'vPeca')),
-      nfServ: txt(g(l, 'nfServ')), pIss: num(g(l, 'pIss')), iss: num(g(l, 'iss')), respIss: txt(g(l, 'respIss')),
+      nfServ: txt(g(l, 'nfServ')), pIss: num(g(l, 'pIss')), iss: num(g(l, 'iss')), respIss: txt(g(l, 'respIss')).toUpperCase(),
       pIrServ: num(g(l, 'pIrServ')), irServ: num(g(l, 'irServ')), vServ: num(g(l, 'vServ')),
       aprovado: num(g(l, 'aprovado')), liquido: num(g(l, 'liquido')), adm: num(g(l, 'adm')),
       data: fmtData(g(l, 'data')), resp: txt(g(l, 'resp'))
     });
+  });
+  return notas;
+}
+
+/* ---------------- Modo offline: arquivos do computador ---------------- */
+var ABA_DADOS = 'BADE SE DADOS';
+function carregarScript(src, teste) {
+  return new Promise(function (ok, erro) {
+    if (teste()) return ok();
+    var sc = document.createElement('script');
+    sc.src = src; sc.onload = ok;
+    sc.onerror = function () { erro(new Error('não foi possível carregar ' + src.split('/').pop() + ' (verifique a internet).')); };
+    document.head.appendChild(sc);
+  });
+}
+var LIB = {
+  xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+  zip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+};
+function lerComo(file, tipo) {
+  return new Promise(function (ok, erro) {
+    var fr = new FileReader();
+    fr.onload = function () { ok(fr.result); };
+    fr.onerror = function () { erro(fr.error); };
+    if (tipo === 'texto') fr.readAsText(file, 'utf-8'); else fr.readAsArrayBuffer(file);
+  });
+}
+
+function lerArquivos(files) {
+  files = Array.prototype.slice.call(files || []);
+  if (!files.length) return;
+  var l = document.getElementById('loading');
+  l.hidden = false; l.textContent = 'Lendo ' + files.length + ' arquivo(s)…';
+  var pdfs = files.filter(function (f) { return /\.pdf$/i.test(f.name); });
+  var outros = files.filter(function (f) { return !/\.pdf$/i.test(f.name); });
+
+  Promise.all(outros.map(function (f) {
+    return lerComo(f, 'texto').then(function (txt) {
+      if (/title-rad|Sint(&eacute;|é)tico da Despesa/i.test(txt)) return { tipo: 'rad', nome: f.name, html: txt };
+      return { tipo: 'planilha', file: f };
+    });
+  })).then(function (lidos) {
+    var rads = lidos.filter(function (x) { return x.tipo === 'rad'; });
+    var planilhas = lidos.filter(function (x) { return x.tipo === 'planilha'; });
+    var notas = [], avisos = [], origem = [];
+    var r = notasDosRads(rads);
+    notas = r.notas; avisos = r.avisos;
+    if (rads.length) origem.push(rads.length + ' RAD(s)');
+    var passo = Promise.resolve();
+    if (planilhas.length) {
+      passo = carregarScript(LIB.xlsx, function () { return window.XLSX; }).then(function () {
+        return Promise.all(planilhas.map(function (p) {
+          return lerComo(p.file, 'bin').then(function (buf) {
+            var t = tabelaDaPlanilha(XLSX.read(buf, { type: 'array', cellDates: true }));
+            if (!t) { avisos.push('“' + p.file.name + '” não tem a aba de dados (cabeçalho começando por "Placa").'); return; }
+            notas = notas.concat(linhasParaNotas(t[0], t.slice(1), ''));
+            origem.push(p.file.name);
+          });
+        }));
+      });
+    }
+    return passo.then(function () {
+      if (pdfs.length) {
+        // PDFs novos se somam aos já abertos (permite abrir RADs e notas em etapas).
+        var ja = {};
+        PDFS.forEach(function (p) { ja[p.nome + p.file.size] = 1; });
+        pdfs.forEach(function (f, i) {
+          if (!ja[f.name + f.size]) PDFS.push({ id: 'local' + Date.now() + '_' + i, nome: f.name, caminho: '', file: f, texto: null });
+        });
+      }
+      if (!notas.length && !NOTAS.length) throw new Error('nenhum RAD ou planilha de dados entre os arquivos escolhidos.');
+      if (!notas.length) { // só PDFs: mantém os dados já carregados
+        l.hidden = true;
+        buscarNotas(false);
+        return;
+      }
+      FONTE = { modo: 'offline', origem: origem.join(' + ') || 'Arquivos locais', atualizadoEm: '', avisos: avisos };
+      exibir(notas.map(function (n) { delete n._p; return n; }));
+    });
+  }).catch(function (e) { erroCarga(e); if (!NOTAS.length) document.getElementById('drop').hidden = false; });
+}
+function tabelaDaPlanilha(wb) {
+  var nomes = wb.SheetNames.slice().sort(function (a) { return a === ABA_DADOS ? -1 : 1; });
+  for (var i = 0; i < nomes.length; i++) {
+    var t = XLSX.utils.sheet_to_json(wb.Sheets[nomes[i]], { header: 1, raw: true, defval: '' });
+    if (t.length && normCab(t[0][0]) === 'placa') return t;
   }
-  return { aba: nomeAba, planilha: nomeArquivo, atualizadoEm: fmtData(new Date()), notas: notas };
+  return null;
+}
+
+/* ---------------- Notas fiscais com ISSQN retido pelo tomador ---------------- */
+function ehTomador(n) {
+  // RAD marca "TOMADOR"; quando o campo vem vazio mas há ISSQN retido, também é retenção pelo tomador.
+  return n.nfServ && (n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0));
+}
+function digitos(s) { return String(s || '').replace(/\D/g, ''); }
+function semZeros(s) { return digitos(s).replace(/^0+/, ''); }
+function contemNumero(texto, numero) {
+  var n = semZeros(numero);
+  if (!n) return false;
+  return new RegExp('(^|[^\\d.,/])0*' + n + '(?![\\d]|[.,]\\d)').test(texto);
+}
+function brNum(v) { return (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function palavrasEstab(estab) {
+  return normCab(estab).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 3 && ['ltda', 'eireli', 'me', 'epp', 'the', 'dos', 'das', 'and'].indexOf(w) < 0; });
+}
+
+/** Verifica um PDF contra uma nota do RAD. */
+function conferir(n, pdf) {
+  var nomeArq = normCab(pdf.nome);
+  var numsArq = (pdf.nome.match(/\d+/g) || []).map(function (x) { return x.replace(/^0+/, ''); });
+  var pal = palavrasEstab(n.estab);
+  var r = {
+    nomeNumero: numsArq.indexOf(semZeros(n.nfServ)) > -1,
+    nomeEstab: pal.length > 0 && pal.some(function (w) { return nomeArq.indexOf(w) > -1; }),
+    lido: pdf.texto != null && pdf.texto.replace(/\s/g, '').length > 30
+  };
+  if (r.lido) {
+    var t = pdf.texto, tn = normCab(t);
+    r.cnpj = digitos(t).indexOf(digitos(n.cnpj)) > -1;
+    r.numero = contemNumero(t, n.nfServ);
+    r.os = !!n.os && digitos(t).indexOf(digitos(n.os)) > -1;
+    r.placa = !!n.placa && tn.replace(/[\s-]/g, '').indexOf(normCab(n.placa).replace(/[\s-]/g, '')) > -1;
+    r.tomador = /retido pelo tomador|retencao do issqn\s*retido|iss(qn)? retido.{0,40}sim|tomador.{0,30}respons/.test(tn);
+    r.valorIss = n.iss > 0 && t.indexOf(brNum(n.iss)) > -1;
+    r.servico = /nfs-?e|nota fiscal de servic|danfse|issqn/.test(tn);
+  }
+  // Pontuação: o CNPJ do prestador e o número/OS no texto confirmam a nota.
+  r.confirmada = !!(r.lido && r.cnpj && (r.numero || r.os));
+  r.pontos = (r.confirmada ? 100 : 0) + (r.cnpj ? 20 : 0) + (r.numero ? 15 : 0) + (r.os ? 15 : 0) + (r.tomador ? 5 : 0) +
+             (r.valorIss ? 5 : 0) + (r.nomeNumero ? 10 : 0) + (r.nomeEstab ? 8 : 0);
+  return r;
+}
+
+function casarNotas(notas) {
+  return notas.filter(ehTomador).map(function (n) {
+    var melhor = null;
+    PDFS.forEach(function (p) {
+      var r = conferir(n, p);
+      // Sem texto, só aceita pelo nome do arquivo (número + nome do estabelecimento).
+      if (!r.confirmada && !(r.nomeNumero && (r.nomeEstab || !r.lido))) return;
+      if (r.lido && !r.confirmada && r.nomeNumero && r.cnpj === false && r.numero === false) return; // texto contradiz
+      if (!melhor || r.pontos > melhor.r.pontos) melhor = { pdf: p, r: r };
+    });
+    var status = !melhor ? 'nao' : melhor.r.confirmada ? 'ok' : 'nome';
+    return { n: n, pdf: melhor && melhor.pdf, r: melhor ? melhor.r : {}, status: status, inferido: !n.respIss };
+  });
+}
+
+/** PDFs ainda sem texto que podem ser a nota: primeiro os que têm o número no nome do arquivo. */
+function pdfsParaLer(completa) {
+  var alvo = NOTAS.filter(ehTomador);
+  var nums = {};
+  alvo.forEach(function (n) { nums[semZeros(n.nfServ)] = 1; });
+  return PDFS.filter(function (p) {
+    if (p.texto != null) return false;
+    if (completa) return true;
+    return (p.nome.match(/\d+/g) || []).some(function (x) { return nums[x.replace(/^0+/, '')]; });
+  });
+}
+
+function buscarNotas(completa) {
+  if (NF.buscando) return;
+  var fila = pdfsParaLer(completa);
+  var st = document.getElementById('nfStatus');
+  if (!fila.length) { renderNotasTomador(); return; }
+  NF.buscando = true;
+  renderNotasTomador();
+  var total = fila.length, feitos = 0;
+  var progresso = function () { st.textContent = 'Lendo PDFs… ' + feitos + ' de ' + total; };
+  progresso();
+
+  var passo;
+  if (MODO === 'appsscript') {
+    passo = function lote(ids) {
+      return chamar('lerTextosPdf', ids).then(function (res) {
+        PDFS.forEach(function (p) { if (res.textos.hasOwnProperty(p.id)) { p.texto = res.textos[p.id]; feitos++; } });
+        progresso(); renderNotasTomador(true);
+        if (res.pendentes.length) return lote(res.pendentes);
+      });
+    }(fila.map(function (p) { return p.id; }));
+  } else {
+    passo = carregarScript(LIB.pdf, function () { return window.pdfjsLib; }).then(function () {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
+      return fila.reduce(function (pr, p) {
+        return pr.then(function () {
+          return textoPdfLocal(p.file).then(function (t) { p.texto = t; }, function () { p.texto = ''; })
+            .then(function () { feitos++; progresso(); });
+        });
+      }, Promise.resolve());
+    });
+  }
+  passo.catch(function (e) { alert('Erro ao ler PDFs: ' + (e && e.message || e)); })
+    .then(function () { NF.buscando = false; renderNotasTomador(); });
+}
+
+function textoPdfLocal(file) {
+  return lerComo(file, 'bin').then(function (buf) {
+    return pdfjsLib.getDocument({ data: buf }).promise;
+  }).then(function (pdf) {
+    var paginas = [];
+    for (var i = 1; i <= Math.min(pdf.numPages, 5); i++) paginas.push(pdf.getPage(i).then(function (pg) { return pg.getTextContent(); }));
+    return Promise.all(paginas).then(function (cs) {
+      return cs.map(function (c) { return c.items.map(function (it) { return it.str; }).join(' '); }).join('\n');
+    });
+  });
+}
+
+var STATUS_NF = {
+  ok: { rot: 'Encontrada e conferida', cls: 'ok', ic: '✓' },
+  nome: { rot: 'Encontrada pelo nome do arquivo', cls: 'warn', ic: '≈' },
+  nao: { rot: 'Não encontrada', cls: 'bad', ic: '✕' }
+};
+function renderNotasTomador(parcial) {
+  var lista = casarNotas(filtrar());
+  NF.lista = lista;
+  var cont = { ok: 0, nome: 0, nao: 0 };
+  lista.forEach(function (x) { cont[x.status]++; });
+  var semTexto = PDFS.filter(function (p) { return p.texto == null; }).length;
+  document.getElementById('nfResumo').innerHTML =
+    '<span class="tag">' + lista.length + ' nota(s) de serviço com ISSQN retido pelo tomador</span>' +
+    ['ok', 'nome', 'nao'].map(function (k) { return '<span class="tag ' + STATUS_NF[k].cls + '">' + STATUS_NF[k].ic + ' ' + cont[k] + ' ' + STATUS_NF[k].rot.toLowerCase() + '</span>'; }).join('') +
+    '<span class="tag">' + PDFS.length + ' PDF(s) na fonte' + (semTexto ? ' · ' + semTexto + ' ainda não lido(s)' : '') + '</span>';
+  var baixaveis = lista.filter(function (x) { return x.pdf; }).length;
+  var bz = document.getElementById('btnZip');
+  bz.disabled = !baixaveis || NF.buscando;
+  bz.textContent = '⬇ Baixar ' + baixaveis + ' nota(s) encontrada(s) (.zip)';
+  document.getElementById('btnVarrer').hidden = !(cont.nao && semTexto);
+  document.getElementById('btnVarrer').disabled = NF.buscando;
+  if (!NF.buscando) document.getElementById('nfStatus').textContent = PDFS.length ? '' :
+    (MODO === 'offline' ? 'Abra também os PDFs das notas (botão “Abrir arquivos…”).' : 'Configure a pasta do Drive para buscar os PDFs.');
+
+  var ck = function (v, rot) { return v === undefined ? '' : '<span class="tag ' + (v ? 'ok' : 'bad') + '">' + (v ? '✓' : '✕') + ' ' + rot + '</span>'; };
+  document.querySelector('#tblNf tbody').innerHTML = lista.length ? lista.map(function (x) {
+    var n = x.n, s = STATUS_NF[x.status];
+    var arq = x.pdf ? (x.pdf.url ? '<a href="' + esc(x.pdf.url) + '" target="_blank" rel="noopener">' + esc(x.pdf.nome) + '</a>'
+                                 : '<a href="#" data-local="' + esc(x.pdf.id) + '">' + esc(x.pdf.nome) + '</a>') : '<span class="muted">—</span>';
+    var conf = x.pdf ? (x.r.lido ? ck(x.r.cnpj, 'CNPJ') + ck(x.r.numero, 'Nº') + ck(x.r.os, 'OS') + ck(x.r.valorIss, 'Valor ISS') + ck(x.r.tomador, 'Retido tomador')
+                                 : '<span class="muted">PDF sem texto legível — só o nome do arquivo confere</span>') : '';
+    return '<tr><td><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +
+      '<td>' + esc(n.unidade) + '</td><td title="' + esc(n.cnpj) + '">' + esc(n.estab) + '<div class="muted" style="font-size:11px">' + esc(n.cnpj) + '</div></td>' +
+      '<td>' + esc(n.cidade) + '</td><td><b>' + esc(n.nfServ) + '</b></td><td>' + esc(n.os) + '</td><td>' + esc(n.placa) + '</td>' +
+      '<td class="n">' + P(n.pIss) + '</td><td class="n">' + R(n.iss) + '</td>' +
+      '<td>' + (x.inferido ? '<span class="tag warn" title="Responsável ISSQN vazio no RAD, mas há ISSQN retido">Vazio no RAD</span>' : 'TOMADOR') + '</td>' +
+      '<td>' + arq + '</td><td class="checks">' + conf + '</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="12">Nenhuma nota de serviço com ISSQN retido pelo tomador nos filtros atuais.</td></tr>';
+  document.querySelectorAll('#tblNf a[data-local]').forEach(function (a) {
+    a.onclick = function (e) {
+      e.preventDefault();
+      var p = PDFS.filter(function (q) { return q.id === a.dataset.local; })[0];
+      if (p) window.open(URL.createObjectURL(p.file), '_blank');
+    };
+  });
+}
+
+function nomeZip() {
+  var d = new Date(), dois = function (n) { return (n < 10 ? '0' : '') + n; };
+  var uni = document.getElementById('fUnidade').value;
+  return 'notas_tomador' + (uni ? '_' + uni : '') + '_' + d.getFullYear() + dois(d.getMonth() + 1) + dois(d.getDate()) + '.zip';
+}
+function nomeNoZip(x) {
+  var base = [x.n.unidade, x.n.nfServ, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_');
+  return base + '.pdf';
+}
+function baixarBlob(blob, nome) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+}
+function baixarZip() {
+  var itens = NF.lista.filter(function (x) { return x.pdf; });
+  if (!itens.length) return;
+  var bz = document.getElementById('btnZip'), rot = bz.textContent;
+  bz.disabled = true; bz.textContent = 'Gerando .zip…';
+  var fim = function () { bz.disabled = false; bz.textContent = rot; };
+  var nome = nomeZip();
+  // Relação das notas incluída no .zip
+  var csv = '﻿Status;Unidade;Estabelecimento;CNPJ;NF Serviço;OS;Placa;% ISSQN;ISSQN;Arquivo original;Arquivo no zip\n' + itens.map(function (x) {
+    return [STATUS_NF[x.status].rot, x.n.unidade, x.n.estab, x.n.cnpj, x.n.nfServ, x.n.os, x.n.placa, brNum(x.n.pIss), brNum(x.n.iss), x.pdf.nome, nomeNoZip(x)]
+      .map(function (v) { v = String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';');
+  }).join('\n');
+
+  if (MODO === 'appsscript') {
+    chamar('gerarZip', itens.map(function (x) { return { id: x.pdf.id, nome: nomeNoZip(x) }; }), nome).then(function (res) {
+      if (res.base64) {
+        var bin = atob(res.base64), u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        baixarBlob(new Blob([u8], { type: 'application/zip' }), res.nome);
+      } else {
+        window.open(res.url, '_blank');
+      }
+      baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), nome.replace('.zip', '_relacao.csv'));
+    }).catch(function (e) { alert('Erro ao gerar o .zip: ' + (e && e.message || e)); }).then(fim);
+  } else {
+    carregarScript(LIB.zip, function () { return window.JSZip; }).then(function () {
+      var zip = new JSZip(), usados = {};
+      itens.forEach(function (x) {
+        var nm = nomeNoZip(x);
+        if (usados[nm]) nm = nm.replace(/\.pdf$/, '_' + (++usados[nm]) + '.pdf'); else usados[nm] = 1;
+        zip.file(nm, x.pdf.file);
+      });
+      zip.file('relacao_notas.csv', csv);
+      return zip.generateAsync({ type: 'blob' });
+    }).then(function (blob) { baixarBlob(blob, nome); })
+      .catch(function (e) { alert('Erro ao gerar o .zip: ' + (e && e.message || e)); }).then(fim);
+  }
+}
+
+/* ---------------- Pasta do Drive ---------------- */
+function configurarPasta() {
+  var atual = FONTE.pastaUrl || '';
+  var v = prompt('Cole o link da pasta do Google Drive com os RADs e as notas fiscais (PDF).\nDeixe vazio para usar a aba “' + ABA_DADOS + '” da planilha.', atual);
+  if (v === null) return;
+  document.getElementById('loading').hidden = false;
+  document.getElementById('loading').textContent = 'Verificando a pasta…';
+  chamar('salvarPasta', v).then(function () { PDFS = []; carregar(); }).catch(erroCarga);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -904,11 +1309,20 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('btnAtualizar').onclick = carregar;
   var inArq = document.getElementById('inArquivo'), drop = document.getElementById('drop');
   document.getElementById('btnArquivo').onclick = function () { inArq.click(); };
-  inArq.onchange = function () { lerArquivo(inArq.files[0]); inArq.value = ''; };
-  ['dragenter', 'dragover'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
-  ['dragleave', 'drop'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
-  document.addEventListener('drop', function (e) { if (e.dataTransfer.files.length) lerArquivo(e.dataTransfer.files[0]); });
+  document.getElementById('btnAbrir').onclick = function () { inArq.click(); };
+  inArq.onchange = function () { lerArquivos(inArq.files); inArq.value = ''; };
+  if (MODO === 'offline') {
+    ['dragenter', 'dragover'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    document.addEventListener('drop', function (e) { if (e.dataTransfer.files.length) lerArquivos(e.dataTransfer.files); });
+    document.getElementById('btnPasta').hidden = true;
+  } else {
+    document.getElementById('btnAbrir').hidden = true;
+    document.getElementById('btnPasta').onclick = configurarPasta;
+  }
   document.getElementById('btnCsv').onclick = exportarCsv;
+  document.getElementById('btnZip').onclick = baixarZip;
+  document.getElementById('btnVarrer').onclick = function () { buscarNotas(true); };
   document.getElementById('btnTema').onclick = function () {
     var root = document.documentElement;
     var escuro = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
