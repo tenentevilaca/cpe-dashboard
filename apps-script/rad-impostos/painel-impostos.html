@@ -298,7 +298,7 @@
       <div class="table-tools">
         <div>
           <h2>Notas fiscais com ISSQN retido pelo tomador</h2>
-          <div class="hint" style="margin:0">Notas de serviço do RAD com responsável <b>TOMADOR</b> localizadas entre os PDFs: confere CNPJ do prestador, número da nota, OS, valor do ISSQN e “Retido pelo Tomador” no texto do PDF. Segue os filtros acima.</div>
+          <div class="hint" style="margin:0">Notas de serviço do RAD com responsável <b>TOMADOR</b> localizadas entre os PDFs pelo <b>número da nota + número da OS</b> encontrados no texto do PDF. CNPJ, valor do ISSQN e “Retido pelo Tomador” são conferências extras. Segue os filtros acima.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="btnVarrer" hidden title="Lê todos os PDFs, inclusive os que não têm o número da nota no nome">🔎 Procurar em todos os PDFs</button>
@@ -1099,6 +1099,7 @@ function conferir(n, pdf) {
   var pal = palavrasEstab(n.estab);
   var r = {
     nomeNumero: numsArq.indexOf(semZeros(n.nfServ)) > -1,
+    nomeOs: !!n.os && numsArq.indexOf(semZeros(n.os)) > -1,
     nomeEstab: pal.length > 0 && pal.some(function (w) { return nomeArq.indexOf(w) > -1; }),
     lido: pdf.texto != null && pdf.texto.replace(/\s/g, '').length > 30
   };
@@ -1112,10 +1113,12 @@ function conferir(n, pdf) {
     r.valorIss = n.iss > 0 && t.indexOf(brNum(n.iss)) > -1;
     r.servico = /nfs-?e|nota fiscal de servic|danfse|issqn/.test(tn);
   }
-  // Pontuação: o CNPJ do prestador e o número/OS no texto confirmam a nota.
-  r.confirmada = !!(r.lido && r.cnpj && (r.numero || r.os));
-  r.pontos = (r.confirmada ? 100 : 0) + (r.cnpj ? 20 : 0) + (r.numero ? 15 : 0) + (r.os ? 15 : 0) + (r.tomador ? 5 : 0) +
-             (r.valorIss ? 5 : 0) + (r.nomeNumero ? 10 : 0) + (r.nomeEstab ? 8 : 0);
+  // ID da nota = número da NF + número da OS (a nota não traz o nome da unidade).
+  r.confirmada = !!(r.lido && r.numero && r.os);
+  // Só um dos dois no texto: aceita como "parcial" apenas se o CNPJ do prestador também estiver no PDF.
+  r.parcial = !!(r.lido && !r.confirmada && (r.numero || r.os) && r.cnpj);
+  r.pontos = (r.confirmada ? 100 : 0) + (r.parcial ? 50 : 0) + (r.numero ? 15 : 0) + (r.os ? 15 : 0) + (r.cnpj ? 10 : 0) +
+             (r.tomador ? 5 : 0) + (r.valorIss ? 5 : 0) + (r.nomeNumero ? 10 : 0) + (r.nomeOs ? 10 : 0) + (r.nomeEstab ? 3 : 0);
   return r;
 }
 
@@ -1124,12 +1127,12 @@ function casarNotas(notas) {
     var melhor = null;
     PDFS.forEach(function (p) {
       var r = conferir(n, p);
-      // Sem texto, só aceita pelo nome do arquivo (número + nome do estabelecimento).
-      if (!r.confirmada && !(r.nomeNumero && (r.nomeEstab || !r.lido))) return;
-      if (r.lido && !r.confirmada && r.nomeNumero && r.cnpj === false && r.numero === false) return; // texto contradiz
+      // PDF com texto: precisa do Nº + OS (ou de um deles + CNPJ). Sem texto: Nº no nome do arquivo + OS ou estabelecimento.
+      var ok = r.lido ? (r.confirmada || r.parcial) : (r.nomeNumero && (r.nomeOs || r.nomeEstab));
+      if (!ok) return;
       if (!melhor || r.pontos > melhor.r.pontos) melhor = { pdf: p, r: r };
     });
-    var status = !melhor ? 'nao' : melhor.r.confirmada ? 'ok' : 'nome';
+    var status = !melhor ? 'nao' : melhor.r.confirmada ? 'ok' : melhor.r.parcial ? 'parcial' : 'nome';
     return { n: n, pdf: melhor && melhor.pdf, r: melhor ? melhor.r : {}, status: status, inferido: !n.respIss };
   });
 }
@@ -1138,7 +1141,7 @@ function casarNotas(notas) {
 function pdfsParaLer(completa) {
   var alvo = NOTAS.filter(ehTomador);
   var nums = {};
-  alvo.forEach(function (n) { nums[semZeros(n.nfServ)] = 1; });
+  alvo.forEach(function (n) { nums[semZeros(n.nfServ)] = 1; if (n.os) nums[semZeros(n.os)] = 1; });
   return PDFS.filter(function (p) {
     if (p.texto != null) return false;
     if (completa) return true;
@@ -1194,19 +1197,20 @@ function textoPdfLocal(file) {
 }
 
 var STATUS_NF = {
-  ok: { rot: 'Encontrada e conferida', cls: 'ok', ic: '✓' },
+  ok: { rot: 'Encontrada (Nº + OS)', cls: 'ok', ic: '✓' },
+  parcial: { rot: 'Conferir: só Nº ou só OS', cls: 'warn', ic: '!' },
   nome: { rot: 'Encontrada pelo nome do arquivo', cls: 'warn', ic: '≈' },
   nao: { rot: 'Não encontrada', cls: 'bad', ic: '✕' }
 };
 function renderNotasTomador(parcial) {
   var lista = casarNotas(filtrar());
   NF.lista = lista;
-  var cont = { ok: 0, nome: 0, nao: 0 };
+  var cont = { ok: 0, parcial: 0, nome: 0, nao: 0 };
   lista.forEach(function (x) { cont[x.status]++; });
   var semTexto = PDFS.filter(function (p) { return p.texto == null; }).length;
   document.getElementById('nfResumo').innerHTML =
     '<span class="tag">' + lista.length + ' nota(s) de serviço com ISSQN retido pelo tomador</span>' +
-    ['ok', 'nome', 'nao'].map(function (k) { return '<span class="tag ' + STATUS_NF[k].cls + '">' + STATUS_NF[k].ic + ' ' + cont[k] + ' ' + STATUS_NF[k].rot.toLowerCase() + '</span>'; }).join('') +
+    ['ok', 'parcial', 'nome', 'nao'].map(function (k) { return '<span class="tag ' + STATUS_NF[k].cls + '">' + STATUS_NF[k].ic + ' ' + cont[k] + ' ' + STATUS_NF[k].rot + '</span>'; }).join('') +
     '<span class="tag">' + PDFS.length + ' PDF(s) na fonte' + (semTexto ? ' · ' + semTexto + ' ainda não lido(s)' : '') + '</span>';
   var baixaveis = lista.filter(function (x) { return x.pdf; }).length;
   var bz = document.getElementById('btnZip');
@@ -1222,7 +1226,7 @@ function renderNotasTomador(parcial) {
     var n = x.n, s = STATUS_NF[x.status];
     var arq = x.pdf ? (x.pdf.url ? '<a href="' + esc(x.pdf.url) + '" target="_blank" rel="noopener">' + esc(x.pdf.nome) + '</a>'
                                  : '<a href="#" data-local="' + esc(x.pdf.id) + '">' + esc(x.pdf.nome) + '</a>') : '<span class="muted">—</span>';
-    var conf = x.pdf ? (x.r.lido ? ck(x.r.cnpj, 'CNPJ') + ck(x.r.numero, 'Nº') + ck(x.r.os, 'OS') + ck(x.r.valorIss, 'Valor ISS') + ck(x.r.tomador, 'Retido tomador')
+    var conf = x.pdf ? (x.r.lido ? ck(x.r.numero, 'Nº NF') + ck(x.r.os, 'OS') + ck(x.r.cnpj, 'CNPJ') + ck(x.r.valorIss, 'Valor ISS') + ck(x.r.tomador, 'Retido tomador')
                                  : '<span class="muted">PDF sem texto legível — só o nome do arquivo confere</span>') : '';
     return '<tr><td><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +
       '<td>' + esc(n.unidade) + '</td><td title="' + esc(n.cnpj) + '">' + esc(n.estab) + '<div class="muted" style="font-size:11px">' + esc(n.cnpj) + '</div></td>' +
@@ -1246,7 +1250,7 @@ function nomeZip() {
   return 'notas_tomador' + (uni ? '_' + uni : '') + '_' + d.getFullYear() + dois(d.getMonth() + 1) + dois(d.getDate()) + '.zip';
 }
 function nomeNoZip(x) {
-  var base = [x.n.unidade, x.n.nfServ, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_');
+  var base = ['NF' + x.n.nfServ, 'OS' + x.n.os, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_');
   return base + '.pdf';
 }
 function baixarBlob(blob, nome) {

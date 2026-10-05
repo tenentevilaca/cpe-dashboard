@@ -40,7 +40,8 @@ PDFs escaneados (imagem, sem texto) só são localizados pelo nome do arquivo ne
 | Unidade | Campo "Nome Órgão / Entidade" do RAD (ex.: `25A BPMAMB` → `BPMAMB`) |
 | RAD repetido | Ordens repetidas (mesma OS/NF/placa) são ignoradas e o painel avisa |
 | Nota de tomador | NF Serviço com Responsável ISSQN = TOMADOR (ou vazio com ISSQN retido > 0) |
-| Nota "encontrada e conferida" | PDF contém o CNPJ do prestador **e** o número da NF ou a OS |
+| Identificação da nota (ID) | Número da NF de serviço **+** número da OS, procurados no texto do PDF (a nota não traz a unidade) |
+| "Conferir: só Nº ou só OS" | O PDF tem só um dos dois, mas tem o CNPJ do prestador — confira manualmente |
 | Nota "encontrada pelo nome" | Nome do arquivo tem o número da NF e o nome do estabelecimento, mas o texto não pôde ser lido |
 | Base peça | Valor a Pagar Peça + ICMS + IRRF peça |
 | Base serviço | Valor Serviço + IRRF serviço + ISSQN retido pelo tomador |
