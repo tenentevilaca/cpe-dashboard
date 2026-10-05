@@ -65,6 +65,7 @@
     border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer;
   }
   .btn:hover { background: var(--surface-2); }
+  a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* Filtros */
@@ -160,11 +161,51 @@
   .btn.busy:disabled { opacity: .85; cursor: progress; }
   .ampulheta { display: inline-block; animation: girar 2s linear infinite; }
   @keyframes girar { 0%, 40% { transform: rotate(0); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
+  /* Navegação lateral */
+  .layout { display: flex; min-height: 100vh; }
+  .lateral {
+    position: sticky; top: 0; height: 100vh; flex: 0 0 auto; width: 172px; padding: 16px 10px;
+    background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; z-index: 6;
+  }
+  .conteudo { flex: 1 1 auto; min-width: 0; }
+  .nav-btn {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-radius: 10px;
+    padding: 10px 12px; background: transparent; color: var(--text-2); font: inherit; font-weight: 500; cursor: pointer;
+  }
+  .nav-btn:hover { background: var(--surface-2); color: var(--text); }
+  .nav-btn[aria-current="page"] { background: var(--hl); color: var(--accent); font-weight: 600; }
+  .nav-btn .ic { font-size: 18px; }
+  @media (max-width: 760px) {
+    .layout { flex-direction: column; }
+    .lateral { position: sticky; height: auto; width: auto; flex-direction: row; padding: 8px 16px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+    .nav-btn { width: auto; white-space: nowrap; }
+  }
+  /* Pré-faturamento */
+  .pf-loading { padding: 60px 0; text-align: center; color: var(--text-2); }
+  #pfTabela td { vertical-align: top; }
+  #pfTabela th.ed { color: var(--accent); }
+  .pf-sel, .pf-obs {
+    font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text);
+    padding: 5px 7px; min-width: 150px; max-width: 260px;
+  }
+  .pf-obs { min-width: 220px; width: 260px; min-height: 34px; resize: vertical; display: block; }
+  .pf-cel { display: flex; align-items: center; gap: 6px; }
+  .pf-st { width: 16px; font-size: 12px; text-align: center; }
+  .pf-st.ok { color: var(--ok); } .pf-st.erro { color: var(--bad); }
+  .pager { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+  .chip .n { color: var(--muted); font-size: 12px; }
+  .chip[aria-pressed="true"] .n { color: inherit; opacity: .8; }
   .empty { padding: 24px; text-align: center; color: var(--muted); }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="layout">
+<nav class="lateral" aria-label="Painéis">
+  <button class="nav-btn" data-view="impostos" aria-current="page"><span class="ic">📊</span><span class="tx">Impostos RAD</span></button>
+  <button class="nav-btn" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento</span></button>
+</nav>
+<div class="conteudo">
+<div class="wrap" id="viewImpostos">
   <header>
     <div>
       <h1>Painel de Impostos — RAD</h1>
@@ -330,6 +371,49 @@
     </section>
   </main>
 </div>
+
+<!-- ================= Pré-faturamento ================= -->
+<div class="wrap" id="viewPrefat" hidden>
+  <header>
+    <div>
+      <h1>Pré-faturamento</h1>
+      <div class="sub" id="pfOrigem">Carregando…</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn" id="pfAbrir" target="_blank" rel="noopener" hidden>↗ Abrir planilha</a>
+      <button class="btn" id="pfAtualizar">↻ Atualizar</button>
+    </div>
+  </header>
+  <div id="pfLoading" class="pf-loading"><span class="ampulheta">⏳</span> Carregando a planilha de pré-faturamento…</div>
+  <main id="pfApp" hidden>
+    <section class="filters" aria-label="Filtros do pré-faturamento">
+      <div class="chips" id="pfChips"></div>
+      <div id="pfFiltros" style="display:contents"></div>
+      <div class="f search">
+        <label for="pfBusca">Buscar</label>
+        <input id="pfBusca" type="search" placeholder="Qualquer coluna…">
+      </div>
+      <button class="btn" id="pfLimpar">Limpar filtros</button>
+    </section>
+    <section class="kpis" id="pfKpis"></section>
+    <section class="card">
+      <div class="table-tools">
+        <div>
+          <h2>Registros</h2>
+          <div class="hint" style="margin:0" id="pfCont"></div>
+        </div>
+        <div class="pager" id="pfPager"></div>
+      </div>
+      <div class="tbl-wrap big-table">
+        <table id="pfTabela"><thead></thead><tbody></tbody></table>
+      </div>
+      <div class="hint" style="margin-top:8px">As colunas com ✎ são gravadas na planilha assim que você altera (listas na hora; OBS ao sair do campo). Use “＋ Novo valor…” para incluir uma opção na lista.</div>
+    </section>
+  </main>
+</div>
+</div>
+</div>
+
 
 <div class="chart-tip" id="tip"></div>
 
@@ -1393,8 +1477,179 @@ function configurarPasta() {
   }).catch(erroCarga);
 }
 
+/* ---------------- Navegação lateral ---------------- */
+function mostrarView(v) {
+  document.querySelectorAll('.nav-btn').forEach(function (b) {
+    if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  document.getElementById('viewImpostos').hidden = v !== 'impostos';
+  document.getElementById('viewPrefat').hidden = v !== 'prefat';
+  // A planilha de pré-faturamento só é carregada quando o painel é aberto (economiza dados).
+  if (v === 'prefat' && !PF.dados && !PF.carregando) pfCarregar();
+  if (v === 'impostos' && NOTAS.length) render();
+  window.scrollTo(0, 0);
+}
+
+/* ---------------- Pré-faturamento ---------------- */
+var PF = { dados: null, carregando: false, pagina: 0, porPagina: 50, filtros: {}, status: null };
+var PF_NOVO = '__novo_valor__';
+
+function pfNorm(s) { return semAcento(s).toLowerCase().replace(/\s+/g, ' ').trim(); }
+function pfHoje() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear(); }
+
+function pfCarregar() {
+  var l = document.getElementById('pfLoading');
+  l.hidden = false; document.getElementById('pfApp').hidden = true;
+  if (MODO !== 'appsscript') { l.textContent = 'O pré-faturamento lê e grava na planilha do Google — disponível ao abrir o painel pelo Apps Script.'; return; }
+  PF.carregando = true;
+  l.innerHTML = '<span class="ampulheta">⏳</span> Carregando a planilha de pré-faturamento…';
+  chamar('getPrefat').then(function (d) {
+    PF.dados = d; PF.carregando = false; PF.pagina = 0;
+    d.edit = {};
+    d.editaveis.forEach(function (e) { d.edit[e.col] = e; });
+    // Coluna "VERIFICAÇÃO" vira os botões de situação; demais listas e "UNIDADE" viram filtros.
+    PF.statusCol = d.editaveis.filter(function (e) { return e.tipo === 'lista' && /^verificac/.test(pfNorm(d.cab[e.col])); }).map(function (e) { return e.col; })[0];
+    PF.colsFiltro = d.cab.map(function (c, i) { return i; }).filter(function (i) {
+      return i !== PF.statusCol && (d.edit[i] && d.edit[i].tipo !== 'texto' || /^unidade/.test(pfNorm(d.cab[i])));
+    });
+    document.getElementById('pfOrigem').textContent = d.planilha + ' · aba “' + d.aba + '” · ' + d.linhas.length + ' registros · atualizado em ' + d.atualizadoEm;
+    var a = document.getElementById('pfAbrir'); a.href = d.url; a.hidden = false;
+    l.hidden = true; document.getElementById('pfApp').hidden = false;
+    pfMontarFiltros(); pfRender();
+  }).catch(function (e) {
+    PF.carregando = false;
+    l.textContent = 'Erro ao carregar o pré-faturamento: ' + (e && e.message || e);
+  });
+}
+
+function pfMontarFiltros() {
+  var d = PF.dados;
+  document.getElementById('pfFiltros').innerHTML = PF.colsFiltro.map(function (c) {
+    var vals = unicos(d.linhas.map(function (l) { return l[c] || '(vazio)'; }));
+    return '<div class="f"><label for="pfF' + c + '">' + esc(d.cab[c]) + '</label><select id="pfF' + c + '" data-c="' + c + '"><option value="">Todos</option>' +
+      vals.map(function (v) { return '<option' + (PF.filtros[c] === v ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select></div>';
+  }).join('');
+  document.querySelectorAll('#pfFiltros select').forEach(function (s) {
+    s.onchange = function () { PF.filtros[s.dataset.c] = s.value; PF.pagina = 0; pfRender(); };
+  });
+}
+
+function pfFiltrar() {
+  var d = PF.dados, q = pfNorm(document.getElementById('pfBusca').value);
+  return d.linhas.map(function (l, i) { return i; }).filter(function (i) {
+    var l = d.linhas[i];
+    if (PF.status != null && (l[PF.statusCol] || '(vazio)') !== PF.status) return false;
+    for (var c in PF.filtros) if (PF.filtros[c] && (l[c] || '(vazio)') !== PF.filtros[c]) return false;
+    if (q && pfNorm(l.join(' ')).indexOf(q) < 0) return false;
+    return true;
+  });
+}
+
+function pfResumo(idx) {
+  var d = PF.dados, sc = PF.statusCol;
+  var obs = d.editaveis.filter(function (e) { return e.tipo === 'texto'; })[0];
+  // Botões de situação (contagem sobre todos os registros)
+  var chips = document.getElementById('pfChips');
+  if (sc != null) {
+    var cont = {};
+    d.linhas.forEach(function (l) { var v = l[sc] || '(vazio)'; cont[v] = (cont[v] || 0) + 1; });
+    var ks = Object.keys(cont).sort(function (a, b) { return cont[b] - cont[a]; });
+    chips.innerHTML = '<button class="chip" data-v="" aria-pressed="' + (PF.status == null) + '">Todos <span class="n">' + d.linhas.length + '</span></button>' +
+      ks.map(function (k) { return '<button class="chip" data-v="' + esc(k) + '" aria-pressed="' + (PF.status === k) + '">' + esc(k) + ' <span class="n">' + cont[k] + '</span></button>'; }).join('');
+    chips.querySelectorAll('.chip').forEach(function (b) {
+      b.onclick = function () { PF.status = b.dataset.v === '' ? null : b.dataset.v; PF.pagina = 0; pfRender(); };
+    });
+  } else chips.innerHTML = '';
+  var lin = idx.map(function (i) { return d.linhas[i]; });
+  var k = [
+    { l: 'Registros filtrados', v: int.format(idx.length), d: 'de ' + int.format(d.linhas.length) },
+    sc != null ? { l: 'Com ' + d.cab[sc].toLowerCase() + ' preenchida', v: int.format(lin.filter(function (l) { return l[sc]; }).length), d: 'nos filtros atuais' } : null,
+    sc != null ? { l: 'Sem ' + d.cab[sc].toLowerCase(), v: int.format(lin.filter(function (l) { return !l[sc]; }).length), d: 'pendentes de verificação' } : null,
+    obs ? { l: 'Com OBS', v: int.format(lin.filter(function (l) { return l[obs.col]; }).length), d: 'observações registradas' } : null
+  ].filter(Boolean);
+  document.getElementById('pfKpis').innerHTML = k.map(function (x) {
+    return '<div class="kpi"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>';
+  }).join('');
+}
+
+function pfRender() {
+  var d = PF.dados, idx = pfFiltrar();
+  pfResumo(idx);
+  var paginas = Math.max(1, Math.ceil(idx.length / PF.porPagina));
+  PF.pagina = Math.min(PF.pagina, paginas - 1);
+  var ini = PF.pagina * PF.porPagina, pag = idx.slice(ini, ini + PF.porPagina);
+  document.getElementById('pfCont').textContent = idx.length + ' registro(s)' + (idx.length ? ' · mostrando ' + (ini + 1) + '–' + (ini + pag.length) : '');
+  document.getElementById('pfPager').innerHTML = paginas > 1 ?
+    '<button class="btn" data-p="-1"' + (PF.pagina ? '' : ' disabled') + '>‹</button> Página ' + (PF.pagina + 1) + ' de ' + paginas +
+    ' <button class="btn" data-p="1"' + (PF.pagina < paginas - 1 ? '' : ' disabled') + '>›</button>' : '';
+  document.querySelectorAll('#pfPager button').forEach(function (b) { b.onclick = function () { PF.pagina += +b.dataset.p; pfRender(); }; });
+
+  document.querySelector('#pfTabela thead').innerHTML = '<tr><th class="n">Linha</th>' + d.cab.map(function (c, i) {
+    return '<th' + (d.edit[i] ? ' class="ed" title="Editável — grava na planilha"' : '') + '>' + esc(c) + (d.edit[i] ? ' ✎' : '') + '</th>';
+  }).join('') + '</tr>';
+  document.querySelector('#pfTabela tbody').innerHTML = pag.length ? pag.map(function (i) {
+    var l = d.linhas[i];
+    return '<tr><td class="n muted">' + (d.linhaIni + i) + '</td>' + d.cab.map(function (c, ci) {
+      return '<td>' + (d.edit[ci] ? pfCampo(i, ci, l[ci]) : esc(l[ci])) + '</td>';
+    }).join('') + '</tr>';
+  }).join('') : '<tr><td class="empty" colspan="' + (d.cab.length + 1) + '">Nenhum registro nos filtros atuais.</td></tr>';
+
+  document.querySelectorAll('#pfTabela .pf-sel').forEach(function (s) { s.onchange = function () { pfAlterar(s); }; });
+  document.querySelectorAll('#pfTabela .pf-obs').forEach(function (t) { t.onchange = function () { pfAlterar(t); }; });
+}
+
+function pfCampo(i, c, v) {
+  var e = PF.dados.edit[c], at = ' data-i="' + i + '" data-c="' + c + '"';
+  if (e.tipo === 'texto') return '<div class="pf-cel"><textarea class="pf-obs" rows="1"' + at + ' placeholder="Observação…">' + esc(v) + '</textarea><span class="pf-st"></span></div>';
+  var ops = e.opcoes.slice();
+  if (v && ops.indexOf(v) < 0) ops.unshift(v);
+  if (e.tipo === 'data' && ops.indexOf(pfHoje()) < 0) ops.unshift(pfHoje());
+  return '<div class="pf-cel"><select class="pf-sel"' + at + '><option value="">—</option>' +
+    ops.map(function (o) { return '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') +
+    '<option value="' + PF_NOVO + '">＋ ' + (e.tipo === 'data' ? 'Outra data…' : 'Novo valor…') + '</option></select><span class="pf-st"></span></div>';
+}
+
+function pfAlterar(el) {
+  var d = PF.dados, i = +el.dataset.i, c = +el.dataset.c, e = d.edit[c];
+  var anterior = d.linhas[i][c], valor = el.value;
+  var st = el.parentNode.querySelector('.pf-st');
+  if (valor === PF_NOVO) {
+    valor = prompt(e.tipo === 'data' ? 'Data da verificação (dd/mm/aaaa):' : 'Novo valor para “' + d.cab[c] + '”:', e.tipo === 'data' ? pfHoje() : '');
+    if (valor == null || !valor.trim()) { el.value = anterior; return; }
+    valor = valor.trim();
+    if (e.tipo === 'data' && !/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) { alert('Use o formato dd/mm/aaaa.'); el.value = anterior; return; }
+  }
+  if (valor === anterior) return;
+  st.className = 'pf-st'; st.textContent = '⏳'; st.title = 'Gravando…';
+  el.disabled = true;
+  chamar('salvarPrefat', d.linhaIni + i, c, valor, anterior).then(function (res) {
+    el.disabled = false;
+    if (res.conflito) {
+      d.linhas[i][c] = res.atual;
+      alert('Esta célula foi alterada por outra pessoa enquanto o painel estava aberto.\nValor atual na planilha: “' + (res.atual || '(vazio)') + '”.\nNada foi sobrescrito.');
+      pfRender();
+      return;
+    }
+    d.linhas[i][c] = res.valor;
+    if (e.opcoes && res.valor && e.opcoes.indexOf(res.valor) < 0 && e.tipo === 'lista') e.opcoes.push(res.valor);
+    if (el.tagName === 'SELECT' && el.value !== res.valor) pfRender(); // ex.: "Novo valor" ou data reformatada
+    else { st.className = 'pf-st ok'; st.textContent = '✓'; st.title = 'Gravado'; pfResumo(pfFiltrar()); }
+  }).catch(function (err) {
+    el.disabled = false; el.value = anterior;
+    st.className = 'pf-st erro'; st.textContent = '✕'; st.title = 'Não gravou: ' + (err && err.message || err);
+    alert('Não foi possível gravar: ' + (err && err.message || err));
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   tipEl = document.getElementById('tip');
+  document.querySelectorAll('.nav-btn').forEach(function (b) { b.onclick = function () { mostrarView(b.dataset.view); }; });
+  document.getElementById('pfAtualizar').onclick = function () { PF.dados = null; pfCarregar(); };
+  document.getElementById('pfBusca').oninput = function () { if (PF.dados) { PF.pagina = 0; pfRender(); } };
+  document.getElementById('pfLimpar').onclick = function () {
+    PF.filtros = {}; PF.status = null; PF.pagina = 0; document.getElementById('pfBusca').value = '';
+    if (PF.dados) { pfMontarFiltros(); pfRender(); }
+  };
   document.getElementById('btnAtualizar').onclick = carregar;
   var inArq = document.getElementById('inArquivo'), drop = document.getElementById('drop');
   document.getElementById('btnArquivo').onclick = function () { inArq.click(); };

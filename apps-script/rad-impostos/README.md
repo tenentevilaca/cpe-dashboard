@@ -55,3 +55,17 @@ PDFs escaneados (imagem, sem texto) só são localizados pelo nome do arquivo ne
 | Base peça | Valor a Pagar Peça + ICMS + IRRF peça |
 | Base serviço | Valor Serviço + IRRF serviço + ISSQN retido pelo tomador |
 | Líquido recalculado | Valor Aprovado − ICMS − IRRF peça − IRRF serviço − ISSQN retido |
+
+## Pré-faturamento (botão na lateral esquerda)
+
+O botão **🧾 Pré-faturamento** abre o painel da planilha definida em `PREFAT_PLANILHA_ID` / `PREFAT_ABA_GID` no `Code.gs`
+(precisa ser uma Planilha Google — arquivo .xlsx não pode ser editado pelo script).
+
+- A planilha só é carregada quando o painel é aberto (economia de dados).
+- Botões de situação com a contagem por valor da coluna **VERIFICAÇÃO**; filtros por **UNIDADE**, **ÚLTIMA VERIFICAÇÃO** e **DATA DA VERIFICAÇÃO**; busca livre.
+- Colunas editáveis (marcadas com ✎), gravadas direto na planilha:
+  - **ÚLTIMA VERIFICAÇÃO**, **VERIFICAÇÃO**: lista suspensa (opções da validação de dados da coluna + valores já usados) e “＋ Novo valor…”, que também acrescenta a opção à validação da planilha;
+  - **DATA DA VERIFICAÇÃO**: lista com as datas usadas + hoje, e “＋ Outra data…” (dd/mm/aaaa);
+  - **OBS**: texto livre, gravado ao sair do campo.
+- Se outra pessoa alterou a célula depois que o painel foi aberto, nada é sobrescrito e o painel avisa o valor atual.
+- As colunas são reconhecidas pelo nome do cabeçalho (sem acento/maiúsculas): ajuste `PREFAT_COLUNAS` se os nomes mudarem.

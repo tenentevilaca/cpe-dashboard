@@ -401,3 +401,135 @@ function getConfig() {
   };
   return { rads: info(ids.rads), notas: info(ids.notas) };
 }
+
+/* ------------------------------------------------------------------ */
+/* Pré-faturamento: painel da planilha de verificação                  */
+/* ------------------------------------------------------------------ */
+
+// Planilha e aba do pré-faturamento (link: .../spreadsheets/d/<ID>/edit?gid=<GID>).
+var PREFAT_PLANILHA_ID = '1e_3NDsYYtxpRXZhoHpY7a4GZLcq9IxN-goOd4boonmU';
+var PREFAT_ABA_GID = 734096426;
+
+// Colunas editáveis no painel (comparadas pelo nome do cabeçalho, sem acento e sem maiúsculas).
+var PREFAT_COLUNAS = [
+  { tipo: 'lista', teste: /^ultima verif/ },
+  { tipo: 'data', teste: /^data (da )?verif/ },
+  { tipo: 'lista', teste: /^verificac/ },
+  { tipo: 'texto', teste: /^obs/ }
+];
+
+function normPrefat_(s) {
+  return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function abrirPrefat_() {
+  var ss;
+  try { ss = SpreadsheetApp.openById(PREFAT_PLANILHA_ID); }
+  catch (e) {
+    var mime = '';
+    try { mime = DriveApp.getFileById(PREFAT_PLANILHA_ID).getMimeType(); } catch (e2) {}
+    if (mime && mime !== MimeType.GOOGLE_SHEETS) {
+      throw new Error('A planilha de pré-faturamento está em formato Excel (.xlsx) e não pode ser editada pelo painel. ' +
+        'Abra-a e use Arquivo › Salvar como Planilhas Google; depois troque PREFAT_PLANILHA_ID no Code.gs pelo ID da nova planilha.');
+    }
+    throw new Error('Sem acesso à planilha de pré-faturamento (' + PREFAT_PLANILHA_ID + '): ' + (e && e.message || e));
+  }
+  var abas = ss.getSheets(), aba = null;
+  for (var i = 0; i < abas.length && !aba; i++) if (abas[i].getSheetId() === PREFAT_ABA_GID) aba = abas[i];
+  // Se o gid mudou (ex.: planilha convertida), usa a aba que tem as colunas de verificação.
+  for (var k = 0; k < abas.length && !aba; k++) {
+    var topo = abas[k].getRange(1, 1, Math.min(15, Math.max(1, abas[k].getLastRow())), Math.max(1, abas[k].getLastColumn())).getDisplayValues();
+    if (topo.some(function (l) { return l.some(function (c) { return /^verificac/.test(normPrefat_(c)); }); })) aba = abas[k];
+  }
+  if (!aba) aba = abas[0];
+  return { ss: ss, aba: aba };
+}
+
+function cabecalhoPrefat_(valores) {
+  for (var r = 0; r < Math.min(15, valores.length); r++) {
+    var l = valores[r].map(normPrefat_);
+    if (l.some(function (c) { return /^verificac|^obs/.test(c); })) return r;
+  }
+  for (var q = 0; q < valores.length; q++) if (valores[q].filter(String).length >= 3) return q;
+  return 0;
+}
+
+function editaveisPrefat_(cab) {
+  var out = [];
+  cab.forEach(function (c, i) {
+    var n = normPrefat_(c);
+    for (var k = 0; k < PREFAT_COLUNAS.length; k++) {
+      if (PREFAT_COLUNAS[k].teste.test(n)) { out.push({ col: i, tipo: PREFAT_COLUNAS[k].tipo }); break; }
+    }
+  });
+  return out;
+}
+
+/** Opções da lista suspensa: a validação de dados da coluna (se houver) + valores já usados. */
+function opcoesPrefat_(aba, colPlanilha, linhaIni, nLinhas, valoresColuna) {
+  var ops = [];
+  var regra = nLinhas > 0 ? aba.getRange(linhaIni, colPlanilha).getDataValidation() : null;
+  if (regra) {
+    var tipo = regra.getCriteriaType(), args = regra.getCriteriaValues();
+    if (tipo === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) ops = args[0].slice();
+    else if (tipo === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) {
+      ops = args[0].getDisplayValues().reduce(function (a, l) { return a.concat(l); }, []);
+    }
+  }
+  valoresColuna.forEach(function (v) { if (v !== '' && ops.indexOf(v) < 0) ops.push(v); });
+  return ops.filter(function (v, i, a) { return v !== '' && a.indexOf(v) === i; });
+}
+
+/** Chamado pelo painel: dados da aba de pré-faturamento (só textos exibidos, para trafegar menos). */
+function getPrefat() {
+  var p = abrirPrefat_(), aba = p.aba;
+  var valores = aba.getDataRange().getDisplayValues();
+  var h = cabecalhoPrefat_(valores);
+  var cab = valores[h] || [];
+  var linhas = valores.slice(h + 1);
+  while (linhas.length && !linhas[linhas.length - 1].some(String)) linhas.pop();
+  var linhaIni = h + 2; // número da 1ª linha de dados na planilha
+  var editaveis = editaveisPrefat_(cab);
+  editaveis.forEach(function (e) {
+    if (e.tipo === 'texto') return;
+    e.opcoes = opcoesPrefat_(aba, e.col + 1, linhaIni, linhas.length, linhas.map(function (l) { return l[e.col]; }));
+  });
+  return {
+    planilha: p.ss.getName(), aba: aba.getName(), url: p.ss.getUrl() + '#gid=' + aba.getSheetId(),
+    cab: cab, linhas: linhas, linhaIni: linhaIni, editaveis: editaveis,
+    atualizadoEm: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm')
+  };
+}
+
+/**
+ * Chamado pelo painel: grava uma célula editável.
+ * "anterior" é o valor que o painel mostrava; se alguém mudou a célula nesse meio tempo, não sobrescreve.
+ * Valor novo numa coluna com lista suspensa é acrescentado às opções da validação.
+ */
+function salvarPrefat(linha, col, valor, anterior) {
+  var aba = abrirPrefat_().aba;
+  var topo = aba.getRange(1, 1, Math.min(15, Math.max(1, aba.getLastRow())), Math.max(1, aba.getLastColumn())).getDisplayValues();
+  var linhaIni = cabecalhoPrefat_(topo) + 2;
+  if (linha < linhaIni) throw new Error('Linha inválida.');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var cel = aba.getRange(linha, col + 1);
+    var atual = cel.getDisplayValue();
+    if (anterior != null && atual !== anterior) return { conflito: true, atual: atual };
+    var regra = cel.getDataValidation();
+    if (valor !== '' && regra && regra.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
+      var ops = regra.getCriteriaValues()[0];
+      if (ops.indexOf(valor) < 0) {
+        var nova = regra.copy().requireValueInList(ops.concat([valor]), regra.getCriteriaValues()[1] !== false).build();
+        var faixa = aba.getRange(linhaIni, col + 1, Math.max(1, aba.getMaxRows() - linhaIni + 1), 1);
+        faixa.setDataValidation(nova);
+      }
+    }
+    cel.setValue(valor);
+    SpreadsheetApp.flush();
+    return { ok: true, valor: cel.getDisplayValue() };
+  } finally {
+    lock.releaseLock();
+  }
+}
