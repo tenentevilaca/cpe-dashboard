@@ -1246,6 +1246,7 @@ function renderNotasTomador(parcial) {
     var n = x.n, s = STATUS_NF[x.status];
     var arq = x.pdf ? (x.pdf.url ? '<a href="' + esc(x.pdf.url) + '" target="_blank" rel="noopener">' + esc(x.pdf.nome) + '</a>'
                                  : '<a href="#" data-local="' + esc(x.pdf.id) + '">' + esc(x.pdf.nome) + '</a>') : '<span class="muted">—</span>';
+    if (x.pdf && x.pdf.caminho) arq += '<div class="muted" style="font-size:11px">📁 ' + esc(x.pdf.caminho.replace(/\/$/, '')) + '</div>';
     var conf = x.pdf ? (x.r.lido ? ck(x.r.numero, 'Nº NF') + ck(x.r.os, 'OS') + ck(x.r.cnpj, 'CNPJ') + ck(x.r.valorIss, 'Valor ISS') + ck(x.r.tomador, 'Retido tomador')
                                  : '<span class="muted">PDF sem texto legível — só o nome do arquivo confere</span>') : '';
     return '<tr><td><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +

@@ -12,8 +12,8 @@
  */
 
 // Pastas do Google Drive (podem ser trocadas pelo botão "📁 Pastas do Drive" no painel).
-var PASTA_RADS_PADRAO = '1_-qJQUiIDqJsPO7vpuMxBZP2bQ46gphf';   // RADs de cada unidade
-var PASTA_NOTAS_PADRAO = '1Sf2E0M96jh5RfWvbpIZTwE26Ef995d3B';  // PDFs das notas fiscais
+var PASTA_RADS_PADRAO = '1K1jNXFhsz2rCxjT8qAEIm2uodP8NruVt';   // RADs de cada unidade
+var PASTA_NOTAS_PADRAO = '1ylX_cDzvczSj3wxz2fNKYUMfdngg5aBm';  // PDFs das notas fiscais
 
 var ABA_DADOS = 'BADE SE DADOS';
 var ABA_CACHE = '_cache_pdf';
@@ -59,13 +59,13 @@ function salvarPastas(rads, notas) {
     DriveApp.getFolderById(id).getName(); // valida o acesso
     cfg[par[0]] = id;
   });
-  PropertiesService.getScriptProperties().setProperty('PASTAS', JSON.stringify(cfg));
+  PropertiesService.getScriptProperties().setProperty('PASTAS_V2', JSON.stringify(cfg));
   return getConfig();
 }
 
 function idsPastas_() {
   var cfg = {};
-  try { cfg = JSON.parse(PropertiesService.getScriptProperties().getProperty('PASTAS') || '{}'); } catch (e) {}
+  try { cfg = JSON.parse(PropertiesService.getScriptProperties().getProperty('PASTAS_V2') || '{}'); } catch (e) {}
   return { rads: cfg.rads || PASTA_RADS_PADRAO, notas: cfg.notas || PASTA_NOTAS_PADRAO };
 }
 
