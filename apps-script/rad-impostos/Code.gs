@@ -27,6 +27,7 @@ var PASTA_ZIP = 'Notas tomador (painel)';
 var LIMITE_SEGUNDOS = 240; // cada chamada de leitura de PDFs para antes de 4 min (o Apps Script corta em 6)
 
 function onOpen() {
+  try { lembrarPlanilha_(); } catch (e) {}
   SpreadsheetApp.getUi()
     .createMenu('📊 Painel de Impostos')
     .addItem('Abrir painel', 'abrirPainel')
@@ -34,13 +35,14 @@ function onOpen() {
 }
 
 function abrirPainel() {
+  lembrarPlanilha_();
   var html = HtmlService.createHtmlOutputFromFile('Index').setWidth(1400).setHeight(900);
   SpreadsheetApp.getUi().showModelessDialog(html, 'Painel de Impostos — RAD');
 }
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Painel de Impostos — RAD')
+    .setTitle('Pré-faturamento — RAD')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -56,7 +58,8 @@ function idDaPasta_(texto) {
 }
 
 /** Chamado pelo painel: salva as pastas (links ou IDs). Vazio = volta para a pasta padrão. */
-function salvarPastas(rads, notas) {
+function salvarPastas(token, rads, notas) {
+  exigirGestor_(token);
   var cfg = {};
   [['rads', rads], ['notas', notas]].forEach(function (par) {
     if (!String(par[1] || '').trim()) return;
@@ -66,7 +69,7 @@ function salvarPastas(rads, notas) {
     cfg[par[0]] = id;
   });
   PropertiesService.getScriptProperties().setProperty('PASTAS_V2', JSON.stringify(cfg));
-  return getConfig();
+  return getConfig(token);
 }
 
 function idsPastas_() {
@@ -90,7 +93,8 @@ function abrirPasta_(id, papel) {
  *  - modo "drive": { rads: [{id, nome, html}], pdfs: [{id, nome, url, tamanho, atualizado, texto?}] }
  *  - modo "planilha": { cab, linhas } da aba de dados.
  */
-function getFontes() {
+function getFontes(token) {
+  exigirGestor_(token);
   var tz = Session.getScriptTimeZone();
   var agora = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
   var ids = idsPastas_();
@@ -101,7 +105,7 @@ function getFontes() {
       return l.map(function (v) { return v instanceof Date ? Utilities.formatDate(v, tz, 'dd/MM/yyyy HH:mm') : v; });
     });
     return {
-      modo: 'planilha', origem: SpreadsheetApp.getActiveSpreadsheet().getName() + ' · aba “' + aba.getName() + '”',
+      modo: 'planilha', origem: painelSS_().getName() + ' · aba “' + aba.getName() + '”',
       atualizadoEm: agora, cab: valores[0], linhas: valores.slice(1)
     };
   }
@@ -265,7 +269,8 @@ function filtrarImpressao_(fp, chaves) {
 }
 
 /** Chamado pelo painel: impressões já guardadas no cache, filtradas pelas chaves. */
-function impressoesCache(ids, chaves) {
+function impressoesCache(token, ids, chaves) {
+  exigirGestor_(token);
   var cache = lerCache_(), out = {};
   ids.forEach(function (id) { if (cache[id]) out[id] = filtrarImpressao_(cache[id].fp, chaves); });
   return out;
@@ -275,7 +280,8 @@ function impressoesCache(ids, chaves) {
  * Chamado pelo painel com um lote de IDs de PDF: lê cada um (OCR) até o limite de tempo.
  * Devolve { fps: {id: impressão filtrada}, pendentes: [ids não processados], erros: {id: msg} }.
  */
-function lerImpressoesPdf(ids, chaves) {
+function lerImpressoesPdf(token, ids, chaves) {
+  exigirGestor_(token);
   var inicio = Date.now();
   var cache = lerCache_();
   var fps = {}, pendentes = [], erros = {}, novos = [];
@@ -312,7 +318,7 @@ function extrairTexto_(arq) {
 }
 
 function abaCache_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = painelSS_();
   var aba = ss.getSheetByName(ABA_CACHE);
   if (!aba) {
     aba = ss.insertSheet(ABA_CACHE);
@@ -356,7 +362,8 @@ function gravarCache_(linhas, cache) {
  * O navegador baixa o arquivo direto do Drive, sem passar pelo painel (menos dados trafegados).
  * Os .zip gerados antes são enviados para a lixeira.
  */
-function gerarZip(itens, nomeZip, csv) {
+function gerarZip(token, itens, nomeZip, csv) {
+  exigirGestor_(token);
   var usados = {};
   var blobs = itens.map(function (it) {
     var blob = DriveApp.getFileById(it.id).getBlob();
@@ -381,7 +388,7 @@ function gerarZip(itens, nomeZip, csv) {
 /* ------------------------------------------------------------------ */
 
 function obterAba_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = painelSS_();
   var aba = ss.getSheetByName(ABA_DADOS);
   if (aba) return aba;
   var abas = ss.getSheets();
@@ -393,7 +400,8 @@ function obterAba_() {
 }
 
 /** Informa ao painel quais pastas estão configuradas. */
-function getConfig() {
+function getConfig(token) {
+  exigirGestor_(token);
   var ids = idsPastas_();
   var info = function (id) {
     try { var p = DriveApp.getFolderById(id); return { id: id, nome: p.getName(), url: p.getUrl() }; }
@@ -481,8 +489,10 @@ function opcoesPrefat_(aba, colPlanilha, linhaIni, nLinhas, valoresColuna) {
 }
 
 /** Chamado pelo painel: dados da aba de pré-faturamento (só textos exibidos, para trafegar menos). */
-function getPrefat() {
+function getPrefat(token) {
+  exigirGestor_(token);
   var p = abrirPrefat_(), aba = p.aba;
+  garantirColunaResposta_(aba);
   var valores = aba.getDataRange().getDisplayValues();
   var h = cabecalhoPrefat_(valores);
   var cab = valores[h] || [];
@@ -496,7 +506,7 @@ function getPrefat() {
   });
   return {
     planilha: p.ss.getName(), aba: aba.getName(), url: p.ss.getUrl() + '#gid=' + aba.getSheetId(),
-    cab: cab, linhas: linhas, linhaIni: linhaIni, editaveis: editaveis,
+    cab: cab, linhas: linhas, linhaIni: linhaIni, editaveis: editaveis, colResposta: colunaPorNome_(cab, /^resposta/),
     atualizadoEm: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm')
   };
 }
@@ -506,11 +516,14 @@ function getPrefat() {
  * "anterior" é o valor que o painel mostrava; se alguém mudou a célula nesse meio tempo, não sobrescreve.
  * Valor novo numa coluna com lista suspensa é acrescentado às opções da validação.
  */
-function salvarPrefat(linha, col, valor, anterior) {
+function salvarPrefat(token, linha, col, valor, anterior) {
+  exigirGestor_(token);
   var aba = abrirPrefat_().aba;
   var topo = aba.getRange(1, 1, Math.min(15, Math.max(1, aba.getLastRow())), Math.max(1, aba.getLastColumn())).getDisplayValues();
-  var linhaIni = cabecalhoPrefat_(topo) + 2;
+  var hPos = cabecalhoPrefat_(topo);
+  var linhaIni = hPos + 2;
   if (linha < linhaIni) throw new Error('Linha inválida.');
+  if (!editaveisPrefat_(topo[hPos]).some(function (e) { return e.col === col; })) throw new Error('Esta coluna não pode ser alterada pelo painel.');
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -532,4 +545,283 @@ function salvarPrefat(linha, col, valor, anterior) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Acesso: gestores e usuários (login próprio)                         */
+/* ------------------------------------------------------------------ */
+/*
+ * Gestor:   quem abre o painel pelo menu da planilha (editor desta planilha), o dono do script ao abrir o
+ *           App da Web logado na conta Google, os e-mails em GESTORES_EMAILS, ou um login com perfil GESTOR.
+ * Usuário:  PM que se cadastra (Nome PM, Cia, Unidade, login e senha) e é aprovado pelo gestor.
+ *           Vê só as linhas da sua Unidade/Cia, sem alterar nada, e pode escrever na coluna RESPOSTA.
+ * Os cadastros ficam na aba oculta "_usuarios" desta planilha (senha guardada só como hash com sal).
+ */
+
+var GESTORES_EMAILS = [];            // e-mails Google com acesso de gestor (além dos editores desta planilha)
+var ABA_USUARIOS = '_usuarios';
+var SESSAO_SEGUNDOS = 6 * 60 * 60;   // sessão de login vale 6 horas
+var USU_CAB = ['login', 'nome_pm', 'cia', 'unidade', 'hash', 'sal', 'status', 'perfil', 'solicitado_em', 'decidido_em', 'decidido_por', 'ultimo_acesso'];
+
+function agora_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'); }
+
+function abaUsuarios_() {
+  var ss = painelSS_();
+  var aba = ss.getSheetByName(ABA_USUARIOS);
+  if (!aba) {
+    aba = ss.insertSheet(ABA_USUARIOS);
+    aba.getRange(1, 1, 1, USU_CAB.length).setValues([USU_CAB]);
+    aba.hideSheet();
+  }
+  return aba;
+}
+
+/** Guarda o ID desta planilha para o App da Web (que roda sem planilha "ativa"). */
+/** Planilha do painel (onde ficam as abas ocultas de cache e usuários), também no App da Web. */
+function painelSS_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss) return ss;
+  var id = PropertiesService.getScriptProperties().getProperty('PAINEL_SS_ID');
+  if (!id) throw new Error('Abra o painel uma vez pelo menu da planilha (📊 Painel de Impostos) para concluir a configuração.');
+  return SpreadsheetApp.openById(id);
+}
+
+function lembrarPlanilha_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss) PropertiesService.getScriptProperties().setProperty('PAINEL_SS_ID', ss.getId());
+}
+
+function lerUsuarios_() {
+  var aba = abaUsuarios_(), n = aba.getLastRow();
+  if (n < 2) return [];
+  return aba.getRange(2, 1, n - 1, USU_CAB.length).getValues().map(function (l, i) {
+    var u = { linha: i + 2 };
+    USU_CAB.forEach(function (c, k) { u[c] = String(l[k] == null ? '' : l[k]); });
+    return u;
+  });
+}
+
+function gravarUsuario_(u) {
+  var aba = abaUsuarios_();
+  var linha = USU_CAB.map(function (c) { return u[c] == null ? '' : u[c]; });
+  if (u.linha) aba.getRange(u.linha, 1, 1, USU_CAB.length).setValues([linha]);
+  else aba.appendRow(linha);
+}
+
+function normLogin_(s) { return String(s || '').trim().toLowerCase(); }
+
+function hashSenha_(senha, sal) {
+  var h = sal + '|' + senha;
+  for (var i = 0; i < 300; i++) {
+    h = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, h + sal, Utilities.Charset.UTF_8));
+  }
+  return h;
+}
+
+function novoToken_() {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    Utilities.getUuid() + Math.random() + Date.now(), Utilities.Charset.UTF_8)).replace(/=+$/, '');
+}
+
+function sessao_(token) {
+  if (!token) return null;
+  var v = CacheService.getScriptCache().get('sess_' + token);
+  return v ? JSON.parse(v) : null;
+}
+
+/** Gestor pela conta Google (menu da planilha / dono do App da Web) ou por login com perfil GESTOR. */
+function gestorGoogle_() {
+  var email = '';
+  try { email = Session.getActiveUser().getEmail(); } catch (e) {}
+  if (!email) return '';
+  var dono = '';
+  try { dono = Session.getEffectiveUser().getEmail(); } catch (e) {}
+  if (email === dono || GESTORES_EMAILS.indexOf(email) > -1) return email;
+  return '';
+}
+
+function exigirGestor_(token) {
+  if (gestorGoogle_()) return { perfil: 'GESTOR', nome: gestorGoogle_() };
+  var s = sessao_(token);
+  if (s && s.perfil === 'GESTOR') return s;
+  throw new Error('Acesso restrito à gestão. Entre com um login de gestor.');
+}
+
+function exigirUsuario_(token) {
+  var s = sessao_(token);
+  if (!s) throw new Error('Sessão expirada. Entre novamente.');
+  return s;
+}
+
+/** Chamado ao abrir o painel: quem está acessando. */
+function getSessao(token) {
+  lembrarPlanilha_();
+  var g = gestorGoogle_();
+  if (g) return { perfil: 'GESTOR', nome: g, google: true };
+  var s = sessao_(token);
+  return s ? { perfil: s.perfil, nome: s.nome_pm, unidade: s.unidade, cia: s.cia } : null;
+}
+
+/** Opções de Unidade e Cia para o formulário de cadastro (tiradas da planilha de pré-faturamento). */
+function getOpcoesCadastro() {
+  var o = { unidades: [], cias: [] };
+  try {
+    var aba = abrirPrefat_().aba;
+    var v = aba.getDataRange().getDisplayValues(), h = cabecalhoPrefat_(v), cab = v[h];
+    var cu = colunaPorNome_(cab, /^unidade/), cc = colunaPorNome_(cab, /^cia\b|^companhia/);
+    var uniq = function (c) {
+      if (c < 0) return [];
+      return v.slice(h + 1).map(function (l) { return String(l[c]).trim(); }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).sort();
+    };
+    o.unidades = uniq(cu); o.cias = uniq(cc);
+  } catch (e) {}
+  return o;
+}
+
+/** Pedido de acesso do PM. Fica PENDENTE até o gestor aprovar. */
+function solicitarAcesso(dados) {
+  var login = normLogin_(dados.login), nome = String(dados.nome || '').trim();
+  var cia = String(dados.cia || '').trim(), unidade = String(dados.unidade || '').trim(), senha = String(dados.senha || '');
+  if (!/^[a-z0-9._@-]{3,60}$/.test(login)) throw new Error('Login inválido: use de 3 a 60 letras, números, ponto, hífen ou @.');
+  if (nome.length < 3) throw new Error('Informe o nome PM.');
+  if (!unidade) throw new Error('Informe a Unidade.');
+  if (!cia) throw new Error('Informe a Cia.');
+  if (senha.length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    if (lerUsuarios_().some(function (u) { return u.login === login; })) throw new Error('Este login já existe. Escolha outro ou fale com o gestor.');
+    var sal = novoToken_().slice(0, 16);
+    gravarUsuario_({ login: login, nome_pm: nome, cia: cia, unidade: unidade, hash: hashSenha_(senha, sal), sal: sal,
+                     status: 'PENDENTE', perfil: 'USUARIO', solicitado_em: agora_() });
+  } finally { lock.releaseLock(); }
+  return { ok: true };
+}
+
+function entrar(login, senha) {
+  login = normLogin_(login);
+  var cache = CacheService.getScriptCache(), kt = 'tent_' + login;
+  var tent = Number(cache.get(kt) || 0);
+  if (tent >= 5) throw new Error('Muitas tentativas. Aguarde 10 minutos.');
+  var u = lerUsuarios_().filter(function (x) { return x.login === login; })[0];
+  if (!u || hashSenha_(String(senha || ''), u.sal) !== u.hash) {
+    cache.put(kt, String(tent + 1), 600);
+    throw new Error('Login ou senha incorretos.');
+  }
+  cache.remove(kt);
+  if (u.status === 'PENDENTE') throw new Error('Seu cadastro ainda aguarda aprovação do gestor.');
+  if (u.status !== 'APROVADO') throw new Error('Acesso ' + u.status.toLowerCase() + '. Fale com o gestor.');
+  var token = novoToken_();
+  var sess = { login: u.login, nome_pm: u.nome_pm, cia: u.cia, unidade: u.unidade, perfil: u.perfil || 'USUARIO' };
+  cache.put('sess_' + token, JSON.stringify(sess), SESSAO_SEGUNDOS);
+  u.ultimo_acesso = agora_(); gravarUsuario_(u);
+  return { token: token, perfil: sess.perfil, nome: u.nome_pm, unidade: u.unidade, cia: u.cia };
+}
+
+function sair(token) { if (token) CacheService.getScriptCache().remove('sess_' + token); return true; }
+
+function trocarSenha(token, atual, nova) {
+  var s = exigirUsuario_(token);
+  if (String(nova || '').length < 6) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
+  var u = lerUsuarios_().filter(function (x) { return x.login === s.login; })[0];
+  if (!u || hashSenha_(String(atual || ''), u.sal) !== u.hash) throw new Error('Senha atual incorreta.');
+  u.sal = novoToken_().slice(0, 16); u.hash = hashSenha_(nova, u.sal); gravarUsuario_(u);
+  return { ok: true };
+}
+
+/* ---- Gestão de acessos ---- */
+
+function listarUsuarios(token) {
+  exigirGestor_(token);
+  return lerUsuarios_().map(function (u) {
+    return { login: u.login, nome: u.nome_pm, cia: u.cia, unidade: u.unidade, status: u.status, perfil: u.perfil,
+             solicitado: u.solicitado_em, decidido: u.decidido_em, por: u.decidido_por, acesso: u.ultimo_acesso };
+  });
+}
+
+/** acao: APROVAR | RECUSAR | BLOQUEAR | REATIVAR | SALVAR (unidade/cia/perfil) | SENHA (gera senha temporária). */
+function decidirUsuario(token, login, acao, dados) {
+  var g = exigirGestor_(token);
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var u = lerUsuarios_().filter(function (x) { return x.login === normLogin_(login); })[0];
+    if (!u) throw new Error('Usuário não encontrado.');
+    dados = dados || {};
+    if (dados.unidade != null) u.unidade = String(dados.unidade).trim();
+    if (dados.cia != null) u.cia = String(dados.cia).trim();
+    if (dados.perfil === 'GESTOR' || dados.perfil === 'USUARIO') u.perfil = dados.perfil;
+    var resp = { ok: true };
+    if (acao === 'APROVAR' || acao === 'REATIVAR') u.status = 'APROVADO';
+    else if (acao === 'RECUSAR') u.status = 'RECUSADO';
+    else if (acao === 'BLOQUEAR') u.status = 'BLOQUEADO';
+    else if (acao === 'SENHA') {
+      var temp = novoToken_().replace(/[^a-zA-Z0-9]/g, '').slice(0, 8);
+      u.sal = novoToken_().slice(0, 16); u.hash = hashSenha_(temp, u.sal); resp.senhaTemporaria = temp;
+    }
+    if (acao !== 'SALVAR' && acao !== 'SENHA') { u.decidido_em = agora_(); u.decidido_por = g.nome || g.nome_pm || g.login || ''; }
+    gravarUsuario_(u);
+    return resp;
+  } finally { lock.releaseLock(); }
+}
+
+/* ---- Visão do usuário (somente leitura + RESPOSTA) ---- */
+
+function colunaPorNome_(cab, re) {
+  for (var i = 0; i < cab.length; i++) if (re.test(normPrefat_(cab[i]))) return i;
+  return -1;
+}
+
+/** Cria a coluna RESPOSTA no fim do cabeçalho, se ainda não existir. */
+function garantirColunaResposta_(aba) {
+  var topo = aba.getRange(1, 1, Math.min(15, Math.max(1, aba.getLastRow())), Math.max(1, aba.getLastColumn())).getDisplayValues();
+  var h = cabecalhoPrefat_(topo);
+  if (colunaPorNome_(topo[h], /^resposta/) > -1) return;
+  var ult = topo[h].length;
+  while (ult > 0 && !String(topo[h][ult - 1]).trim()) ult--;
+  aba.getRange(h + 1, ult + 1).setValue('RESPOSTA').setFontWeight('bold');
+}
+
+function mesmaChave_(a, b) { return normPrefat_(a).replace(/[^a-z0-9]/g, '') === normPrefat_(b).replace(/[^a-z0-9]/g, ''); }
+
+/** Linhas da Unidade/Cia do usuário. Devolve só o necessário para a consulta. */
+function getMinhasNotas(token) {
+  var s = exigirUsuario_(token);
+  var aba = abrirPrefat_().aba;
+  garantirColunaResposta_(aba);
+  var v = aba.getDataRange().getDisplayValues(), h = cabecalhoPrefat_(v), cab = v[h];
+  var cu = colunaPorNome_(cab, /^unidade/), cc = colunaPorNome_(cab, /^cia\b|^companhia/);
+  if (cu < 0) throw new Error('A planilha de pré-faturamento não tem a coluna UNIDADE.');
+  var cr = colunaPorNome_(cab, /^resposta/);
+  var linhas = [];
+  for (var r = h + 1; r < v.length; r++) {
+    var l = v[r];
+    if (!l.some(String)) continue;
+    if (!mesmaChave_(l[cu], s.unidade)) continue;
+    if (cc > -1 && !mesmaChave_(l[cc], s.cia)) continue;
+    linhas.push({ linha: r + 1, v: l });
+  }
+  return {
+    cab: cab, linhas: linhas, colResposta: cr, colStatus: colunaPorNome_(cab, /^verificac/), colObs: colunaPorNome_(cab, /^obs/),
+    filtroCia: cc > -1, unidade: s.unidade, cia: s.cia, nome: s.nome_pm, atualizadoEm: agora_()
+  };
+}
+
+/** O usuário só pode gravar a RESPOSTA, e só numa linha da sua Unidade/Cia. */
+function responder(token, linha, texto, anterior) {
+  var s = exigirUsuario_(token);
+  var aba = abrirPrefat_().aba;
+  var topo = aba.getRange(1, 1, Math.min(15, Math.max(1, aba.getLastRow())), Math.max(1, aba.getLastColumn())).getDisplayValues();
+  var h = cabecalhoPrefat_(topo), cab = topo[h];
+  var cu = colunaPorNome_(cab, /^unidade/), cc = colunaPorNome_(cab, /^cia\b|^companhia/), cr = colunaPorNome_(cab, /^resposta/);
+  if (cr < 0 || linha <= h + 1) throw new Error('Linha inválida.');
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var l = aba.getRange(linha, 1, 1, cab.length).getDisplayValues()[0];
+    if (!mesmaChave_(l[cu], s.unidade) || (cc > -1 && !mesmaChave_(l[cc], s.cia))) throw new Error('Sem permissão para esta linha.');
+    var cel = aba.getRange(linha, cr + 1);
+    if (anterior != null && cel.getDisplayValue() !== anterior) return { conflito: true, atual: cel.getDisplayValue() };
+    texto = String(texto || '').slice(0, 2000);
+    cel.setValue(texto);
+    cel.setNote(texto ? 'Respondido por ' + s.nome_pm + ' (' + s.login + ') em ' + agora_() : '');
+    return { ok: true, valor: cel.getDisplayValue() };
+  } finally { lock.releaseLock(); }
 }

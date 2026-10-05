@@ -69,3 +69,24 @@ O botão **🧾 Pré-faturamento** abre o painel da planilha definida em `PREFAT
   - **OBS**: texto livre, gravado ao sair do campo.
 - Se outra pessoa alterou a célula depois que o painel foi aberto, nada é sobrescrito e o painel avisa o valor atual.
 - As colunas são reconhecidas pelo nome do cabeçalho (sem acento/maiúsculas): ajuste `PREFAT_COLUNAS` se os nomes mudarem.
+
+## Acesso: gestão × usuário (login e senha)
+
+O mesmo projeto atende dois públicos:
+
+| Perfil | Como entra | O que vê |
+|---|---|---|
+| **Gestor** | Menu da planilha (📊 Painel de Impostos › Abrir painel), o dono do script abrindo o App da Web na conta Google, e-mails em `GESTORES_EMAILS`, ou login com perfil Gestor | Impostos RAD, Pré-faturamento (gestão, com edição) e **Acessos** |
+| **Usuário (PM)** | App da Web com login e senha próprios | Só as notas da sua **Unidade e Cia**, sem alterar nada; escreve apenas na coluna **RESPOSTA** |
+
+Fluxo:
+1. O PM abre o link do App da Web › **Solicitar acesso** › informa Nome PM, Unidade, Cia, login e senha.
+2. O gestor abre **👥 Acessos**, confere/ajusta Unidade e Cia e clica **Aprovar** (ou Recusar). Depois pode bloquear, reativar, gerar senha temporária ou tornar o usuário gestor.
+3. O PM entra e vê as notas da Unidade/Cia: situação (Aprovada / Pendente / Em análise, a partir da coluna VERIFICAÇÃO), a OBS do gestor e o campo **Resposta**.
+4. A coluna **RESPOSTA** é criada automaticamente na planilha de pré-faturamento; cada resposta recebe uma nota na célula com quem respondeu e quando. Na gestão ela aparece só para leitura (💬).
+
+Publicação do App da Web: **Implantar › Nova implantação › App da Web** — *Executar como: Eu* e *Quem pode acessar: Qualquer pessoa*.
+Envie o link gerado aos PMs. Abra o painel uma vez pelo menu da planilha antes (isso registra a planilha usada pelo App da Web).
+
+Segurança: senhas guardadas só como hash com sal na aba oculta `_usuarios`; sessão de 6 h; 5 tentativas erradas bloqueiam o login por 10 min;
+o servidor confere Unidade/Cia em toda leitura e gravação. A coluna CIA é reconhecida pelo cabeçalho "CIA"/"Companhia"; sem ela, o filtro é só por Unidade.

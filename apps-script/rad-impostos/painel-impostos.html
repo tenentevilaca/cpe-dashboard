@@ -49,6 +49,7 @@
     --warn: #f2c04f; --warn-bg: #352a10; --hl: #1d2a3a;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -180,6 +181,34 @@
     .lateral { position: sticky; height: auto; width: auto; flex-direction: row; padding: 8px 16px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
     .nav-btn { width: auto; white-space: nowrap; }
   }
+  .nav-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+  .nav-btn small:empty { display: none; }
+  #navPend:not(:empty) { color: var(--bad); font-weight: 600; }
+  .nav-rodape { margin-top: auto; border-top: 1px solid var(--border); padding-top: 10px; }
+  .quem { font-size: 12px; color: var(--text-2); padding: 0 12px 6px; word-break: break-word; }
+  @media (max-width: 760px) { .nav-rodape { margin: 0; border: 0; padding: 0; display: flex; align-items: center; } .quem { display: none; } }
+  /* Login */
+  .login-card { max-width: 460px; margin: 40px auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+  .login-card h1 { margin-bottom: 2px; }
+  .login-card .f { flex: 0 0 auto; min-width: 0; }
+  .login-card form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+  .login-card .f input, .acc input, .acc select {
+    font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%;
+  }
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .login-msg { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .login-msg.erro { color: var(--bad); } .login-msg.ok { color: var(--ok); }
+  /* Usuário */
+  .sit { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .sit.aprov { color: var(--ok); background: var(--ok-bg); }
+  .sit.pend { color: var(--bad); background: var(--bad-bg); }
+  .sit.anal { color: var(--warn); background: var(--warn-bg); }
+  td.obs-gestor { white-space: normal; min-width: 200px; max-width: 320px; background: var(--hl); }
+  tr.linha-pend td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+  /* Acessos */
+  .acc input, .acc select { padding: 5px 7px; font-size: 13px; min-width: 110px; }
+  .acc .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .acc .btn { padding: 4px 9px; font-size: 12px; }
   /* Pré-faturamento */
   .pf-loading { padding: 60px 0; text-align: center; color: var(--text-2); }
   #pfTabela td { vertical-align: top; }
@@ -200,12 +229,96 @@
 </head>
 <body>
 <div class="layout">
-<nav class="lateral" aria-label="Painéis">
+<nav class="lateral" id="lateral" aria-label="Painéis" hidden>
   <button class="nav-btn" data-view="impostos" aria-current="page"><span class="ic">📊</span><span class="tx">Impostos RAD</span></button>
-  <button class="nav-btn" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento</span></button>
+  <button class="nav-btn so-drive" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento<small>gestão</small></span></button>
+  <button class="nav-btn so-drive" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
+  <div class="nav-rodape so-drive">
+    <div class="quem" id="navQuem"></div>
+    <button class="nav-btn" id="navSair" hidden><span class="ic">⎋</span><span class="tx">Sair</span></button>
+  </div>
 </nav>
 <div class="conteudo">
-<div class="wrap" id="viewImpostos">
+<!-- ================= Login / cadastro ================= -->
+<div class="wrap" id="viewLogin" hidden>
+  <div class="login-card">
+    <h1>Pré-faturamento — RAD</h1>
+    <p class="sub">Consulta das notas da sua Unidade e Cia.</p>
+    <div class="tabs" role="tablist">
+      <button class="chip" id="tabEntrar" aria-pressed="true">Entrar</button>
+      <button class="chip" id="tabCadastro" aria-pressed="false">Solicitar acesso</button>
+    </div>
+    <form id="formEntrar" autocomplete="on">
+      <div class="f"><label for="lgLogin">Login</label><input id="lgLogin" autocomplete="username" required></div>
+      <div class="f"><label for="lgSenha">Senha</label><input id="lgSenha" type="password" autocomplete="current-password" required></div>
+      <button class="btn primary" type="submit">Entrar</button>
+    </form>
+    <form id="formCadastro" hidden autocomplete="off">
+      <p class="hint">Preencha seus dados. O gestor confere e libera o acesso só às notas da sua Unidade e Cia.</p>
+      <div class="f"><label for="cdNome">Nome PM</label><input id="cdNome" required placeholder="Ex.: 3º SGT PM FULANO DE TAL"></div>
+      <div class="dupla">
+        <div class="f"><label for="cdUnidade">Unidade</label><input id="cdUnidade" list="dlUnidades" required></div>
+        <div class="f"><label for="cdCia">Cia</label><input id="cdCia" list="dlCias" required></div>
+      </div>
+      <datalist id="dlUnidades"></datalist><datalist id="dlCias"></datalist>
+      <div class="f"><label for="cdLogin">Login (ex.: seu nº PM)</label><input id="cdLogin" autocomplete="username" required></div>
+      <div class="dupla">
+        <div class="f"><label for="cdSenha">Senha (mín. 6)</label><input id="cdSenha" type="password" autocomplete="new-password" required minlength="6"></div>
+        <div class="f"><label for="cdSenha2">Confirmar senha</label><input id="cdSenha2" type="password" autocomplete="new-password" required minlength="6"></div>
+      </div>
+      <button class="btn primary" type="submit">Enviar solicitação</button>
+    </form>
+    <div class="login-msg" id="loginMsg" role="status"></div>
+  </div>
+</div>
+
+<!-- ================= Visão do usuário (somente leitura + Resposta) ================= -->
+<div class="wrap" id="viewUsuario" hidden>
+  <header>
+    <div>
+      <h1>Minhas notas</h1>
+      <div class="sub" id="uOrigem"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="uSenha">🔑 Trocar senha</button>
+      <button class="btn" id="uAtualizar">↻ Atualizar</button>
+      <button class="btn" id="uSair">⎋ Sair</button>
+    </div>
+  </header>
+  <div id="uLoading" class="pf-loading"><span class="ampulheta">⏳</span> Carregando suas notas…</div>
+  <main id="uApp" hidden>
+    <section class="filters">
+      <div class="chips" id="uChips"></div>
+      <div class="f search"><label for="uBusca">Buscar</label><input id="uBusca" type="search" placeholder="OS, placa, estabelecimento…"></div>
+    </section>
+    <section class="kpis" id="uKpis"></section>
+    <section class="card">
+      <div class="table-tools">
+        <div><h2>Notas da Unidade</h2><div class="hint" style="margin:0" id="uCont"></div></div>
+        <div class="pager" id="uPager"></div>
+      </div>
+      <div class="tbl-wrap big-table"><table id="uTabela"><thead></thead><tbody></tbody></table></div>
+      <div class="hint" style="margin-top:8px">Somente consulta. Em caso de pendência, leia a observação do gestor e escreva sua resposta no campo <b>Resposta</b> (gravada ao sair do campo).</div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= Gestão de acessos ================= -->
+<div class="wrap" id="viewAcessos" hidden>
+  <header>
+    <div><h1>Acessos</h1><div class="sub">Pedidos de acesso dos PMs e usuários liberados. Cada usuário vê só a sua Unidade e Cia.</div></div>
+    <div><button class="btn" id="acAtualizar">↻ Atualizar</button></div>
+  </header>
+  <div id="acLoading" class="pf-loading"><span class="ampulheta">⏳</span> Carregando…</div>
+  <section class="card" id="acApp" hidden>
+    <div class="chips" id="acChips" style="margin-bottom:10px"></div>
+    <div class="tbl-wrap"><table id="acTabela"><thead><tr>
+      <th>Situação</th><th>Nome PM</th><th>Login</th><th>Unidade</th><th>Cia</th><th>Perfil</th><th>Solicitado</th><th>Último acesso</th><th>Ações</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</div>
+
+<div class="wrap" id="viewImpostos" hidden>
   <header>
     <div>
       <h1>Painel de Impostos — RAD</h1>
@@ -916,8 +1029,11 @@ var PDFS = [];        // [{id, nome, caminho, lido (impressão já no cache do s
 var FONTE = {};       // informações da última carga
 var NF = { lista: [], buscando: false };
 
+var SEM_TOKEN = ['entrar', 'solicitarAcesso', 'getOpcoesCadastro'];
 function chamar(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
+  // Todas as funções do servidor (menos login/cadastro) recebem o token da sessão como 1º argumento.
+  if (SEM_TOKEN.indexOf(fn) < 0) args.unshift(lerToken());
   return new Promise(function (ok, erro) {
     var r = google.script.run.withSuccessHandler(ok).withFailureHandler(erro);
     r[fn].apply(r, args);
@@ -1482,11 +1598,14 @@ function mostrarView(v) {
   document.querySelectorAll('.nav-btn').forEach(function (b) {
     if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  document.getElementById('viewImpostos').hidden = v !== 'impostos';
-  document.getElementById('viewPrefat').hidden = v !== 'prefat';
+  ['impostos', 'prefat', 'acessos', 'usuario', 'login'].forEach(function (k) {
+    document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = v !== k;
+  });
+  if (v === 'acessos') acCarregar();
   // A planilha de pré-faturamento só é carregada quando o painel é aberto (economiza dados).
   if (v === 'prefat' && !PF.dados && !PF.carregando) pfCarregar();
   if (v === 'impostos' && NOTAS.length) render();
+  if (v === 'login' || v === 'usuario') document.getElementById('lateral').hidden = true;
   window.scrollTo(0, 0);
 }
 
@@ -1585,11 +1704,13 @@ function pfRender() {
   document.querySelectorAll('#pfPager button').forEach(function (b) { b.onclick = function () { PF.pagina += +b.dataset.p; pfRender(); }; });
 
   document.querySelector('#pfTabela thead').innerHTML = '<tr><th class="n">Linha</th>' + d.cab.map(function (c, i) {
+    if (i === d.colResposta) return '<th title="Escrita pelo usuário da Unidade — somente leitura na gestão">' + esc(c) + ' 💬</th>';
     return '<th' + (d.edit[i] ? ' class="ed" title="Editável — grava na planilha"' : '') + '>' + esc(c) + (d.edit[i] ? ' ✎' : '') + '</th>';
   }).join('') + '</tr>';
   document.querySelector('#pfTabela tbody').innerHTML = pag.length ? pag.map(function (i) {
     var l = d.linhas[i];
     return '<tr><td class="n muted">' + (d.linhaIni + i) + '</td>' + d.cab.map(function (c, ci) {
+      if (ci === d.colResposta) return '<td class="obs-gestor">' + esc(l[ci]) + '</td>';
       return '<td>' + (d.edit[ci] ? pfCampo(i, ci, l[ci]) : esc(l[ci])) + '</td>';
     }).join('') + '</tr>';
   }).join('') : '<tr><td class="empty" colspan="' + (d.cab.length + 1) + '">Nenhum registro nos filtros atuais.</td></tr>';
@@ -1641,6 +1762,224 @@ function pfAlterar(el) {
   });
 }
 
+/* ---------------- Sessão, login e cadastro ---------------- */
+var SESSAO = null;
+function lerToken() { try { return sessionStorage.getItem('pf_token') || ''; } catch (e) { return ''; } }
+function guardarToken(t) { try { if (t) sessionStorage.setItem('pf_token', t); else sessionStorage.removeItem('pf_token'); } catch (e) {} }
+
+function iniciar() {
+  if (MODO === 'offline') {
+    document.querySelectorAll('.so-drive').forEach(function (el) { el.hidden = true; });
+    document.getElementById('lateral').hidden = false;
+    mostrarView('impostos');
+    carregar();
+    return;
+  }
+  chamar('getSessao').then(function (s) {
+    SESSAO = s;
+    if (s && s.perfil === 'GESTOR') {
+      document.getElementById('lateral').hidden = false;
+      document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · gestor';
+      document.getElementById('navSair').hidden = !!s.google;
+      mostrarView('impostos');
+      carregar();
+      acContarPendentes();
+    } else if (s && s.perfil === 'USUARIO') {
+      mostrarView('usuario');
+      uCarregar();
+    } else {
+      guardarToken('');
+      mostrarView('login');
+    }
+  }).catch(function () { mostrarView('login'); });
+}
+
+function msgLogin(t, ok) { var m = document.getElementById('loginMsg'); m.textContent = t || ''; m.className = 'login-msg ' + (ok ? 'ok' : 'erro'); }
+function abaLogin(cad) {
+  document.getElementById('tabEntrar').setAttribute('aria-pressed', !cad);
+  document.getElementById('tabCadastro').setAttribute('aria-pressed', !!cad);
+  document.getElementById('formEntrar').hidden = !!cad;
+  document.getElementById('formCadastro').hidden = !cad;
+  msgLogin('');
+  if (cad && !abaLogin.opcoes) {
+    abaLogin.opcoes = true;
+    chamar('getOpcoesCadastro').then(function (o) {
+      document.getElementById('dlUnidades').innerHTML = o.unidades.map(function (u) { return '<option value="' + esc(u) + '">'; }).join('');
+      document.getElementById('dlCias').innerHTML = o.cias.map(function (u) { return '<option value="' + esc(u) + '">'; }).join('');
+    }).catch(function () {});
+  }
+}
+function configurarLogin() {
+  document.getElementById('tabEntrar').onclick = function () { abaLogin(false); };
+  document.getElementById('tabCadastro').onclick = function () { abaLogin(true); };
+  document.getElementById('formEntrar').onsubmit = function (e) {
+    e.preventDefault();
+    var b = this.querySelector('button'); b.disabled = true; msgLogin('⏳ Entrando…', true);
+    chamar('entrar', document.getElementById('lgLogin').value, document.getElementById('lgSenha').value).then(function (r) {
+      guardarToken(r.token);
+      document.getElementById('lgSenha').value = '';
+      msgLogin('');
+      iniciar();
+    }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
+  };
+  document.getElementById('formCadastro').onsubmit = function (e) {
+    e.preventDefault();
+    var v = function (id) { return document.getElementById(id).value; };
+    if (v('cdSenha') !== v('cdSenha2')) { msgLogin('As senhas não conferem.'); return; }
+    var b = this.querySelector('button'); b.disabled = true; msgLogin('⏳ Enviando…', true);
+    chamar('solicitarAcesso', { nome: v('cdNome'), unidade: v('cdUnidade'), cia: v('cdCia'), login: v('cdLogin'), senha: v('cdSenha') }).then(function () {
+      document.getElementById('formCadastro').reset();
+      abaLogin(false);
+      msgLogin('✅ Solicitação enviada. Você poderá entrar assim que o gestor aprovar o acesso.', true);
+    }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
+  };
+}
+function sairSessao() {
+  chamar('sair').catch(function () {}).then(function () { guardarToken(''); SESSAO = null; location.reload(); });
+}
+
+/* ---------------- Visão do usuário ---------------- */
+var U = { dados: null, filtro: null, pagina: 0, porPagina: 50 };
+
+/** Situação da nota a partir da coluna VERIFICAÇÃO. */
+function situacao(v) {
+  var n = pfNorm(v);
+  if (!n) return { k: 'anal', rot: 'Em análise', ic: '⏳' };
+  if (/reprov|nao aprov|pend|diverg|corrig|devolv|irregular|recus|ajust/.test(n)) return { k: 'pend', rot: 'Pendente', ic: '!' };
+  if (/aprov|conferid|^ok|regular|liberad|correto/.test(n)) return { k: 'aprov', rot: 'Aprovada', ic: '✓' };
+  return { k: 'anal', rot: v, ic: '•' };
+}
+
+function uCarregar() {
+  document.getElementById('uLoading').hidden = false; document.getElementById('uApp').hidden = true;
+  chamar('getMinhasNotas').then(function (d) {
+    U.dados = d; U.pagina = 0;
+    document.getElementById('uOrigem').textContent = d.nome + ' · Unidade ' + d.unidade + (d.filtroCia ? ' · Cia ' + d.cia : '') + ' · atualizado em ' + d.atualizadoEm;
+    document.getElementById('uLoading').hidden = true; document.getElementById('uApp').hidden = false;
+    uRender();
+  }).catch(function (e) {
+    var m = e && e.message || String(e);
+    if (/sess/i.test(m)) { guardarToken(''); mostrarView('login'); msgLogin(m); return; }
+    document.getElementById('uLoading').textContent = 'Erro: ' + m;
+  });
+}
+
+function uRender() {
+  var d = U.dados, cs = d.colStatus, q = pfNorm(document.getElementById('uBusca').value);
+  var cont = { aprov: 0, pend: 0, anal: 0 };
+  d.linhas.forEach(function (l) { cont[situacao(cs > -1 ? l.v[cs] : '').k]++; });
+  var rot = { aprov: '✓ Aprovadas', pend: '! Pendentes', anal: '⏳ Em análise' };
+  document.getElementById('uChips').innerHTML = '<button class="chip" data-k="" aria-pressed="' + !U.filtro + '">Todas <span class="n">' + d.linhas.length + '</span></button>' +
+    ['pend', 'aprov', 'anal'].map(function (k) { return '<button class="chip" data-k="' + k + '" aria-pressed="' + (U.filtro === k) + '">' + rot[k] + ' <span class="n">' + cont[k] + '</span></button>'; }).join('');
+  document.querySelectorAll('#uChips .chip').forEach(function (b) { b.onclick = function () { U.filtro = b.dataset.k || null; U.pagina = 0; uRender(); }; });
+  var respondidas = d.linhas.filter(function (l) { return d.colResposta > -1 && l.v[d.colResposta]; }).length;
+  document.getElementById('uKpis').innerHTML = [
+    { l: 'Notas da Unidade', v: d.linhas.length, d: d.filtroCia ? 'Cia ' + d.cia : '' },
+    { l: 'Aprovadas', v: cont.aprov, d: '' },
+    { l: 'Pendentes', v: cont.pend, d: 'precisam de resposta' },
+    { l: 'Respondidas', v: respondidas, d: '' }
+  ].map(function (x) { return '<div class="kpi"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(int.format(x.v)) + '</div><div class="d">' + esc(x.d) + '</div></div>'; }).join('');
+
+  var lin = d.linhas.filter(function (l) {
+    if (U.filtro && situacao(cs > -1 ? l.v[cs] : '').k !== U.filtro) return false;
+    return !q || pfNorm(l.v.join(' ')).indexOf(q) > -1;
+  });
+  // Pendentes primeiro
+  lin.sort(function (a, b) { var o = { pend: 0, anal: 1, aprov: 2 }; return o[situacao(cs > -1 ? a.v[cs] : '').k] - o[situacao(cs > -1 ? b.v[cs] : '').k]; });
+  var paginas = Math.max(1, Math.ceil(lin.length / U.porPagina));
+  U.pagina = Math.min(U.pagina, paginas - 1);
+  var ini = U.pagina * U.porPagina, pag = lin.slice(ini, ini + U.porPagina);
+  document.getElementById('uCont').textContent = lin.length + ' nota(s)' + (lin.length ? ' · mostrando ' + (ini + 1) + '–' + (ini + pag.length) : '');
+  document.getElementById('uPager').innerHTML = paginas > 1 ? '<button class="btn" data-p="-1"' + (U.pagina ? '' : ' disabled') + '>‹</button> Página ' + (U.pagina + 1) + ' de ' + paginas +
+    ' <button class="btn" data-p="1"' + (U.pagina < paginas - 1 ? '' : ' disabled') + '>›</button>' : '';
+  document.querySelectorAll('#uPager button').forEach(function (b) { b.onclick = function () { U.pagina += +b.dataset.p; uRender(); }; });
+
+  var cols = d.cab.map(function (c, i) { return i; }).filter(function (i) { return i !== d.colResposta && String(d.cab[i]).trim(); });
+  document.querySelector('#uTabela thead').innerHTML = '<tr><th>Situação</th>' + cols.map(function (i) {
+    return '<th>' + esc(d.cab[i]) + (i === d.colObs ? ' (gestor)' : '') + '</th>';
+  }).join('') + (d.colResposta > -1 ? '<th class="ed">Resposta ✎</th>' : '') + '</tr>';
+  document.querySelector('#uTabela tbody').innerHTML = pag.length ? pag.map(function (l) {
+    var st = situacao(cs > -1 ? l.v[cs] : '');
+    return '<tr class="' + (st.k === 'pend' ? 'linha-pend' : '') + '"><td><span class="sit ' + st.k + '">' + st.ic + ' ' + esc(st.rot) + '</span></td>' +
+      cols.map(function (i) { return '<td' + (i === d.colObs ? ' class="obs-gestor"' : '') + '>' + esc(l.v[i]) + '</td>'; }).join('') +
+      (d.colResposta > -1 ? '<td><div class="pf-cel"><textarea class="pf-obs u-resp" data-l="' + l.linha + '" placeholder="' +
+        (st.k === 'pend' ? 'Responda ao questionamento…' : 'Resposta (opcional)…') + '">' + esc(l.v[d.colResposta]) + '</textarea><span class="pf-st"></span></div></td>' : '') + '</tr>';
+  }).join('') : '<tr><td class="empty" colspan="' + (cols.length + 2) + '">Nenhuma nota encontrada.</td></tr>';
+  document.querySelectorAll('#uTabela .u-resp').forEach(function (t) { t.onchange = function () { uResponder(t); }; });
+}
+
+function uResponder(el) {
+  var d = U.dados, linha = +el.dataset.l;
+  var reg = d.linhas.filter(function (l) { return l.linha === linha; })[0];
+  var anterior = reg.v[d.colResposta], st = el.parentNode.querySelector('.pf-st');
+  st.className = 'pf-st'; st.textContent = '⏳'; el.disabled = true;
+  chamar('responder', linha, el.value, anterior).then(function (r) {
+    el.disabled = false;
+    if (r.conflito) { reg.v[d.colResposta] = r.atual; alert('A resposta desta nota foi alterada em outro acesso. Valor atual: “' + r.atual + '”.'); uRender(); return; }
+    reg.v[d.colResposta] = r.valor; st.className = 'pf-st ok'; st.textContent = '✓'; st.title = 'Resposta gravada';
+  }).catch(function (e) {
+    el.disabled = false; el.value = anterior; st.className = 'pf-st erro'; st.textContent = '✕';
+    alert('Não foi possível gravar a resposta: ' + (e && e.message || e));
+  });
+}
+
+/* ---------------- Gestão de acessos ---------------- */
+var AC = { lista: null, filtro: 'PENDENTE' };
+function acContarPendentes() {
+  chamar('listarUsuarios').then(function (l) {
+    AC.lista = l;
+    var n = l.filter(function (u) { return u.status === 'PENDENTE'; }).length;
+    document.getElementById('navPend').textContent = n ? n + ' pedido(s) aguardando' : '';
+  }).catch(function () {});
+}
+function acCarregar() {
+  document.getElementById('acLoading').hidden = false; document.getElementById('acApp').hidden = true;
+  chamar('listarUsuarios').then(function (l) {
+    AC.lista = l;
+    document.getElementById('acLoading').hidden = true; document.getElementById('acApp').hidden = false;
+    acRender();
+  }).catch(function (e) { document.getElementById('acLoading').textContent = 'Erro: ' + (e && e.message || e); });
+}
+function acRender() {
+  var l = AC.lista, cont = {};
+  l.forEach(function (u) { cont[u.status] = (cont[u.status] || 0) + 1; });
+  var n = cont.PENDENTE || 0;
+  document.getElementById('navPend').textContent = n ? n + ' pedido(s) aguardando' : '';
+  if (!cont[AC.filtro] && AC.filtro) AC.filtro = n ? 'PENDENTE' : '';
+  document.getElementById('acChips').innerHTML = [['', 'Todos', l.length], ['PENDENTE', 'Aguardando aprovação', cont.PENDENTE || 0], ['APROVADO', 'Liberados', cont.APROVADO || 0],
+    ['BLOQUEADO', 'Bloqueados', cont.BLOQUEADO || 0], ['RECUSADO', 'Recusados', cont.RECUSADO || 0]].map(function (c) {
+    return '<button class="chip" data-s="' + c[0] + '" aria-pressed="' + (AC.filtro === c[0]) + '">' + c[1] + ' <span class="n">' + c[2] + '</span></button>';
+  }).join('');
+  document.querySelectorAll('#acChips .chip').forEach(function (b) { b.onclick = function () { AC.filtro = b.dataset.s; acRender(); }; });
+  var tag = { PENDENTE: 'warn', APROVADO: 'ok', BLOQUEADO: 'bad', RECUSADO: 'bad' };
+  var lin = l.filter(function (u) { return !AC.filtro || u.status === AC.filtro; });
+  document.querySelector('#acTabela tbody').innerHTML = lin.length ? lin.map(function (u) {
+    var a = function (acao, rot, cls) { return '<button class="btn ' + (cls || '') + '" data-a="' + acao + '" data-l="' + esc(u.login) + '">' + rot + '</button>'; };
+    var acoes = u.status === 'PENDENTE' ? a('APROVAR', '✓ Aprovar', 'primary') + a('RECUSAR', '✕ Recusar')
+              : u.status === 'APROVADO' ? a('SALVAR', 'Salvar') + a('SENHA', 'Nova senha') + a('BLOQUEAR', 'Bloquear')
+              : a('REATIVAR', 'Reativar');
+    return '<tr class="acc" data-l="' + esc(u.login) + '"><td><span class="tag ' + (tag[u.status] || '') + '">' + esc(u.status) + '</span></td>' +
+      '<td>' + esc(u.nome) + '</td><td>' + esc(u.login) + '</td>' +
+      '<td><input data-f="unidade" value="' + esc(u.unidade) + '" list="dlUnidades"></td><td><input data-f="cia" value="' + esc(u.cia) + '" list="dlCias"></td>' +
+      '<td><select data-f="perfil"><option' + (u.perfil !== 'GESTOR' ? ' selected' : '') + ' value="USUARIO">Usuário</option><option' + (u.perfil === 'GESTOR' ? ' selected' : '') + ' value="GESTOR">Gestor</option></select></td>' +
+      '<td>' + esc(u.solicitado) + '</td><td>' + esc(u.acesso || '—') + '</td><td><div class="acoes">' + acoes + '</div></td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="9">Nenhum usuário nesta situação.</td></tr>';
+  document.querySelectorAll('#acTabela button[data-a]').forEach(function (b) {
+    b.onclick = function () {
+      var tr = b.closest('tr'), g = function (f) { return tr.querySelector('[data-f="' + f + '"]').value; };
+      var acao = b.dataset.a;
+      if (acao === 'RECUSAR' && !confirm('Recusar o pedido de ' + b.dataset.l + '?')) return;
+      if (acao === 'BLOQUEAR' && !confirm('Bloquear o acesso de ' + b.dataset.l + '?')) return;
+      if (acao === 'APROVAR' && (!g('unidade') || !g('cia')) && !confirm('Unidade ou Cia em branco. Aprovar mesmo assim?')) return;
+      b.disabled = true; b.textContent = '⏳';
+      chamar('decidirUsuario', b.dataset.l, acao, { unidade: g('unidade'), cia: g('cia'), perfil: g('perfil') }).then(function (r) {
+        if (r.senhaTemporaria) alert('Senha temporária de ' + b.dataset.l + ': ' + r.senhaTemporaria + '\nPasse ao usuário e peça para trocá-la em “Trocar senha”.');
+        acCarregar();
+      }).catch(function (e) { alert('Erro: ' + (e && e.message || e)); acCarregar(); });
+    };
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   tipEl = document.getElementById('tip');
   document.querySelectorAll('.nav-btn').forEach(function (b) { b.onclick = function () { mostrarView(b.dataset.view); }; });
@@ -1672,7 +2011,18 @@ document.addEventListener('DOMContentLoaded', function () {
     root.dataset.theme = escuro ? 'light' : 'dark';
     if (NOTAS.length) render();
   };
-  carregar();
+  configurarLogin();
+  document.getElementById('navSair').onclick = sairSessao;
+  document.getElementById('uSair').onclick = sairSessao;
+  document.getElementById('uAtualizar').onclick = uCarregar;
+  document.getElementById('uBusca').oninput = function () { if (U.dados) { U.pagina = 0; uRender(); } };
+  document.getElementById('acAtualizar').onclick = acCarregar;
+  document.getElementById('uSenha').onclick = function () {
+    var at = prompt('Senha atual:'); if (at == null) return;
+    var nv = prompt('Nova senha (mínimo 6 caracteres):'); if (nv == null) return;
+    chamar('trocarSenha', at, nv).then(function () { alert('Senha alterada.'); }).catch(function (e) { alert(e && e.message || e); });
+  };
+  iniciar();
 });
 </script>
 </body>
