@@ -2,14 +2,18 @@
  * Painel de Impostos — RAD
  *
  * Fontes de dados (nesta ordem):
- *  1. Pasta do Google Drive configurada no painel (botão "Pasta do Drive"):
- *     - todos os "Relatório Sintético da Despesa - RAD" (.xls exportados do sistema), um por unidade;
- *     - todas as notas fiscais em PDF (inclusive em subpastas).
- *  2. Se nenhuma pasta estiver configurada: a aba ABA_DADOS desta planilha.
+ *  1. Pastas do Google Drive (PASTA_RADS_PADRAO / PASTA_NOTAS_PADRAO ou as escolhidas no painel):
+ *     - RADs: "Relatório Sintético da Despesa - RAD" (.xls exportados do sistema), um por unidade;
+ *     - Notas: notas fiscais em PDF (inclusive em subpastas).
+ *  2. Se as duas constantes estiverem vazias: a aba ABA_DADOS desta planilha.
  *
  * O texto dos PDFs é extraído pelo OCR do Google Drive (serviço avançado "Drive API")
  * e guardado na aba oculta "_cache_pdf" para não ser lido de novo.
  */
+
+// Pastas do Google Drive (podem ser trocadas pelo botão "📁 Pastas do Drive" no painel).
+var PASTA_RADS_PADRAO = '1_-qJQUiIDqJsPO7vpuMxBZP2bQ46gphf';   // RADs de cada unidade
+var PASTA_NOTAS_PADRAO = '1Sf2E0M96jh5RfWvbpIZTwE26Ef995d3B';  // PDFs das notas fiscais
 
 var ABA_DADOS = 'BADE SE DADOS';
 var ABA_CACHE = '_cache_pdf';
@@ -45,20 +49,30 @@ function idDaPasta_(texto) {
   return m ? m[1] : '';
 }
 
-/** Chamado pelo painel: salva a pasta do Drive (link ou ID). Vazio = usar a aba da planilha. */
-function salvarPasta(texto) {
-  var props = PropertiesService.getScriptProperties();
-  if (!String(texto || '').trim()) { props.deleteProperty('PASTA_ID'); return { ok: true, pasta: '' }; }
-  var id = idDaPasta_(texto);
-  if (!id) throw new Error('Link de pasta inválido. Cole o link da pasta do Google Drive.');
-  var pasta = DriveApp.getFolderById(id); // valida o acesso
-  props.setProperty('PASTA_ID', id);
-  return { ok: true, pasta: pasta.getName(), id: id };
+/** Chamado pelo painel: salva as pastas (links ou IDs). Vazio = volta para a pasta padrão. */
+function salvarPastas(rads, notas) {
+  var cfg = {};
+  [['rads', rads], ['notas', notas]].forEach(function (par) {
+    if (!String(par[1] || '').trim()) return;
+    var id = idDaPasta_(par[1]);
+    if (!id) throw new Error('Link de pasta inválido: ' + par[1]);
+    DriveApp.getFolderById(id).getName(); // valida o acesso
+    cfg[par[0]] = id;
+  });
+  PropertiesService.getScriptProperties().setProperty('PASTAS', JSON.stringify(cfg));
+  return getConfig();
 }
 
-function pastaAtual_() {
-  var id = PropertiesService.getScriptProperties().getProperty('PASTA_ID');
-  return id ? DriveApp.getFolderById(id) : null;
+function idsPastas_() {
+  var cfg = {};
+  try { cfg = JSON.parse(PropertiesService.getScriptProperties().getProperty('PASTAS') || '{}'); } catch (e) {}
+  return { rads: cfg.rads || PASTA_RADS_PADRAO, notas: cfg.notas || PASTA_NOTAS_PADRAO };
+}
+
+function abrirPasta_(id, papel) {
+  if (!id) return null;
+  try { return DriveApp.getFolderById(id); }
+  catch (e) { throw new Error('Sem acesso à pasta de ' + papel + ' (' + id + '). Verifique se ela está compartilhada com a sua conta.'); }
 }
 
 /* ------------------------------------------------------------------ */
@@ -73,9 +87,9 @@ function pastaAtual_() {
 function getFontes() {
   var tz = Session.getScriptTimeZone();
   var agora = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
-  var pasta = pastaAtual_();
+  var ids = idsPastas_();
 
-  if (!pasta) {
+  if (!ids.rads && !ids.notas) {
     var aba = obterAba_();
     var valores = aba.getDataRange().getValues().map(function (l) {
       return l.map(function (v) { return v instanceof Date ? Utilities.formatDate(v, tz, 'dd/MM/yyyy HH:mm') : v; });
@@ -86,27 +100,42 @@ function getFontes() {
     };
   }
 
-  var rads = [], pdfs = [];
+  var pastaRads = abrirPasta_(ids.rads, 'RADs');
+  var pastaNotas = abrirPasta_(ids.notas, 'notas');
+  var rads = [], pdfs = [], vistos = {}, ignorados = [];
   var cache = lerCache_();
-  listarArquivos_(pasta, '', function (arq, caminho) {
+
+  var tratar = function (arq, caminho) {
+    var id = arq.getId();
+    if (vistos[id]) return;
+    vistos[id] = 1;
     var nome = arq.getName();
     var mime = arq.getMimeType();
     if (mime === MimeType.PDF || /\.pdf$/i.test(nome)) {
-      var id = arq.getId();
       var atualizado = arq.getLastUpdated().getTime();
       var c = cache[id];
       pdfs.push({
         id: id, nome: nome, caminho: caminho, url: arq.getUrl(), tamanho: arq.getSize(), atualizado: atualizado,
         texto: c && c.atualizado === atualizado ? c.texto : null
       });
+    } else if (mime === MimeType.GOOGLE_SHEETS) {
+      // RAD enviado com "converter uploads" ligado: vira Planilha Google.
+      var grade = SpreadsheetApp.openById(id).getSheets()[0].getDataRange().getDisplayValues();
+      if (grade.some(function (l) { return /^placa$/i.test(String(l[0]).trim()); })) rads.push({ id: id, nome: caminho + nome, grade: grade });
     } else if (/\.(xls|html?)$/i.test(nome) || /rad/i.test(nome)) {
-      if (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.GOOGLE_DOCS) return;
       var html = arq.getBlob().getDataAsString('UTF-8');
-      if (/title-rad|Sint(&eacute;|é)tico da Despesa/i.test(html)) rads.push({ id: arq.getId(), nome: caminho + nome, html: html });
+      if (/title-rad|Sint(&eacute;|é)tico da Despesa/i.test(html)) rads.push({ id: id, nome: caminho + nome, html: html });
+      else ignorados.push(caminho + nome);
     }
-  });
+  };
+  if (pastaRads) listarArquivos_(pastaRads, '', tratar);
+  if (pastaNotas) listarArquivos_(pastaNotas, '', tratar);
 
-  return { modo: 'drive', origem: 'Pasta do Drive “' + pasta.getName() + '”', pastaUrl: pasta.getUrl(), atualizadoEm: agora, rads: rads, pdfs: pdfs };
+  var nomes = [pastaRads && 'RADs: “' + pastaRads.getName() + '”', pastaNotas && 'Notas: “' + pastaNotas.getName() + '”'].filter(String);
+  return {
+    modo: 'drive', origem: nomes.join(' · '), pastaRadsUrl: pastaRads && pastaRads.getUrl(), pastaNotasUrl: pastaNotas && pastaNotas.getUrl(),
+    atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados
+  };
 }
 
 function listarArquivos_(pasta, caminho, cb) {
@@ -216,7 +245,7 @@ function gerarZip(itens, nomeZip) {
   var bytes = zip.getBytes();
   if (bytes.length < 8 * 1024 * 1024) return { nome: nomeZip, base64: Utilities.base64Encode(bytes) };
 
-  var pasta = pastaAtual_();
+  var pasta = abrirPasta_(idsPastas_().notas, 'notas');
   var destinos = pasta.getFoldersByName(PASTA_ZIP);
   var destino = destinos.hasNext() ? destinos.next() : pasta.createFolder(PASTA_ZIP);
   var arq = destino.createFile(zip);
@@ -239,9 +268,12 @@ function obterAba_() {
   throw new Error('Nenhuma pasta do Drive configurada e a aba de dados não foi encontrada. Configure a pasta no painel.');
 }
 
-/** Informa ao painel qual pasta está configurada. */
+/** Informa ao painel quais pastas estão configuradas. */
 function getConfig() {
-  var pasta = null;
-  try { pasta = pastaAtual_(); } catch (e) { /* pasta removida ou sem acesso */ }
-  return { pasta: pasta ? pasta.getName() : '', pastaUrl: pasta ? pasta.getUrl() : '' };
+  var ids = idsPastas_();
+  var info = function (id) {
+    try { var p = DriveApp.getFolderById(id); return { id: id, nome: p.getName(), url: p.getUrl() }; }
+    catch (e) { return { id: id, nome: '', url: 'https://drive.google.com/drive/folders/' + id, erro: 'sem acesso' }; }
+  };
+  return { rads: info(ids.rads), notas: info(ids.notas) };
 }

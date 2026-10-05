@@ -12,14 +12,16 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
 
 ## Opção 1 — Google Drive + Apps Script (recomendado)
 
-1. Coloque numa pasta do Google Drive os RADs exportados do sistema (`RelatorioSinteticoDaDespesaRAD*.xls`, um por unidade)
-   e os PDFs das notas (podem estar em subpastas).
+1. As pastas já vêm configuradas no `Code.gs`:
+   - RADs (`RelatorioSinteticoDaDespesaRAD*.xls`, um por unidade): `PASTA_RADS_PADRAO`
+   - Notas fiscais em PDF (subpastas incluídas): `PASTA_NOTAS_PADRAO`
+
+   Para trocar, use o botão **📁 Pastas do Drive** no painel. Se o RAD for convertido em Planilha Google no upload, também é lido.
 2. Crie uma Planilha Google (pode ser em branco) › **Extensões › Apps Script**.
 3. Cole `Code.gs`; crie o arquivo HTML `Index` e cole `Index.html`.
 4. Ative o serviço avançado do Drive: em **Serviços (+)** adicione **Drive API** (v3) — ou, em
    *Configurações do projeto › Mostrar "appsscript.json"*, cole o `appsscript.json` desta pasta.
 5. Salve, recarregue a planilha e abra **📊 Painel de Impostos › Abrir painel** (autorize na 1ª vez).
-6. No painel, clique em **📁 Pasta do Drive** e cole o link da pasta.
 
 O texto dos PDFs é lido pelo OCR do Google Drive (funciona também com PDF escaneado) e guardado na aba oculta
 `_cache_pdf`, então só a primeira leitura de cada PDF é demorada. Primeiro são lidos os PDFs com o número da nota

@@ -171,7 +171,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="btnTema" title="Alternar tema claro/escuro">◐ Tema</button>
-      <button class="btn" id="btnPasta" title="Pasta do Google Drive com os RADs e as notas">📁 Pasta do Drive</button>
+      <button class="btn" id="btnPasta" title="Pastas do Google Drive com os RADs e as notas">📁 Pastas do Drive</button>
       <button class="btn" id="btnAbrir" title="Abrir RADs, planilha ou PDFs das notas">📂 Abrir arquivos…</button>
       <button class="btn" id="btnAtualizar">↻ Atualizar dados</button>
     </div>
@@ -853,14 +853,17 @@ function carregar() {
   chamar('getFontes').then(function (res) {
     var notas, avisos = [];
     if (res.modo === 'drive') {
-      var r = notasDosRads(res.rads.map(function (x) { return { nome: x.nome, html: x.html }; }));
+      var r = notasDosRads(res.rads);
       notas = r.notas; avisos = r.avisos;
+      if (!res.rads.length) avisos.push('Nenhum RAD encontrado na pasta de RADs.');
+      if (!res.pdfs.length) avisos.push('Nenhum PDF encontrado na pasta de notas.');
+      if ((res.ignorados || []).length) avisos.push('Arquivos ignorados por não serem RAD: ' + res.ignorados.join(', '));
       PDFS = res.pdfs;
     } else {
       notas = linhasParaNotas(res.cab, res.linhas, '');
       PDFS = [];
     }
-    FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos, pastaUrl: res.pastaUrl };
+    FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos };
     exibir(notas);
   }).catch(erroCarga);
 }
@@ -914,12 +917,29 @@ function lerRadHtml(html, nomeArquivo) {
   return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo };
 }
 
+/** RAD que virou Planilha Google (grade de células). */
+function lerRadGrade(grade, nomeArquivo) {
+  var orgao = '', periodo = '', cab = null, linhas = [];
+  grade.forEach(function (l) {
+    l = l.map(function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); });
+    l.forEach(function (v, i) {
+      if (!orgao && /^(Nome|Código) Órgão \/ Entidade:?$/i.test(v)) orgao = l.slice(i + 1).filter(String)[0] || '';
+      var m = !periodo && /Período:\s*(.+)$/i.exec(v); if (m) periodo = m[1];
+    });
+    if (normCab(l[0]) === 'placa') { cab = l; return; }
+    if (cab && l[0] && !/^qtd de os/i.test(l[0])) linhas.push(l);
+  });
+  if (!cab) throw new Error('“' + nomeArquivo + '” não parece um RAD (cabeçalho "Placa" não encontrado).');
+  var sigla = orgao.replace(/^\d+\s*[ºª°A-Z]?\s+/i, '').trim() || orgao;
+  return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo };
+}
+
 /** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. */
 function notasDosRads(rads) {
   var notas = [], vistas = {}, avisos = [], porUnidade = {};
   rads.forEach(function (r) {
     var rad;
-    try { rad = lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
+    try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
     var novas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade).filter(function (n) {
       var k = [n.os, n.nfPeca, n.nfServ, n.placa].join('|');
       if (vistas[k]) return false;
@@ -1298,14 +1318,17 @@ function baixarZip() {
   }
 }
 
-/* ---------------- Pasta do Drive ---------------- */
+/* ---------------- Pastas do Drive ---------------- */
 function configurarPasta() {
-  var atual = FONTE.pastaUrl || '';
-  var v = prompt('Cole o link da pasta do Google Drive com os RADs e as notas fiscais (PDF).\nDeixe vazio para usar a aba “' + ABA_DADOS + '” da planilha.', atual);
-  if (v === null) return;
-  document.getElementById('loading').hidden = false;
-  document.getElementById('loading').textContent = 'Verificando a pasta…';
-  chamar('salvarPasta', v).then(function () { PDFS = []; carregar(); }).catch(erroCarga);
+  chamar('getConfig').then(function (cfg) {
+    var rads = prompt('Pasta dos RADs (link do Google Drive).\nAtual: ' + (cfg.rads.nome || cfg.rads.erro || '—') + '\nDeixe vazio para manter a padrão.', cfg.rads.url);
+    if (rads === null) return;
+    var notas = prompt('Pasta das notas fiscais em PDF (link do Google Drive).\nAtual: ' + (cfg.notas.nome || cfg.notas.erro || '—') + '\nDeixe vazio para manter a padrão.', cfg.notas.url);
+    if (notas === null) return;
+    document.getElementById('loading').hidden = false;
+    document.getElementById('loading').textContent = 'Verificando as pastas…';
+    return chamar('salvarPastas', rads, notas).then(function () { PDFS = []; carregar(); });
+  }).catch(erroCarga);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
