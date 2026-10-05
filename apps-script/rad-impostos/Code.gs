@@ -15,6 +15,9 @@
 var PASTA_RADS_PADRAO = '1K1jNXFhsz2rCxjT8qAEIm2uodP8NruVt';   // RADs de cada unidade
 var PASTA_NOTAS_PADRAO = '1ylX_cDzvczSj3wxz2fNKYUMfdngg5aBm';  // PDFs das notas fiscais
 
+// Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
+var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
+
 var ABA_DADOS = 'BADE SE DADOS';
 var ABA_CACHE = '_cache_pdf';
 var PASTA_ZIP = 'Notas tomador (painel)';
@@ -102,7 +105,7 @@ function getFontes() {
 
   var pastaRads = abrirPasta_(ids.rads, 'RADs');
   var pastaNotas = abrirPasta_(ids.notas, 'notas');
-  var rads = [], pdfs = [], vistos = {}, ignorados = [];
+  var rads = [], pdfs = [], vistos = {}, ignorados = [], consolidados = [];
   var cache = lerCache_();
 
   var tratar = function (arq, caminho) {
@@ -118,6 +121,8 @@ function getFontes() {
         id: id, nome: nome, caminho: caminho, url: arq.getUrl(), tamanho: arq.getSize(), atualizado: atualizado,
         texto: c && c.atualizado === atualizado ? c.texto : null
       });
+    } else if (IGNORAR_RADS.test(nome)) {
+      consolidados.push(caminho + nome); // planilha consolidada: os dados já estão nos RADs das unidades
     } else if (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
                /\.(xlsx|xlsm|xls|html?)$/i.test(nome) || /rad/i.test(nome)) {
       try {
@@ -135,7 +140,7 @@ function getFontes() {
   var nomes = [pastaRads && 'RADs: “' + pastaRads.getName() + '”', pastaNotas && 'Notas: “' + pastaNotas.getName() + '”'].filter(String);
   return {
     modo: 'drive', origem: nomes.join(' · '), pastaRadsUrl: pastaRads && pastaRads.getUrl(), pastaNotasUrl: pastaNotas && pastaNotas.getUrl(),
-    atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados
+    atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados
   };
 }
 

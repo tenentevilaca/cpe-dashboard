@@ -863,7 +863,8 @@ function carregar() {
       notas = linhasParaNotas(res.cab, res.linhas, '');
       PDFS = [];
     }
-    FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos };
+    FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos,
+              nRads: (res.rads || []).length, consolidados: res.consolidados || [] };
     exibir(notas);
   }).catch(erroCarga);
 }
@@ -871,7 +872,8 @@ function carregar() {
 function exibir(notas) {
   NOTAS = notas.map(preparar);
   var unidades = unicos(NOTAS.map(function (n) { return n.unidade; }));
-  document.getElementById('origem').textContent = (FONTE.origem || '') + ' · ' + NOTAS.length + ' ordens · ' +
+  document.getElementById('origem').textContent = (FONTE.origem || '') + (FONTE.nRads ? ' · ' + FONTE.nRads + ' RAD(s) lido(s)' : '') +
+    ((FONTE.consolidados || []).length ? ' (' + FONTE.consolidados.length + ' “UNIAO RAD” desconsiderada(s))' : '') + ' · ' + NOTAS.length + ' ordens · ' +
     (unidades.length ? unidades.length + ' unidade(s): ' + unidades.join(', ') : '') +
     (PDFS.length ? ' · ' + PDFS.length + ' PDF(s)' : '') + (FONTE.atualizadoEm ? ' · atualizado em ' + FONTE.atualizadoEm : '');
   var av = document.getElementById('avisos');
@@ -1039,7 +1041,8 @@ function lerArquivos(files) {
   var l = document.getElementById('loading');
   l.hidden = false; l.textContent = 'Lendo ' + files.length + ' arquivo(s)…';
   var pdfs = files.filter(function (f) { return /\.pdf$/i.test(f.name); });
-  var outros = files.filter(function (f) { return !/\.pdf$/i.test(f.name); });
+  // "UNIAO RAD" é a junção dos RADs das unidades: desconsiderada para não duplicar.
+  var outros = files.filter(function (f) { return !/\.pdf$/i.test(f.name) && !/uni[aã]o[\s_-]*rad/i.test(f.name); });
 
   Promise.all(outros.map(function (f) {
     return lerComo(f, 'texto').then(function (txt) {

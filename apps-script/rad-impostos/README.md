@@ -16,7 +16,7 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
    - RADs (`RelatorioSinteticoDaDespesaRAD*.xls`, um por unidade): `PASTA_RADS_PADRAO`
    - Notas fiscais em PDF (subpastas incluídas): `PASTA_NOTAS_PADRAO`
 
-   Para trocar, use o botão **📁 Pastas do Drive** no painel. Na pasta de RADs são lidos: o .xls exportado do sistema, planilhas Excel (.xlsx/.xls, inclusive a consolidada "UNIAO RAD" com a aba BADE SE DADOS) e Planilhas Google.
+   Para trocar, use o botão **📁 Pastas do Drive** no painel. Na pasta de RADs são lidos: o .xls exportado do sistema, planilhas Excel (.xlsx/.xls, e Planilhas Google. Arquivos "UNIAO RAD" (junção dos demais) são desconsiderados — ajuste `IGNORAR_RADS` no Code.gs se precisar. Novos RADs colocados na pasta (ou em subpastas) entram automaticamente ao clicar em ↻ Atualizar dados.
 2. Crie uma Planilha Google (pode ser em branco) › **Extensões › Apps Script**.
 3. Cole `Code.gs`; crie o arquivo HTML `Index` e cole `Index.html`.
 4. Ative o serviço avançado do Drive: em **Serviços (+)** adicione **Drive API** (v3) — ou, em
