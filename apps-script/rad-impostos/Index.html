@@ -1185,13 +1185,21 @@ function buscarNotas(completa) {
 
   var passo;
   if (MODO === 'appsscript') {
-    passo = function lote(ids) {
-      return chamar('lerTextosPdf', ids).then(function (res) {
+    // Lotes pequenos: o progresso anda a cada poucos PDFs e as notas já encontradas podem ser baixadas durante a leitura.
+    var LOTE = 4, ids = fila.map(function (p) { return p.id; }), erros = NF.erros = [];
+    passo = (function proximo() {
+      if (!ids.length) return Promise.resolve();
+      var agora = ids.splice(0, LOTE);
+      return chamar('lerTextosPdf', agora).then(function (res) {
         PDFS.forEach(function (p) { if (res.textos.hasOwnProperty(p.id)) { p.texto = res.textos[p.id]; feitos++; } });
-        progresso(); renderNotasTomador(true);
-        if (res.pendentes.length) return lote(res.pendentes);
+        Object.keys(res.erros || {}).forEach(function (id) { erros.push(res.erros[id]); });
+        ids = res.pendentes.concat(ids);
+        progresso();
+        if (erros.length) st.textContent += ' · ' + erros.length + ' PDF(s) com erro de leitura: ' + erros[0];
+        renderNotasTomador(true);
+        return proximo();
       });
-    }(fila.map(function (p) { return p.id; }));
+    })();
   } else {
     passo = carregarScript(LIB.pdf, function () { return window.pdfjsLib; }).then(function () {
       pdfjsLib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
@@ -1204,7 +1212,10 @@ function buscarNotas(completa) {
     });
   }
   passo.catch(function (e) { alert('Erro ao ler PDFs: ' + (e && e.message || e)); })
-    .then(function () { NF.buscando = false; renderNotasTomador(); });
+    .then(function () {
+      NF.buscando = false; renderNotasTomador();
+      if ((NF.erros || []).length) st.textContent = NF.erros.length + ' PDF(s) não puderam ser lidos. Primeiro erro: ' + NF.erros[0];
+    });
 }
 
 function textoPdfLocal(file) {
@@ -1237,8 +1248,8 @@ function renderNotasTomador(parcial) {
     '<span class="tag">' + PDFS.length + ' PDF(s) na fonte' + (semTexto ? ' · ' + semTexto + ' ainda não lido(s)' : '') + '</span>';
   var baixaveis = lista.filter(function (x) { return x.pdf; }).length;
   var bz = document.getElementById('btnZip');
-  bz.disabled = !baixaveis || NF.buscando;
-  bz.textContent = '⬇ Baixar ' + baixaveis + ' nota(s) encontrada(s) (.zip)';
+  bz.disabled = !baixaveis || NF.zipando;
+  bz.textContent = NF.zipando ? 'Gerando .zip…' : '⬇ Baixar ' + baixaveis + ' nota(s) encontrada(s) (.zip)';
   document.getElementById('btnVarrer').hidden = !(cont.nao && semTexto);
   document.getElementById('btnVarrer').disabled = NF.buscando;
   if (!NF.buscando) document.getElementById('nfStatus').textContent = PDFS.length ? '' :
@@ -1286,9 +1297,9 @@ function baixarBlob(blob, nome) {
 function baixarZip() {
   var itens = NF.lista.filter(function (x) { return x.pdf; });
   if (!itens.length) return;
-  var bz = document.getElementById('btnZip'), rot = bz.textContent;
-  bz.disabled = true; bz.textContent = 'Gerando .zip…';
-  var fim = function () { bz.disabled = false; bz.textContent = rot; };
+  NF.zipando = true;
+  renderNotasTomador(true);
+  var fim = function () { NF.zipando = false; renderNotasTomador(true); };
   var nome = nomeZip();
   // Relação das notas incluída no .zip
   var csv = '﻿Status;Unidade;Estabelecimento;CNPJ;NF Serviço;OS;Placa;% ISSQN;ISSQN;Arquivo original;Arquivo no zip\n' + itens.map(function (x) {
