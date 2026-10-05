@@ -118,14 +118,15 @@ function getFontes() {
         id: id, nome: nome, caminho: caminho, url: arq.getUrl(), tamanho: arq.getSize(), atualizado: atualizado,
         texto: c && c.atualizado === atualizado ? c.texto : null
       });
-    } else if (mime === MimeType.GOOGLE_SHEETS) {
-      // RAD enviado com "converter uploads" ligado: vira Planilha Google.
-      var grade = SpreadsheetApp.openById(id).getSheets()[0].getDataRange().getDisplayValues();
-      if (grade.some(function (l) { return /^placa$/i.test(String(l[0]).trim()); })) rads.push({ id: id, nome: caminho + nome, grade: grade });
-    } else if (/\.(xls|html?)$/i.test(nome) || /rad/i.test(nome)) {
-      var html = arq.getBlob().getDataAsString('UTF-8');
-      if (/title-rad|Sint(&eacute;|é)tico da Despesa/i.test(html)) rads.push({ id: id, nome: caminho + nome, html: html });
-      else ignorados.push(caminho + nome);
+    } else if (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
+               /\.(xlsx|xlsm|xls|html?)$/i.test(nome) || /rad/i.test(nome)) {
+      try {
+        var rad = lerRadArquivo_(arq, mime);
+        if (rad) { rad.id = id; rad.nome = caminho + nome; rads.push(rad); }
+        else ignorados.push(caminho + nome);
+      } catch (e) {
+        ignorados.push(caminho + nome + ' (erro: ' + (e && e.message || e) + ')');
+      }
     }
   };
   if (pastaRads) listarArquivos_(pastaRads, '', tratar);
@@ -136,6 +137,47 @@ function getFontes() {
     modo: 'drive', origem: nomes.join(' · '), pastaRadsUrl: pastaRads && pastaRads.getUrl(), pastaNotasUrl: pastaNotas && pastaNotas.getUrl(),
     atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados
   };
+}
+
+/**
+ * Lê um arquivo de RAD. Aceita:
+ *  - .xls exportado do sistema (na verdade é HTML) -> { html }
+ *  - planilha Excel (.xlsx/.xls) ou Planilha Google, inclusive a consolidada "UNIAO RAD" -> { grade }
+ * Devolve null se o arquivo não tiver a tabela do RAD.
+ */
+function lerRadArquivo_(arq, mime) {
+  if (mime === MimeType.GOOGLE_SHEETS) return gradeDaPlanilha_(SpreadsheetApp.openById(arq.getId()));
+  var blob = arq.getBlob();
+  var b = blob.getBytes();
+  var ehXlsx = b.length > 1 && b[0] === 0x50 && b[1] === 0x4B;               // "PK" (zip)
+  var ehXlsBin = b.length > 1 && (b[0] & 0xFF) === 0xD0 && (b[1] & 0xFF) === 0xCF; // Excel 97-2003
+  if (ehXlsx || ehXlsBin) {
+    // Converte uma cópia temporária em Planilha Google só para ler, e apaga em seguida.
+    var tmp = Drive.Files.create({ name: '_tmp_rad_' + arq.getName(), mimeType: MimeType.GOOGLE_SHEETS }, blob, { fields: 'id' });
+    try { return gradeDaPlanilha_(SpreadsheetApp.openById(tmp.id)); }
+    finally { DriveApp.getFileById(tmp.id).setTrashed(true); }
+  }
+  var html = blob.getDataAsString('UTF-8');
+  if (/title-rad|Sint(&eacute;|é)tico da Despesa|<table/i.test(html) && /Placa/i.test(html)) return { html: html };
+  return null;
+}
+
+/** Procura a aba com a tabela do RAD (cabeçalho "Placa"); prefere a aba ABA_DADOS. */
+function gradeDaPlanilha_(ss) {
+  var tz = Session.getScriptTimeZone();
+  var abas = ss.getSheets().slice().sort(function (a) { return a.getName() === ABA_DADOS ? -1 : 1; });
+  for (var i = 0; i < abas.length; i++) {
+    var v = abas[i].getDataRange().getValues();
+    var temCab = v.slice(0, 30).some(function (l) { return /^placa$/i.test(String(l[0]).trim()); });
+    if (!temCab) continue;
+    return {
+      aba: abas[i].getName(),
+      grade: v.map(function (l) {
+        return l.map(function (x) { return x instanceof Date ? Utilities.formatDate(x, tz, 'dd/MM/yyyy HH:mm') : x; });
+      })
+    };
+  }
+  return null;
 }
 
 function listarArquivos_(pasta, caminho, cb) {
