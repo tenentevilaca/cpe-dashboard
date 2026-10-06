@@ -1775,6 +1775,7 @@ function iniciar() {
     carregar();
     return;
   }
+  if (window.TOKEN_INICIAL) { guardarToken(window.TOKEN_INICIAL); window.TOKEN_INICIAL = ''; } // aberto pelo menu da planilha
   chamar('getSessao').then(function (s) {
     SESSAO = s;
     if (s && s.perfil === 'GESTOR') {
@@ -1791,7 +1792,10 @@ function iniciar() {
       guardarToken('');
       mostrarView('login');
     }
-  }).catch(function () { mostrarView('login'); });
+  }).catch(function (e) {
+    mostrarView('login');
+    msgLogin('Não foi possível verificar o acesso: ' + (e && e.message || e) + ' — se houver mais de uma conta Google aberta no navegador, use uma janela anônima só com a conta dona da planilha.');
+  });
 }
 
 function msgLogin(t, ok) { var m = document.getElementById('loginMsg'); m.textContent = t || ''; m.className = 'login-msg ' + (ok ? 'ok' : 'erro'); }

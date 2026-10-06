@@ -36,7 +36,16 @@ function onOpen() {
 
 function abrirPainel() {
   lembrarPlanilha_();
-  var html = HtmlService.createHtmlOutputFromFile('Index').setWidth(1400).setHeight(900);
+  // Quem chega aqui pelo menu é editor desta planilha: o painel já abre com uma sessão de gestor,
+  // sem depender do e-mail da conta Google (que falha, p. ex., com várias contas abertas no navegador).
+  var email = '';
+  try { email = Session.getActiveUser().getEmail(); } catch (e) {}
+  var token = novoToken_();
+  CacheService.getScriptCache().put('sess_' + token, JSON.stringify({
+    login: 'planilha', nome_pm: email || 'Gestor (planilha)', perfil: 'GESTOR', planilha: true
+  }), SESSAO_SEGUNDOS);
+  var html = HtmlService.createHtmlOutputFromFile('Index').setWidth(1400).setHeight(900)
+    .append('<script>window.TOKEN_INICIAL = ' + JSON.stringify(token) + ';</script>');
   SpreadsheetApp.getUi().showModelessDialog(html, 'Painel de Impostos — RAD');
 }
 
@@ -659,7 +668,7 @@ function getSessao(token) {
   var g = gestorGoogle_();
   if (g) return { perfil: 'GESTOR', nome: g, google: true };
   var s = sessao_(token);
-  return s ? { perfil: s.perfil, nome: s.nome_pm, unidade: s.unidade, cia: s.cia } : null;
+  return s ? { perfil: s.perfil, nome: s.nome_pm, unidade: s.unidade, cia: s.cia, google: !!s.planilha } : null;
 }
 
 /** Opções de Unidade e Cia para o formulário de cadastro (tiradas da planilha de pré-faturamento). */
