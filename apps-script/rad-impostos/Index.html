@@ -1619,13 +1619,13 @@ var PF_NOVO = '__novo_valor__';
 function pfNorm(s) { return semAcento(s).toLowerCase().replace(/\s+/g, ' ').trim(); }
 function pfHoje() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear(); }
 
-function pfCarregar() {
+function pfCarregar(atualizar) {
   var l = document.getElementById('pfLoading');
   l.hidden = false; document.getElementById('pfApp').hidden = true;
   if (MODO !== 'appsscript') { l.textContent = 'O pré-faturamento lê e grava na planilha do Google — disponível ao abrir o painel pelo Apps Script.'; return; }
   PF.carregando = true;
   l.innerHTML = '<span class="ampulheta">⏳</span> Carregando a planilha de pré-faturamento…';
-  chamar('getPrefat').then(function (d) {
+  chamar('getPrefat', !!atualizar).then(function (d) {
     PF.dados = d; PF.carregando = false; PF.pagina = 0;
     d.edit = {};
     d.editaveis.forEach(function (e) { d.edit[e.col] = e; });
@@ -1991,7 +1991,7 @@ function acRender() {
 document.addEventListener('DOMContentLoaded', function () {
   tipEl = document.getElementById('tip');
   document.querySelectorAll('.nav-btn').forEach(function (b) { b.onclick = function () { mostrarView(b.dataset.view); }; });
-  document.getElementById('pfAtualizar').onclick = function () { PF.dados = null; pfCarregar(); };
+  document.getElementById('pfAtualizar').onclick = function () { PF.dados = null; pfCarregar(true); };
   document.getElementById('pfBusca').oninput = function () { if (PF.dados) { PF.pagina = 0; pfRender(); } };
   document.getElementById('pfLimpar').onclick = function () {
     PF.filtros = {}; PF.status = null; PF.pagina = 0; document.getElementById('pfBusca').value = '';

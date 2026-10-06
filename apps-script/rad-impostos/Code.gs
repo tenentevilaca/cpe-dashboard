@@ -96,11 +96,11 @@ function descobrir_(forcar) {
   if (!forcar) {
     try {
       var d0 = JSON.parse(props.getProperty('DESCOBERTA') || 'null');
-      if (d0 && d0.raiz === raiz) return d0;
+      if (d0 && d0.raiz === raiz && Date.now() - (d0.em || 0) < 6 * 3600 * 1000) return d0;
     } catch (e) {}
   }
   var pastaRaiz = abrirPasta_(raiz, 'raiz');
-  var achado = { raiz: raiz, rads: '', notas: '', prefat: '', prefatXlsx: '' };
+  var achado = { raiz: raiz, rads: '', notas: '', prefat: '', prefatXlsx: '', em: Date.now() };
   var nivel = [{ p: pastaRaiz, prof: 0 }];
   while (nivel.length) {
     var prox = [];
@@ -502,18 +502,27 @@ function normPrefat_(s) {
   return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function idPrefat_() {
+function idPrefat_(forcar) {
   var d = {};
-  try { d = idsPastas_(); } catch (e) {}
+  try { d = forcar ? descobrir_(true) : idsPastas_(); } catch (e) {}
   return d.prefat || PREFAT_PLANILHA_ID;
 }
 
-function abrirPrefat_() {
-  var ss, idPf = idPrefat_();
+/** Abre a planilha de pré-faturamento; se não achar (ou mudou), procura de novo na raiz antes de desistir. */
+function abrirPrefat_(forcar) {
+  try { return abrirPrefatId_(idPrefat_(forcar)); }
+  catch (e) {
+    if (forcar) throw e;
+    return abrirPrefatId_(idPrefat_(true));
+  }
+}
+
+function abrirPrefatId_(idPf) {
+  var ss;
   if (!idPf) {
     var xl = '';
     try { xl = idsPastas_().prefatXlsx; } catch (e) {}
-    throw new Error(xl ? 'A planilha de pré-faturamento “' + xl + '” está em Excel (.xlsx). Abra-a e use Arquivo › Salvar como Planilhas Google (na mesma pasta); depois clique em “Pastas do Drive” › OK.'
+    throw new Error(xl ? 'A planilha de pré-faturamento “' + xl + '” está em Excel (.xlsx) e não há uma Planilha Google com “FATUR” no nome dentro da pasta raiz. Abra o .xlsx, use Arquivo › Salvar como Planilhas Google e confira se a cópia ficou dentro da pasta raiz (ou de uma subpasta); depois clique em ↻ Atualizar.'
                        : 'Planilha de pré-faturamento não encontrada na pasta raiz (procurei uma Planilha Google com “FATUR” no nome).');
   }
   try { ss = SpreadsheetApp.openById(idPf); }
@@ -573,9 +582,9 @@ function opcoesPrefat_(aba, colPlanilha, linhaIni, nLinhas, valoresColuna) {
 }
 
 /** Chamado pelo painel: dados da aba de pré-faturamento (só textos exibidos, para trafegar menos). */
-function getPrefat(token) {
+function getPrefat(token, atualizar) {
   exigirGestor_(token);
-  var p = abrirPrefat_(), aba = p.aba;
+  var p = abrirPrefat_(!!atualizar), aba = p.aba;
   garantirColunaResposta_(aba);
   var valores = aba.getDataRange().getDisplayValues();
   var h = cabecalhoPrefat_(valores);
