@@ -440,8 +440,12 @@ function gerarZip(token, itens, nomeZip, csv) {
   var pasta = abrirPasta_(idsPastas_().notas, 'notas');
   var destinos = pasta.getFoldersByName(PASTA_ZIP);
   var destino = destinos.hasNext() ? destinos.next() : pasta.createFolder(PASTA_ZIP);
-  var antigos = destino.getFiles();
-  while (antigos.hasNext()) { var a = antigos.next(); if (/\.zip$/i.test(a.getName())) a.setTrashed(true); }
+  // Limpa só .zip com mais de 1 hora: não apaga o de outra pessoa que acabou de gerar e ainda vai baixar.
+  var antigos = destino.getFiles(), limite = Date.now() - 3600 * 1000;
+  while (antigos.hasNext()) {
+    var a = antigos.next();
+    if (/\.zip$/i.test(a.getName()) && a.getDateCreated().getTime() < limite) a.setTrashed(true);
+  }
   var arq = destino.createFile(zip);
   return { nome: nomeZip, url: 'https://drive.google.com/uc?export=download&id=' + arq.getId(), tamanho: arq.getSize() };
 }

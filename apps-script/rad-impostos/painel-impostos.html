@@ -458,7 +458,7 @@
     </section>
     <section class="card" id="sofiConsulta" hidden>
       <div class="table-tools">
-        <div><h2>Todos os RADs</h2><div class="hint" style="margin:0">Pagos e a pagar. Um RAD marcado por engano pode ser desfeito aqui.</div></div>
+        <div><h2>Todos os RADs</h2><div class="hint" style="margin:0">Pagos e a pagar. Clique em “A pagar” para registrar o pagamento ou em “✓ Pago” para desfazer um registro feito por engano.</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="sofiFiltro" class="pf-sel"><option value="">Todos</option><option value="apagar">A pagar</option><option value="pago">Pagos</option></select>
           <button class="btn primary" id="sofiCsv">⬇ Exportar CSV</button>
@@ -891,7 +891,8 @@ function renderKpis(d) {
     { l: 'Valor aprovado', v: Rk(aprov), d: R(aprov) },
     { l: state.imposto === 'todos' ? 'Impostos informados' : imp(state.imposto).nome + ' informado', v: Rk(totImp), d: aprov ? P(totImp / aprov * 100) + ' do aprovado' : '—' },
     { l: 'Valor líquido', v: Rk(soma(d, 'liquido')), d: R(soma(d, 'liquido')) },
-    { l: 'Diferença (informado − recalculado)', v: R(difTot), d: nDif ? nDif + ' ordem(ns) com diferença' : 'Nenhuma diferença encontrada', cls: Math.abs(difTot) > TOLERANCIA ? 'neg' : '' }
+    // Sem ordem com diferença acima da tolerância, centavos de arredondamento não são mostrados como diferença.
+    { l: 'Diferença (informado − recalculado)', v: R(nDif ? difTot : 0), d: nDif ? nDif + ' ordem(ns) com diferença' : 'Nenhuma diferença encontrada', cls: nDif ? 'neg' : '' }
   ];
   document.getElementById('kpis').innerHTML = k.map(function (x) {
     return '<div class="kpi"><div class="l">' + esc(x.l) + '</div><div class="v ' + (x.cls || '') + '">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>';
@@ -1202,7 +1203,7 @@ function exportarCsv() {
     });
   }));
   var csv = '\ufeff' + linhas.map(function (l) {
-    return l.map(function (v) { v = String(v == null ? '' : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';');
+    return l.map(celCsv).join(';');
   }).join('\n');
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -1228,7 +1229,12 @@ function chamar(fn) {
   // Todas as funções do servidor (menos login/cadastro) recebem o token da sessão como 1º argumento.
   if (SEM_TOKEN.indexOf(fn) < 0) args.unshift(lerToken());
   return new Promise(function (ok, erro) {
-    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(erro);
+    var falha = function (e) {
+      // Sessão vencida (6 h) ou perfil alterado: avisa na barra superior o que fazer.
+      if (/Sessão expirada|Acesso restrito/.test(e && e.message || e)) statusTopo('Sua sessão expirou ou o acesso mudou. Recarregue a página (F5) ou entre novamente.', true);
+      erro(e);
+    };
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(falha);
     r[fn].apply(r, args);
   });
 }
@@ -1364,8 +1370,11 @@ function notasDosRads(rads) {
   rads.forEach(function (r) {
     var rad;
     try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
+    // Ordem repetida só é descartada dentro do mesmo RAD (mesma Unidade e período): assim um RAD enviado duas vezes não
+    // duplica valores, mas uma OS que aparece em quinzenas diferentes continua contando em cada RAD.
+    var identRad = rad.unidade + '|' + (rad.periodo || '');
     var novas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade).filter(function (n) {
-      var k = [n.os, n.nfPeca, n.nfServ, n.placa].join('|');
+      var k = [identRad, n.os, n.nfPeca, n.nfServ, n.placa].join('|');
       if (vistas[k]) return false;
       vistas[k] = 1; return true;
     });
@@ -1836,7 +1845,7 @@ function baixarZip() {
   var fim = function () { NF.zipando = false; renderNotasTomador(); };
   var nome = nomeZip();
   // Relação (planilha) das notas do imposto selecionado, com os valores de cada imposto da nota.
-  var cel = function (v) { v = String(v == null ? '' : v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var cel = celCsv;
   var cab = ['Situação', 'Imposto', 'Tipo da NF', 'Unidade', 'Estabelecimento', 'CNPJ', 'Município', 'Optante Simples', 'Nº NF', 'OS', 'Placa',
              'Base da nota', 'Alíquota', 'ICMS', 'IRRF Peça', 'IRRF Serviço', 'ISSQN', 'Resp. ISSQN', 'Valor do imposto selecionado', 'Valor aprovado', 'Valor líquido',
              'Arquivo original', 'Pasta', 'Arquivo no zip'];
@@ -1989,6 +1998,14 @@ function rolagemHorizontal(idTabela) {
   });
 }
 
+/* ---------------- CSV ---------------- */
+/** Célula de CSV: aspas quando preciso e texto que começa com = + @ tratado como texto (não vira fórmula no Excel). */
+function celCsv(v) {
+  v = String(v == null ? '' : v);
+  if (/^[=+@]/.test(v)) v = "'" + v;
+  return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+
 /* ---------------- Faixa de status da barra superior ---------------- */
 function statusTopo(msg, erro) {
   var el = document.getElementById('topoStatus');
@@ -2069,15 +2086,17 @@ function sofiRender() {
   if (SOFI.consulta) {
     var f = document.getElementById('sofiFiltro').value;
     var lista = rads.filter(function (r) { var pg = !!(pagos[r.chave] && pagos[r.chave].pago); return !f || (f === 'pago') === pg; });
-    document.querySelector('#sofiTodos thead').innerHTML = cab + '<th>Situação</th><th>Pago em</th><th>Por</th><th>Arquivo(s) RAD</th><th></th></tr>';
+    document.querySelector('#sofiTodos thead').innerHTML = cab + '<th>Situação</th><th>Pago em</th><th>Por</th><th>Arquivo(s) RAD</th></tr>';
     document.querySelector('#sofiTodos tbody').innerHTML = lista.length ? lista.map(function (r) {
       var pg = pagos[r.chave] && pagos[r.chave].pago;
-      return '<tr>' + linha(r) + '<td>' + (pg ? '<span class="tag ok">✓ Pago</span>' : '<span class="tag warn">A pagar</span>') + '</td>' +
-        '<td>' + esc(pg ? pagos[r.chave].em : '') + '</td><td>' + esc(pg ? pagos[r.chave].por : '') + '</td>' +
-        '<td class="muted" style="white-space:normal;max-width:260px">' + esc(Object.keys(r.arquivos).join(', ')) + '</td>' +
-        '<td>' + (pg ? '<button class="btn" data-desfazer="' + esc(r.chave) + '">Desfazer</button>' : '<button class="btn primary" data-pagar="' + esc(r.chave) + '">✓ Pago</button>') + '</td></tr>';
-    }).join('') : '<tr><td class="empty" colspan="12">Nenhum RAD.</td></tr>';
-    document.querySelector('#sofiTodos tfoot').innerHTML = rodape(lista, '<td></td><td></td><td></td><td></td><td></td>');
+      // Uma única indicação de situação: o botão mostra o estado atual e, ao clicar, troca.
+      return '<tr' + (pg ? ' class="rad-pago"' : '') + '>' + linha(r) + '<td>' + (pg
+          ? '<button class="btn pago" data-desfazer="' + esc(r.chave) + '" title="Clique para desfazer o pagamento">✓ Pago</button>'
+          : '<button class="btn apagar" data-pagar="' + esc(r.chave) + '" title="Clique quando o RAD for pago">A pagar</button>') + '</td>' +
+        '<td>' + esc(pg ? pagos[r.chave].em : '—') + '</td><td>' + esc(pg ? pagos[r.chave].por : '—') + '</td>' +
+        '<td class="muted" style="white-space:normal;max-width:260px">' + esc(Object.keys(r.arquivos).join(', ')) + '</td></tr>';
+    }).join('') : '<tr><td class="empty" colspan="11">Nenhum RAD.</td></tr>';
+    document.querySelector('#sofiTodos tfoot').innerHTML = rodape(lista, '<td></td><td></td><td></td><td></td>');
     rolagemHorizontal('sofiTodos');
   }
   document.querySelectorAll('#viewSofi button[data-pagar]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.pagar, true); }; });
@@ -2100,7 +2119,7 @@ function sofiMarcar(b, chave, pago, semConfirmar) {
 
 function sofiCsv() {
   var pagos = SOFI.pagos || {}, f = document.getElementById('sofiFiltro').value;
-  var cel = function (v) { v = String(v == null ? '' : v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var cel = celCsv;
   var linhas = radsResumo().filter(function (r) { var pg = !!(pagos[r.chave] && pagos[r.chave].pago); return !f || (f === 'pago') === pg; }).map(function (r) {
     var pg = pagos[r.chave] && pagos[r.chave].pago;
     return [r.unidade, r.rotPeriodo, r.qtd, brNum(r.aprovado), brNum(r.impostos), brNum(r.adm), brNum(r.liquido), pg ? 'Pago' : 'A pagar',
