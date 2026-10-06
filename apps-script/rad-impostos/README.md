@@ -123,5 +123,6 @@ O gestor também vê a aba SOFI.
 
 ## Visual
 
-Identidade "Gestão à Vista CPE": menu lateral preto ("Painel de Gestão"), barra superior preta com o escudo PMMG/CPE em
-vetor (colorido) e faixa dourada de status, fundo bege e indicadores com barra lateral.
+Identidade "Gestão à Vista CPE": menu lateral preto com o escudo padrão PMMG/CPE (imagem `escudo-pmmg-cpe.webp`, embutida
+no Index.html) e "Painel de Gestão", barra superior preta com título e faixa dourada de status, fundo bege e indicadores
+com barra lateral.
