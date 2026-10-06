@@ -279,6 +279,10 @@
   .btn { border-radius: 6px; }
   .btn.primary { background: var(--gold); border-color: var(--gold); color: #17150f; font-weight: 600; }
   .btn.primary:hover { background: var(--gold-2); border-color: var(--gold-2); }
+  .btn.apagar { background: var(--warn-bg); color: var(--warn); border-color: #e3c983; font-weight: 600; min-width: 92px; }
+  .btn.apagar:hover { background: #f6e3b4; }
+  .btn.pago { background: var(--ok); color: #fff; border-color: var(--ok); font-weight: 600; min-width: 92px; }
+  tr.rad-pago td { color: var(--muted); }
   .chip[aria-pressed="true"] { background: var(--gold); color: #17150f; border-color: var(--gold); }
   .chip .dot { box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
   .kpi { position: relative; overflow: hidden; border-radius: 8px; }
@@ -289,7 +293,7 @@
   .card h2 { border-bottom: 2px solid var(--gold); padding-bottom: 6px; display: inline-block; margin-bottom: 6px; }
   th { background: var(--surface-2); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   /* menu lateral escuro */
-  .lateral { background: var(--ink); border-right: 0; padding-top: 18px; }
+  .lateral { background: var(--ink); border-right: 0; padding-top: 18px; width: 196px; overflow-y: auto; }
   .lateral .marca { color: var(--gold-2); font-size: 10.5px; letter-spacing: .28em; text-transform: uppercase; padding: 4px 12px 14px; border-bottom: 1px solid #23211c; margin-bottom: 8px; }
   .nav-btn { color: #e9e3d3; border-radius: 8px; }
   .nav-btn:hover { background: #1d1b17; color: #fff; }
@@ -303,18 +307,77 @@
   .topo-in { display: flex; align-items: center; gap: 14px; padding: 12px 24px; max-width: 1440px; margin: 0 auto; }
   .topo .escudo { width: 52px; height: 60px; flex: 0 0 auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
   .topo-sub { color: var(--gold-2); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-  .topo-tit { font-size: 22px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .topo-tit { font-size: 30px; font-weight: 700; color: #fff; line-height: 1.15; letter-spacing: .01em; }
+  .topo-in { min-height: 84px; }
+  .marca-escudo { display: flex; justify-content: center; padding: 4px 0 10px; }
+  .marca-escudo .escudo { width: 128px; height: 143px; filter: drop-shadow(0 3px 8px rgba(0,0,0,.6)); }
+  .lateral .marca { text-align: center; }
   .topo-st { background: var(--gold); color: #17150f; text-align: center; font-size: 12px; font-weight: 600; padding: 5px 12px; }
   .topo-st.erro { background: var(--bad); color: #fff; }
   .login-card .escudo { width: 84px; height: 98px; display: block; margin: 0 auto 10px; }
   .login-card h1 { display: block; text-align: center; }
   .login-card .sub { text-align: center; }
-  @media (max-width: 760px) { .topo-in { padding: 10px 12px; } .topo .escudo { width: 40px; height: 46px; } .topo-tit { font-size: 17px; } .lateral .marca { display: none; } }
+  @media (max-width: 760px) { .topo-in { padding: 10px 12px; min-height: 0; } .topo-tit { font-size: 20px; } .lateral .marca, .marca-escudo { display: none; } }
 </style>
 </head>
 <body>
 <div class="layout">
 <nav class="lateral" id="lateral" aria-label="Painéis" hidden>
+  <div class="marca-escudo"><svg class="escudo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 224" role="img" aria-label="Escudo PMMG CPE">
+  <defs>
+    <clipPath id="escLateral-c"><path d="M100 17C135 17 160 23 176 31V120C176 166 145 192 100 210C55 192 24 166 24 120V31C40 23 65 17 100 17Z"/></clipPath>
+  </defs>
+  <!-- borda preta com filete dourado externo -->
+  <path d="M100 4C142 4 172 11 190 22V121C190 176 152 204 100 221C48 204 10 176 10 121V22C28 11 58 4 100 4Z" fill="#141412" stroke="#b9a46a" stroke-width="2.5"/>
+  <!-- campo creme com filete dourado -->
+  <path d="M100 17C135 17 160 23 176 31V120C176 166 145 192 100 210C55 192 24 166 24 120V31C40 23 65 17 100 17Z" fill="#f3eedc" stroke="#b9a46a" stroke-width="1.6"/>
+  <g clip-path="url(#escLateral-c)">
+    <!-- montanhas -->
+    <path d="M24 158 L50 128 L62 136 L76 112 L92 126 L100 120 L118 104 L134 124 L146 116 L176 146 V224 H24Z" fill="#3f7f3b"/>
+    <path d="M76 112 L84 122 L78 125Z M118 104 L127 116 L121 118Z M50 128 L56 134 L51 136Z" fill="#6aa95a"/>
+    <!-- campo inferior -->
+    <path d="M24 170 Q100 158 176 170 V224 H24Z" fill="#2f6a2d"/>
+  </g>
+  <!-- PMMG / CPE -->
+  <text x="100" y="74" text-anchor="middle" textLength="140" lengthAdjust="spacingAndGlyphs" font-family="Arial Black, 'Arial Bold', Arial, Helvetica, sans-serif" font-weight="900" font-size="52" fill="#141412">PMMG</text>
+  <text x="100" y="94" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="15" letter-spacing="1" fill="#141412">CPE</text>
+  <!-- louros dourados -->
+  <g id="escLateral-l" fill="#d1a33a" stroke="#8d6b1d" stroke-width=".7">
+    <path d="M70 196 Q40 170 46 118" fill="none" stroke="#8d6b1d" stroke-width="2.4"/>
+    <ellipse cx="47" cy="120" rx="4.2" ry="9.5" transform="rotate(-14 47 120)"/>
+    <ellipse cx="43" cy="135" rx="4.2" ry="9.5" transform="rotate(-30 43 135)"/>
+    <ellipse cx="43" cy="150" rx="4.2" ry="9.5" transform="rotate(-46 43 150)"/>
+    <ellipse cx="47" cy="164" rx="4.2" ry="9.5" transform="rotate(-60 47 164)"/>
+    <ellipse cx="55" cy="177" rx="4.2" ry="9.5" transform="rotate(-72 55 177)"/>
+    <ellipse cx="65" cy="187" rx="4.2" ry="9.5" transform="rotate(-84 65 187)"/>
+    <ellipse cx="55" cy="126" rx="3.6" ry="8.5" transform="rotate(24 55 126)"/>
+    <ellipse cx="53" cy="140" rx="3.6" ry="8.5" transform="rotate(12 53 140)"/>
+    <ellipse cx="55" cy="154" rx="3.6" ry="8.5" transform="rotate(0 55 154)"/>
+    <ellipse cx="60" cy="167" rx="3.6" ry="8.5" transform="rotate(-14 60 167)"/>
+    <ellipse cx="68" cy="178" rx="3.6" ry="8.5" transform="rotate(-30 68 178)"/>
+  </g>
+  <use href="#escLateral-l" transform="translate(200 0) scale(-1 1)"/>
+  <!-- ponta da espada acima do triângulo -->
+  <path d="M100 102 L105 118 L102 117 L102 124 H98 V117 L95 118Z" fill="#141412"/>
+  <!-- triângulo vermelho -->
+  <path d="M100 124 L136 182 H64Z" fill="#c8102e" stroke="#141412" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M100 133 L128 177 H72Z" fill="none" stroke="#e8c96a" stroke-width="1"/>
+  <!-- garruchas cruzadas -->
+  <g fill="#141412">
+    <g transform="rotate(-24 100 163)">
+      <rect x="86" y="160.5" width="22" height="3.2" rx="1.2"/>
+      <path d="M86 160.5 Q80 161 79 166 L82 170 Q84 166 88 164Z"/>
+    </g>
+    <g transform="rotate(24 100 163) translate(200 0) scale(-1 1)">
+      <rect x="86" y="160.5" width="22" height="3.2" rx="1.2"/>
+      <path d="M86 160.5 Q80 161 79 166 L82 170 Q84 166 88 164Z"/>
+    </g>
+  </g>
+  <!-- espada abaixo do triângulo -->
+  <rect x="97.7" y="182" width="4.6" height="17" fill="#141412"/>
+  <path d="M84 186 Q92 184 100 185 Q108 184 116 186 L116 190 Q108 188 100 189 Q92 188 84 190Z" fill="#141412"/>
+  <circle cx="100" cy="202" r="3.8" fill="#141412"/>
+</svg></div>
   <div class="marca">Painel de Gestão</div>
   <button class="nav-btn" data-view="impostos" aria-current="page"><span class="ic">📊</span><span class="tx">Impostos RAD</span></button>
   <button class="nav-btn so-drive" data-view="sofi"><span class="ic">🏦</span><span class="tx">SOFI<small>pagamento dos RADs</small></span></button>
@@ -329,52 +392,7 @@
 <div class="conteudo">
 <div class="topo" id="topo">
   <div class="topo-in">
-    <svg class="escudo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 232" role="img" aria-label="Escudo PMMG CPE">
-  <defs>
-    <clipPath id="esc-in"><path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z"/></clipPath>
-  </defs>
-  <!-- borda preta -->
-  <path d="M100 3C143 3 177 9 193 19V119C193 175 152 207 100 229C48 207 7 175 7 119V19C23 9 57 3 100 3Z" fill="#1c1c1a" stroke="#c4b287" stroke-width="3"/>
-  <!-- campo creme -->
-  <path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z" fill="#efe6cc"/>
-  <g clip-path="url(#esc-in)">
-    <!-- montanhas verdes -->
-    <path d="M19 150 L52 112 L66 124 L84 98 L100 112 L118 92 L136 118 L150 106 L181 142 V230 H19Z" fill="#3e7d3a"/>
-    <path d="M52 112 L60 121 L66 124 L58 128Z M118 92 L126 104 L120 108Z" fill="#5c9a4f"/>
-    <path d="M19 178 Q100 160 181 178 V230 H19Z" fill="#336b30"/>
-  </g>
-  <!-- PMMG / CPE -->
-  <text x="100" y="62" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="44" letter-spacing="1" fill="#1c1c1a">PMMG</text>
-  <text x="100" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#1c1c1a">CPE</text>
-  <!-- louros dourados -->
-  <g fill="#c99a2e" stroke="#8a6a1c" stroke-width=".6">
-    <g id="louro">
-      <path d="M58 168 Q36 140 46 98" fill="none" stroke="#8a6a1c" stroke-width="2.4"/>
-      <ellipse cx="45" cy="104" rx="4" ry="9" transform="rotate(-20 45 104)"/>
-      <ellipse cx="42" cy="118" rx="4" ry="9" transform="rotate(-35 42 118)"/>
-      <ellipse cx="43" cy="132" rx="4" ry="9" transform="rotate(-50 43 132)"/>
-      <ellipse cx="47" cy="145" rx="4" ry="9" transform="rotate(-62 47 145)"/>
-      <ellipse cx="54" cy="157" rx="4" ry="9" transform="rotate(-75 54 157)"/>
-      <ellipse cx="53" cy="108" rx="3.5" ry="8" transform="rotate(20 53 108)"/>
-      <ellipse cx="52" cy="122" rx="3.5" ry="8" transform="rotate(10 52 122)"/>
-      <ellipse cx="54" cy="136" rx="3.5" ry="8" transform="rotate(0 54 136)"/>
-      <ellipse cx="59" cy="149" rx="3.5" ry="8" transform="rotate(-15 59 149)"/>
-    </g>
-    <use href="#louro" transform="translate(200 0) scale(-1 1)"/>
-  </g>
-  <!-- espada -->
-  <rect x="97.6" y="88" width="4.8" height="104" fill="#1c1c1a"/>
-  <path d="M100 74 L104 92 H96Z" fill="#1c1c1a"/>
-  <rect x="84" y="160" width="32" height="5" rx="1.5" fill="#1c1c1a"/>
-  <circle cx="100" cy="195" r="4" fill="#1c1c1a"/>
-  <!-- triângulo vermelho com fuzis cruzados -->
-  <path d="M100 94 L132 150 H68Z" fill="#c62828" stroke="#1c1c1a" stroke-width="3" stroke-linejoin="round"/>
-  <g stroke="#1c1c1a" stroke-width="2.2" stroke-linecap="round" fill="none">
-    <path d="M84 140 L115 122"/><path d="M116 140 L85 122"/>
-    <path d="M115 122 l4 -1.5"/><path d="M85 122 l-4 -1.5"/>
-    <path d="M86 140 l-3 3"/><path d="M114 140 l3 3"/>
-  </g>
-</svg>
+    
     <div>
       <div class="topo-sub" id="topoSub">Estado-Maior do CPE | Exercício</div>
       <div class="topo-tit" id="topoTitulo">Painel de Impostos — RAD</div>
@@ -385,51 +403,60 @@
 <!-- ================= Login / cadastro ================= -->
 <div class="wrap" id="viewLogin" hidden>
   <div class="login-card">
-    <svg class="escudo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 232" role="img" aria-label="Escudo PMMG CPE">
+    <svg class="escudo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 224" role="img" aria-label="Escudo PMMG CPE">
   <defs>
-    <clipPath id="esc-in2"><path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z"/></clipPath>
+    <clipPath id="escLogin-c"><path d="M100 17C135 17 160 23 176 31V120C176 166 145 192 100 210C55 192 24 166 24 120V31C40 23 65 17 100 17Z"/></clipPath>
   </defs>
-  <!-- borda preta -->
-  <path d="M100 3C143 3 177 9 193 19V119C193 175 152 207 100 229C48 207 7 175 7 119V19C23 9 57 3 100 3Z" fill="#1c1c1a" stroke="#c4b287" stroke-width="3"/>
-  <!-- campo creme -->
-  <path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z" fill="#efe6cc"/>
-  <g clip-path="url(#esc-in2)">
-    <!-- montanhas verdes -->
-    <path d="M19 150 L52 112 L66 124 L84 98 L100 112 L118 92 L136 118 L150 106 L181 142 V230 H19Z" fill="#3e7d3a"/>
-    <path d="M52 112 L60 121 L66 124 L58 128Z M118 92 L126 104 L120 108Z" fill="#5c9a4f"/>
-    <path d="M19 178 Q100 160 181 178 V230 H19Z" fill="#336b30"/>
+  <!-- borda preta com filete dourado externo -->
+  <path d="M100 4C142 4 172 11 190 22V121C190 176 152 204 100 221C48 204 10 176 10 121V22C28 11 58 4 100 4Z" fill="#141412" stroke="#b9a46a" stroke-width="2.5"/>
+  <!-- campo creme com filete dourado -->
+  <path d="M100 17C135 17 160 23 176 31V120C176 166 145 192 100 210C55 192 24 166 24 120V31C40 23 65 17 100 17Z" fill="#f3eedc" stroke="#b9a46a" stroke-width="1.6"/>
+  <g clip-path="url(#escLogin-c)">
+    <!-- montanhas -->
+    <path d="M24 158 L50 128 L62 136 L76 112 L92 126 L100 120 L118 104 L134 124 L146 116 L176 146 V224 H24Z" fill="#3f7f3b"/>
+    <path d="M76 112 L84 122 L78 125Z M118 104 L127 116 L121 118Z M50 128 L56 134 L51 136Z" fill="#6aa95a"/>
+    <!-- campo inferior -->
+    <path d="M24 170 Q100 158 176 170 V224 H24Z" fill="#2f6a2d"/>
   </g>
   <!-- PMMG / CPE -->
-  <text x="100" y="62" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="44" letter-spacing="1" fill="#1c1c1a">PMMG</text>
-  <text x="100" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#1c1c1a">CPE</text>
+  <text x="100" y="74" text-anchor="middle" textLength="140" lengthAdjust="spacingAndGlyphs" font-family="Arial Black, 'Arial Bold', Arial, Helvetica, sans-serif" font-weight="900" font-size="52" fill="#141412">PMMG</text>
+  <text x="100" y="94" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="15" letter-spacing="1" fill="#141412">CPE</text>
   <!-- louros dourados -->
-  <g fill="#c99a2e" stroke="#8a6a1c" stroke-width=".6">
-    <g id="louro2">
-      <path d="M58 168 Q36 140 46 98" fill="none" stroke="#8a6a1c" stroke-width="2.4"/>
-      <ellipse cx="45" cy="104" rx="4" ry="9" transform="rotate(-20 45 104)"/>
-      <ellipse cx="42" cy="118" rx="4" ry="9" transform="rotate(-35 42 118)"/>
-      <ellipse cx="43" cy="132" rx="4" ry="9" transform="rotate(-50 43 132)"/>
-      <ellipse cx="47" cy="145" rx="4" ry="9" transform="rotate(-62 47 145)"/>
-      <ellipse cx="54" cy="157" rx="4" ry="9" transform="rotate(-75 54 157)"/>
-      <ellipse cx="53" cy="108" rx="3.5" ry="8" transform="rotate(20 53 108)"/>
-      <ellipse cx="52" cy="122" rx="3.5" ry="8" transform="rotate(10 52 122)"/>
-      <ellipse cx="54" cy="136" rx="3.5" ry="8" transform="rotate(0 54 136)"/>
-      <ellipse cx="59" cy="149" rx="3.5" ry="8" transform="rotate(-15 59 149)"/>
+  <g id="escLogin-l" fill="#d1a33a" stroke="#8d6b1d" stroke-width=".7">
+    <path d="M70 196 Q40 170 46 118" fill="none" stroke="#8d6b1d" stroke-width="2.4"/>
+    <ellipse cx="47" cy="120" rx="4.2" ry="9.5" transform="rotate(-14 47 120)"/>
+    <ellipse cx="43" cy="135" rx="4.2" ry="9.5" transform="rotate(-30 43 135)"/>
+    <ellipse cx="43" cy="150" rx="4.2" ry="9.5" transform="rotate(-46 43 150)"/>
+    <ellipse cx="47" cy="164" rx="4.2" ry="9.5" transform="rotate(-60 47 164)"/>
+    <ellipse cx="55" cy="177" rx="4.2" ry="9.5" transform="rotate(-72 55 177)"/>
+    <ellipse cx="65" cy="187" rx="4.2" ry="9.5" transform="rotate(-84 65 187)"/>
+    <ellipse cx="55" cy="126" rx="3.6" ry="8.5" transform="rotate(24 55 126)"/>
+    <ellipse cx="53" cy="140" rx="3.6" ry="8.5" transform="rotate(12 53 140)"/>
+    <ellipse cx="55" cy="154" rx="3.6" ry="8.5" transform="rotate(0 55 154)"/>
+    <ellipse cx="60" cy="167" rx="3.6" ry="8.5" transform="rotate(-14 60 167)"/>
+    <ellipse cx="68" cy="178" rx="3.6" ry="8.5" transform="rotate(-30 68 178)"/>
+  </g>
+  <use href="#escLogin-l" transform="translate(200 0) scale(-1 1)"/>
+  <!-- ponta da espada acima do triângulo -->
+  <path d="M100 102 L105 118 L102 117 L102 124 H98 V117 L95 118Z" fill="#141412"/>
+  <!-- triângulo vermelho -->
+  <path d="M100 124 L136 182 H64Z" fill="#c8102e" stroke="#141412" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M100 133 L128 177 H72Z" fill="none" stroke="#e8c96a" stroke-width="1"/>
+  <!-- garruchas cruzadas -->
+  <g fill="#141412">
+    <g transform="rotate(-24 100 163)">
+      <rect x="86" y="160.5" width="22" height="3.2" rx="1.2"/>
+      <path d="M86 160.5 Q80 161 79 166 L82 170 Q84 166 88 164Z"/>
     </g>
-    <use href="#louro2" transform="translate(200 0) scale(-1 1)"/>
+    <g transform="rotate(24 100 163) translate(200 0) scale(-1 1)">
+      <rect x="86" y="160.5" width="22" height="3.2" rx="1.2"/>
+      <path d="M86 160.5 Q80 161 79 166 L82 170 Q84 166 88 164Z"/>
+    </g>
   </g>
-  <!-- espada -->
-  <rect x="97.6" y="88" width="4.8" height="104" fill="#1c1c1a"/>
-  <path d="M100 74 L104 92 H96Z" fill="#1c1c1a"/>
-  <rect x="84" y="160" width="32" height="5" rx="1.5" fill="#1c1c1a"/>
-  <circle cx="100" cy="195" r="4" fill="#1c1c1a"/>
-  <!-- triângulo vermelho com fuzis cruzados -->
-  <path d="M100 94 L132 150 H68Z" fill="#c62828" stroke="#1c1c1a" stroke-width="3" stroke-linejoin="round"/>
-  <g stroke="#1c1c1a" stroke-width="2.2" stroke-linecap="round" fill="none">
-    <path d="M84 140 L115 122"/><path d="M116 140 L85 122"/>
-    <path d="M115 122 l4 -1.5"/><path d="M85 122 l-4 -1.5"/>
-    <path d="M86 140 l-3 3"/><path d="M114 140 l3 3"/>
-  </g>
+  <!-- espada abaixo do triângulo -->
+  <rect x="97.7" y="182" width="4.6" height="17" fill="#141412"/>
+  <path d="M84 186 Q92 184 100 185 Q108 184 116 186 L116 190 Q108 188 100 189 Q92 188 84 190Z" fill="#141412"/>
+  <circle cx="100" cy="202" r="3.8" fill="#141412"/>
 </svg>
     <h1>Pré-faturamento — RAD</h1>
     <p class="sub">Consulta das notas da sua Unidade e Cia.</p>
@@ -516,7 +543,7 @@
   <header>
     <div>
       <h1>SOFI — Pagamento dos RADs</h1>
-      <div class="sub">Totais de cada RAD (Unidade × quinzena) calculados a partir dos RADs lidos. Ao marcar “Pago”, o RAD sai da lista.</div>
+      <div class="sub">Totais de cada RAD (Unidade × quinzena). Quando o RAD for pago, clique em <b>“A pagar”</b>: ele vira <b>“✓ Pago”</b> e sai da lista na próxima atualização (continua em “Consultar RADs”).</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="sofiConsultar">📋 Consultar RADs</button>
@@ -2073,7 +2100,7 @@ function statusTopo(msg, erro) {
 
 /* ---------------- SOFI: pagamento dos RADs ---------------- */
 var VIEW = '';
-var SOFI = { pagos: null, consulta: false, carregando: false };
+var SOFI = { pagos: null, consulta: false, carregando: false, nestaSessao: {} };
 
 /** Totais de cada RAD (Unidade + período) a partir das ordens lidas. */
 function radsResumo() {
@@ -2107,13 +2134,15 @@ function sofiCarregar() {
 
 function sofiRender() {
   var rads = radsResumo(), pagos = SOFI.pagos || {};
-  var aPagar = rads.filter(function (r) { return !(pagos[r.chave] && pagos[r.chave].pago); });
+  // Pagos agora continuam na lista (mostrando "Pago") até atualizar/reabrir a tela; depois só em "Consultar RADs".
+  var aPagar = rads.filter(function (r) { return !(pagos[r.chave] && pagos[r.chave].pago) || SOFI.nestaSessao[r.chave]; });
+  var pendentes = aPagar.filter(function (r) { return !(pagos[r.chave] && pagos[r.chave].pago); });
   var pagosL = rads.filter(function (r) { return pagos[r.chave] && pagos[r.chave].pago; });
   var tot = function (l, c) { return r2(l.reduce(function (s, r) { return s + r[c]; }, 0)); };
   document.getElementById('sofiKpis').innerHTML = [
-    { l: 'RADs a pagar', v: int.format(aPagar.length), d: 'de ' + rads.length + ' RAD(s) lidos', c: 'gold' },
-    { l: 'Valor líquido a pagar', v: Rk(tot(aPagar, 'liquido')), d: R(tot(aPagar, 'liquido')) },
-    { l: 'Impostos retidos (a pagar)', v: Rk(tot(aPagar, 'impostos')), d: R(tot(aPagar, 'impostos')) },
+    { l: 'RADs a pagar', v: int.format(pendentes.length), d: 'de ' + rads.length + ' RAD(s) lidos', c: 'gold' },
+    { l: 'Valor líquido a pagar', v: Rk(tot(pendentes, 'liquido')), d: R(tot(pendentes, 'liquido')) },
+    { l: 'Impostos retidos (a pagar)', v: Rk(tot(pendentes, 'impostos')), d: R(tot(pendentes, 'impostos')) },
     { l: 'RADs pagos', v: int.format(pagosL.length), d: R(tot(pagosL, 'liquido')) + ' líquidos' }
   ].map(function (x) { return '<div class="kpi ' + (x.c || '') + '"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>'; }).join('');
 
@@ -2126,12 +2155,16 @@ function sofiRender() {
     return l.length ? '<tr><td>Total</td><td></td><td class="n">' + tot(l, 'qtd') + '</td><td class="n">' + R(tot(l, 'aprovado')) + '</td><td class="n">' + R(tot(l, 'impostos')) +
       '</td><td class="n">' + R(tot(l, 'adm')) + '</td><td class="n">' + R(tot(l, 'liquido')) + '</td>' + extra + '</tr>' : '';
   };
-  document.querySelector('#sofiTabela thead').innerHTML = cab + '<th>Ação</th></tr>';
+  document.querySelector('#sofiTabela thead').innerHTML = cab + '<th>Situação</th></tr>';
   document.querySelector('#sofiTabela tbody').innerHTML = aPagar.length ? aPagar.map(function (r) {
-    return '<tr>' + linha(r) + '<td><button class="btn primary" data-pagar="' + esc(r.chave) + '">✓ Pago</button></td></tr>';
+    var pg = pagos[r.chave] && pagos[r.chave].pago;
+    return '<tr' + (pg ? ' class="rad-pago"' : '') + '>' + linha(r) + '<td>' + (pg
+      ? '<button class="btn pago" data-desfazer="' + esc(r.chave) + '" data-sem-confirmar="1" title="Pago em ' + esc(pagos[r.chave].em) + ' — clique para desfazer">✓ Pago</button>'
+      : '<button class="btn apagar" data-pagar="' + esc(r.chave) + '" title="Clique quando o RAD for pago">A pagar</button>') + '</td></tr>';
   }).join('') : '<tr><td class="empty" colspan="8">Nenhum RAD pendente de pagamento. 🎉</td></tr>';
-  document.querySelector('#sofiTabela tfoot').innerHTML = rodape(aPagar, '<td></td>');
-  document.getElementById('sofiCont').textContent = aPagar.length + ' RAD(s) aguardando pagamento';
+  document.querySelector('#sofiTabela tfoot').innerHTML = rodape(pendentes, '<td></td>');
+  document.getElementById('sofiCont').textContent = pendentes.length + ' RAD(s) aguardando pagamento' +
+    (aPagar.length > pendentes.length ? ' · os marcados como pagos saem da lista ao atualizar' : '');
 
   var cons = document.getElementById('sofiConsulta');
   cons.hidden = !SOFI.consulta;
@@ -2151,16 +2184,17 @@ function sofiRender() {
     rolagemHorizontal('sofiTodos');
   }
   document.querySelectorAll('#viewSofi button[data-pagar]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.pagar, true); }; });
-  document.querySelectorAll('#viewSofi button[data-desfazer]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.desfazer, false); }; });
+  document.querySelectorAll('#viewSofi button[data-desfazer]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.desfazer, false, !!b.dataset.semConfirmar); }; });
   rolagemHorizontal('sofiTabela');
 }
 
-function sofiMarcar(b, chave, pago) {
+function sofiMarcar(b, chave, pago, semConfirmar) {
   var r = radsResumo().filter(function (x) { return x.chave === chave; })[0];
   if (!r) return;
   var msg = pago ? 'Confirmar o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '?\nValor líquido: ' + R(r.liquido)
-                 : 'Desfazer o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '? Ele volta para “RADs a pagar”.';
-  if (!confirm(msg)) return;
+                 : 'Desfazer o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '? Ele volta para “A pagar”.';
+  if (!semConfirmar && !confirm(msg)) return;
+  if (pago) SOFI.nestaSessao[chave] = 1;
   b.disabled = true; b.textContent = '⏳';
   chamar('marcarPago', chave, { unidade: r.unidade, periodo: r.rotPeriodo, qtd: r.qtd, aprovado: r.aprovado, impostos: r.impostos, adm: r.adm, liquido: r.liquido }, pago)
     .then(function (res) { SOFI.pagos[chave] = { pago: res.pago, em: res.em, por: res.por }; sofiRender(); })
@@ -2192,7 +2226,7 @@ function mostrarView(v) {
     document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = v !== k;
   });
   if (v === 'acessos') acCarregar();
-  if (v === 'sofi') sofiCarregar();
+  if (v === 'sofi') { SOFI.nestaSessao = {}; if (SOFI.pagos) sofiRender(); sofiCarregar(); }
   // A planilha de pré-faturamento só é carregada quando o painel é aberto (economiza dados).
   if (v === 'prefat' && !PF.dados && !PF.carregando) pfCarregar();
   if (v === 'impostos' && NOTAS.length) render();
@@ -2675,7 +2709,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('uBusca').oninput = function () { if (U.dados) { U.pagina = 0; uRender(); } };
   document.getElementById('acAtualizar').onclick = acCarregar;
   document.getElementById('sofiConsultar').onclick = function () { SOFI.consulta = !SOFI.consulta; sofiRender(); };
-  document.getElementById('sofiAtualizar').onclick = function () { SOFI.pagos = null; carregar(); };
+  document.getElementById('sofiAtualizar').onclick = function () { SOFI.pagos = null; SOFI.nestaSessao = {}; carregar(); };
   document.getElementById('sofiFiltro').onchange = sofiRender;
   document.getElementById('sofiCsv').onclick = sofiCsv;
   document.getElementById('navSenha').onclick = function () { document.getElementById('uSenha').onclick(); };

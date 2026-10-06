@@ -117,7 +117,7 @@ o servidor confere Unidade/Cia em toda leitura e gravação. A coluna CIA é rec
 
 Perfil **SOFI** (definido pelo gestor em Acessos): vê o painel de Impostos RAD (sem os botões de inserir/pastas) e a aba
 **🏦 SOFI**, com a tabela dos RADs (Unidade × quinzena) ainda não pagos — Nº de OS, valor aprovado, impostos retidos, taxa
-adm. e valor líquido — e o botão **✓ Pago** (o RAD sai da lista). **📋 Consultar RADs** mostra todos, pagos e a pagar, com
+adm. e valor líquido — e o botão **A pagar** (ao clicar vira **✓ Pago**; o RAD sai da lista na próxima atualização). **📋 Consultar RADs** mostra todos, pagos e a pagar, com
 data e responsável do pagamento, opção de desfazer e exportação CSV. O registro fica na aba oculta `_rads_pagos`.
 O gestor também vê a aba SOFI.
 
