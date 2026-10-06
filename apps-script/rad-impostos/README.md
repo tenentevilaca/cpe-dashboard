@@ -108,3 +108,6 @@ o servidor confere Unidade/Cia em toda leitura e gravação. A coluna CIA é rec
 - **⬆ Inserir RADs** (gestão, App da Web): escolha os .xls baixados do sistema; cada um é guardado na pasta de RADs, na
   subpasta do período (ex.: "2026-09 · 2ª quinzena"), com o nome "RAD <Unidade> <AAAA-MM> <1ª|2ª> quinzena.xls".
   Reenviar o RAD da mesma Unidade e período substitui o anterior (o antigo vai para a lixeira).
+- **⬆ Inserir notas (PDF)** (gestão, App da Web): escolha um ou vários PDFs; são guardados na pasta de notas, na subpasta da
+  quinzena dos filtros "Mês do RAD"/"Quinzena" (ou da quinzena atual, se não houver filtro). PDF repetido (mesmo nome e tamanho)
+  não é duplicado. Logo após o envio o painel procura as notas nesses PDFs, sem recarregar tudo. Limite: 20 MB por PDF.

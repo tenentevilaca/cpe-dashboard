@@ -1100,3 +1100,44 @@ function salvarRads(token, arquivos) {
     });
   } finally { lock.releaseLock(); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Inserir notas fiscais (PDF) pelo painel                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Chamado pelo painel para cada PDF ({nome, base64}). Guarda na pasta de notas, na subpasta da quinzena
+ * escolhida ("2026-09 · 2ª quinzena"). Se já existir um PDF com o mesmo nome e tamanho, não duplica.
+ * Devolve o PDF no formato da lista do painel, para ele já procurar a nota sem recarregar tudo.
+ */
+function salvarNota(token, arq, destino) {
+  exigirGestor_(token);
+  var bytes = Utilities.base64Decode(arq.base64);
+  if (!(bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) {
+    return { nome: arq.nome, ok: false, msg: 'não é um PDF' };
+  }
+  var ids = idsPastas_();
+  var pastaNotas;
+  if (ids.notas && ids.notas !== ids.raiz) pastaNotas = DriveApp.getFolderById(ids.notas);
+  else {
+    pastaNotas = pastaFilha_(DriveApp.getFolderById(ids.raiz), 'Notas Fiscais');
+    PropertiesService.getScriptProperties().deleteProperty('DESCOBERTA');
+  }
+  var mes = /^\d{4}-\d{2}$/.test(destino && destino.mes) ? destino.mes : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM');
+  var q = destino && (destino.q === 1 || destino.q === 2) ? destino.q : (new Date().getDate() <= 15 ? 1 : 2);
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var sub = pastaFilha_(pastaNotas, mes + ' · ' + q + 'ª quinzena');
+    var nome = String(arq.nome || 'nota.pdf').replace(/[\\/:*?"<>|]/g, '-');
+    if (!/\.pdf$/i.test(nome)) nome += '.pdf';
+    var iguais = sub.getFilesByName(nome);
+    while (iguais.hasNext()) {
+      var f = iguais.next();
+      if (f.getSize() === bytes.length) return { nome: arq.nome, ok: true, duplicado: true, pasta: sub.getName(), pdf: null };
+      nome = nome.replace(/(\.pdf)$/i, ' (' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'ddMMyy-HHmmss') + ')$1');
+    }
+    var novo = sub.createFile(Utilities.newBlob(bytes, MimeType.PDF, nome));
+    var caminho = (pastaNotas.getId() === ids.notas ? '' : pastaNotas.getName() + '/') + sub.getName() + '/';
+    return { nome: arq.nome, ok: true, pasta: sub.getName(), pdf: { id: novo.getId(), nome: nome, caminho: caminho, lido: false } };
+  } finally { lock.releaseLock(); }
+}

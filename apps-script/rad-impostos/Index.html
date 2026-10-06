@@ -373,6 +373,8 @@
       <button class="btn" id="btnTema" title="Alternar tema claro/escuro">◐ Tema</button>
       <button class="btn" id="btnInserirRad" title="Guardar no Drive os RADs baixados do sistema (organizados por período)">⬆ Inserir RADs</button>
       <input type="file" id="inRad" accept=".xls,.htm,.html" multiple hidden>
+      <button class="btn" id="btnInserirNota" title="Guardar no Drive os PDFs das notas fiscais (vários de uma vez)">⬆ Inserir notas (PDF)</button>
+      <input type="file" id="inNota" accept=".pdf,application/pdf" multiple hidden>
       <button class="btn" id="btnPasta" title="Pasta raiz do Drive (RADs, notas e planilha de pré-faturamento)">📁 Pastas do Drive</button>
       <button class="btn" id="btnAbrir" title="Abrir RADs, planilha ou PDFs das notas">📂 Abrir arquivos…</button>
       <button class="btn" id="btnAtualizar">↻ Atualizar dados</button>
@@ -1580,7 +1582,10 @@ function buscarNotas() {
     .then(function () { return lerFila(PDFS.filter(function (p) { return !p.fp && porNome(p); })); })
     .then(function () { return lerFila(PDFS.filter(function (p) { return !p.fp; })); })
     .catch(function (e) { NF.erros.push(String(e && e.message || e)); })
-    .then(function () { NF.buscando = false; renderNotasTomador(); });
+    .then(function () {
+      NF.buscando = false; renderNotasTomador();
+      if (NF.relerDepois) { NF.relerDepois = false; buscarNotas(); } // chegaram PDFs novos durante a leitura
+    });
 }
 
 function textoPdfLocal(file) {
@@ -1748,6 +1753,54 @@ function inserirRads(files) {
     if (ok.length) carregar();
   }).catch(function (e) { alert('Erro ao enviar os RADs: ' + (e && e.message || e)); })
     .then(function () { b.disabled = false; b.textContent = rot; });
+}
+
+/* ---------------- Inserir notas fiscais (PDF) no Drive ---------------- */
+/** Quinzena de destino: a dos filtros Mês/Quinzena, se escolhidos; senão a quinzena de hoje. */
+function destinoNotas() {
+  var hoje = new Date(), dois = function (n) { return (n < 10 ? '0' : '') + n; };
+  var mes = document.getElementById('fMes').value || (hoje.getFullYear() + '-' + dois(hoje.getMonth() + 1));
+  var q = +document.getElementById('fQuinzena').value || (hoje.getDate() <= 15 ? 1 : 2);
+  var m = mes.split('-');
+  return { mes: mes, q: q, rot: MESES[+m[1] - 1] + '/' + m[0] + ' · ' + q + 'ª quinzena' };
+}
+/** Envia os PDFs um a um (menos risco com arquivos grandes) e já procura as notas nos novos PDFs. */
+function inserirNotas(files) {
+  files = Array.prototype.slice.call(files || []);
+  if (!files.length) return;
+  var dest = destinoNotas();
+  if (!confirm('Guardar ' + files.length + ' PDF(s) na pasta de notas, quinzena “' + dest.rot + '”?\n\n' +
+               'Para outra quinzena, cancele e escolha antes “Mês do RAD” e “Quinzena” nos filtros.')) return;
+  var grandes = files.filter(function (f) { return f.size > 20 * 1024 * 1024; });
+  files = files.filter(function (f) { return f.size <= 20 * 1024 * 1024; });
+  var b = document.getElementById('btnInserirNota'), rot = b.textContent, res = [], i = 0;
+  b.disabled = true;
+  var ler = function (f) {
+    return new Promise(function (ok, erro) {
+      var fr = new FileReader();
+      fr.onload = function () { ok(String(fr.result).split(',')[1] || ''); };
+      fr.onerror = function () { erro(fr.error); };
+      fr.readAsDataURL(f);
+    });
+  };
+  (function proximo() {
+    if (i >= files.length) return Promise.resolve();
+    var f = files[i++];
+    b.textContent = '⏳ Enviando ' + i + ' de ' + files.length + '…';
+    return ler(f).then(function (b64) { return chamar('salvarNota', { nome: f.name, base64: b64 }, { mes: dest.mes, q: dest.q }); })
+      .then(function (r) { res.push(r); }, function (e) { res.push({ nome: f.name, ok: false, msg: String(e && e.message || e) }); })
+      .then(proximo);
+  })().then(function () {
+    var novos = res.filter(function (r) { return r.ok && r.pdf; }), dup = res.filter(function (r) { return r.ok && r.duplicado; });
+    var falha = res.filter(function (r) { return !r.ok; });
+    novos.forEach(function (r) { PDFS.push(r.pdf); });
+    alert((novos.length ? '✅ ' + novos.length + ' PDF(s) guardado(s) em “' + (novos[0].pasta) + '”.\n' : '') +
+      (dup.length ? 'ℹ ' + dup.length + ' já existia(m) na pasta e não foi(ram) duplicado(s).\n' : '') +
+      (falha.length || grandes.length ? '\n⚠ Não guardados:\n' + falha.map(function (r) { return '• ' + r.nome + ': ' + r.msg; })
+        .concat(grandes.map(function (f) { return '• ' + f.name + ': maior que 20 MB'; })).join('\n') : '') +
+      (novos.length ? '\nO painel vai procurar as notas nesses PDFs agora.' : ''));
+    if (novos.length) { if (NF.buscando) NF.relerDepois = true; else buscarNotas(); }
+  }).then(function () { b.disabled = false; b.textContent = rot; });
 }
 
 /* ---------------- Pastas do Drive ---------------- */
@@ -2247,12 +2300,16 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('drop', function (e) { if (e.dataTransfer.files.length) lerArquivos(e.dataTransfer.files); });
     document.getElementById('btnPasta').hidden = true;
     document.getElementById('btnInserirRad').hidden = true;
+    document.getElementById('btnInserirNota').hidden = true;
   } else {
     document.getElementById('btnAbrir').hidden = true;
     document.getElementById('btnPasta').onclick = configurarPasta;
     var inRad = document.getElementById('inRad');
     document.getElementById('btnInserirRad').onclick = function () { inRad.click(); };
     inRad.onchange = function () { inserirRads(inRad.files); inRad.value = ''; };
+    var inNota = document.getElementById('inNota');
+    document.getElementById('btnInserirNota').onclick = function () { inNota.click(); };
+    inNota.onchange = function () { inserirNotas(inNota.files); inNota.value = ''; };
   }
   document.getElementById('btnCsv').onclick = exportarCsv;
   document.getElementById('btnZip').onclick = baixarZip;
