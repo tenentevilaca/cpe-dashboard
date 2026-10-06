@@ -85,6 +85,9 @@ Fluxo:
 3. O PM entra e vê as notas da Unidade/Cia: situação (Aprovada / Pendente / Em análise, a partir da coluna VERIFICAÇÃO), a OBS do gestor e o campo **Resposta**.
 4. A coluna **RESPOSTA** é criada automaticamente na planilha de pré-faturamento; cada resposta recebe uma nota na célula com quem respondeu e quando. Na gestão ela aparece só para leitura (💬).
 
+Administrador inicial: login **frotaCPE** (perfil Gestor, Unidade/Cia CPE), criado automaticamente na aba `_usuarios` na primeira
+utilização — o código guarda só o hash da senha. Troque a senha no primeiro acesso em **🔑 Trocar senha** (menu lateral).
+
 Publicação do App da Web: **Implantar › Nova implantação › App da Web** — *Executar como: Eu* e *Quem pode acessar: Qualquer pessoa*.
 Envie o link gerado aos PMs. Abra o painel uma vez pelo menu da planilha antes (isso registra a planilha usada pelo App da Web).
 

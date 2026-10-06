@@ -570,6 +570,10 @@ function salvarPrefat(token, linha, col, valor, anterior) {
 var GESTORES_EMAILS = [];            // e-mails Google com acesso de gestor (além dos editores desta planilha)
 var ABA_USUARIOS = '_usuarios';
 var SESSAO_SEGUNDOS = 6 * 60 * 60;   // sessão de login vale 6 horas
+// Administrador inicial (CPE). Só o hash da senha fica no código; é criado se ainda não existir
+// e, depois disso, a senha pode ser trocada pelo próprio admin em "Trocar senha".
+var ADMIN_INICIAL = { login: 'frotacpe', nome_pm: 'Administrador — Frota CPE', cia: 'CPE', unidade: 'CPE',
+                      sal: 'eHvZdKLsGHzi4gU-', hash: 'AZ2mTHuvhFl2yOoSmIc0wpbK/z8PNC4l20Fj8bGRCRg=' };
 var USU_CAB = ['login', 'nome_pm', 'cia', 'unidade', 'hash', 'sal', 'status', 'perfil', 'solicitado_em', 'decidido_em', 'decidido_por', 'ultimo_acesso'];
 
 function agora_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'); }
@@ -601,13 +605,25 @@ function lembrarPlanilha_() {
 }
 
 function lerUsuarios_() {
-  var aba = abaUsuarios_(), n = aba.getLastRow();
+  var aba = abaUsuarios_();
+  garantirAdmin_(aba);
+  var n = aba.getLastRow();
   if (n < 2) return [];
   return aba.getRange(2, 1, n - 1, USU_CAB.length).getValues().map(function (l, i) {
     var u = { linha: i + 2 };
     USU_CAB.forEach(function (c, k) { u[c] = String(l[k] == null ? '' : l[k]); });
     return u;
   });
+}
+
+function garantirAdmin_(aba) {
+  var n = aba.getLastRow();
+  var logins = n > 1 ? aba.getRange(2, 1, n - 1, 1).getValues().map(function (l) { return String(l[0]); }) : [];
+  if (logins.indexOf(ADMIN_INICIAL.login) > -1) return;
+  var u = { login: ADMIN_INICIAL.login, nome_pm: ADMIN_INICIAL.nome_pm, cia: ADMIN_INICIAL.cia, unidade: ADMIN_INICIAL.unidade,
+            hash: ADMIN_INICIAL.hash, sal: ADMIN_INICIAL.sal, status: 'APROVADO', perfil: 'GESTOR',
+            solicitado_em: agora_(), decidido_em: agora_(), decidido_por: 'configuração inicial' };
+  aba.appendRow(USU_CAB.map(function (c) { return u[c] == null ? '' : u[c]; }));
 }
 
 function gravarUsuario_(u) {

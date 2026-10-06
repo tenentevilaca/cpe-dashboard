@@ -235,6 +235,7 @@
   <button class="nav-btn so-drive" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
   <div class="nav-rodape so-drive">
     <div class="quem" id="navQuem"></div>
+    <button class="nav-btn" id="navSenha" hidden><span class="ic">🔑</span><span class="tx">Trocar senha</span></button>
     <button class="nav-btn" id="navSair" hidden><span class="ic">⎋</span><span class="tx">Sair</span></button>
   </div>
 </nav>
@@ -1782,6 +1783,7 @@ function iniciar() {
       document.getElementById('lateral').hidden = false;
       document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · gestor';
       document.getElementById('navSair').hidden = !!s.google;
+      document.getElementById('navSenha').hidden = !!s.google;
       mostrarView('impostos');
       carregar();
       acContarPendentes();
@@ -2021,6 +2023,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('uAtualizar').onclick = uCarregar;
   document.getElementById('uBusca').oninput = function () { if (U.dados) { U.pagina = 0; uRender(); } };
   document.getElementById('acAtualizar').onclick = acCarregar;
+  document.getElementById('navSenha').onclick = function () { document.getElementById('uSenha').onclick(); };
   document.getElementById('uSenha').onclick = function () {
     var at = prompt('Senha atual:'); if (at == null) return;
     var nv = prompt('Nova senha (mínimo 6 caracteres):'); if (nv == null) return;
