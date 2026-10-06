@@ -12,7 +12,10 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
 
 ## Opção 1 — Google Drive + Apps Script (recomendado)
 
-1. As pastas já vêm configuradas no `Code.gs`:
+1. Basta a **pasta raiz** (`PASTA_RAIZ` no `Code.gs`). Dentro dela o script localiza sozinho, pelos nomes:
+   a pasta de RADs (nome com "RAD"), a de notas ("NOTA", "NF" ou "FISCA") e a planilha de pré-faturamento
+   (Planilha Google com "FATUR" no nome). Sem pasta específica, lê a raiz toda. Para trocar a raiz ou procurar de novo:
+   botão **📁 Pastas do Drive**. Configuração antiga (referência):
    - RADs (`RelatorioSinteticoDaDespesaRAD*.xls`, um por unidade): `PASTA_RADS_PADRAO`
    - Notas fiscais em PDF (subpastas incluídas): `PASTA_NOTAS_PADRAO`
 

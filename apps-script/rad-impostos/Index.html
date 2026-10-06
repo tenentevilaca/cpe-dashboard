@@ -327,7 +327,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="btnTema" title="Alternar tema claro/escuro">◐ Tema</button>
-      <button class="btn" id="btnPasta" title="Pastas do Google Drive com os RADs e as notas">📁 Pastas do Drive</button>
+      <button class="btn" id="btnPasta" title="Pasta raiz do Drive (RADs, notas e planilha de pré-faturamento)">📁 Pastas do Drive</button>
       <button class="btn" id="btnAbrir" title="Abrir RADs, planilha ou PDFs das notas">📂 Abrir arquivos…</button>
       <button class="btn" id="btnAtualizar">↻ Atualizar dados</button>
     </div>
@@ -1584,13 +1584,15 @@ function baixarZip() {
 /* ---------------- Pastas do Drive ---------------- */
 function configurarPasta() {
   chamar('getConfig').then(function (cfg) {
-    var rads = prompt('Pasta dos RADs (link do Google Drive).\nAtual: ' + (cfg.rads.nome || cfg.rads.erro || '—') + '\nDeixe vazio para manter a padrão.', cfg.rads.url);
-    if (rads === null) return;
-    var notas = prompt('Pasta das notas fiscais em PDF (link do Google Drive).\nAtual: ' + (cfg.notas.nome || cfg.notas.erro || '—') + '\nDeixe vazio para manter a padrão.', cfg.notas.url);
-    if (notas === null) return;
+    var linha = function (rot, x) { return rot + ': ' + (x.nome || x.erro || '—'); };
+    var resumo = 'Encontrado a partir da pasta raiz:\n' + [
+      linha('• Raiz', cfg.raiz), linha('• RADs', cfg.rads), linha('• Notas', cfg.notas), linha('• Pré-faturamento', cfg.prefat)
+    ].join('\n') + (cfg.prefatXlsx ? '\n⚠ “' + cfg.prefatXlsx + '” está em .xlsx — salve como Planilha Google.' : '');
+    var raiz = prompt(resumo + '\n\nPara trocar, cole o link da nova pasta raiz. Para procurar de novo na mesma raiz, deixe como está e clique em OK.', cfg.raiz.url || '');
+    if (raiz === null) return;
     document.getElementById('loading').hidden = false;
-    document.getElementById('loading').textContent = 'Verificando as pastas…';
-    return chamar('salvarPastas', rads, notas).then(function () { PDFS = []; carregar(); });
+    document.getElementById('loading').textContent = 'Procurando as pastas na raiz…';
+    return chamar('salvarPastas', raiz).then(function () { PDFS = []; PF.dados = null; carregar(); });
   }).catch(erroCarga);
 }
 

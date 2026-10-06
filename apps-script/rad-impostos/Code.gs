@@ -2,7 +2,7 @@
  * Painel de Impostos — RAD
  *
  * Fontes de dados (nesta ordem):
- *  1. Pastas do Google Drive (PASTA_RADS_PADRAO / PASTA_NOTAS_PADRAO ou as escolhidas no painel):
+ *  1. Pastas do Google Drive, descobertas a partir de PASTA_RAIZ (ou a raiz escolhida no painel):
  *     - RADs: "Relatório Sintético da Despesa - RAD" (.xls exportados do sistema), um por unidade;
  *     - Notas: notas fiscais em PDF (inclusive em subpastas).
  *  2. Se as duas constantes estiverem vazias: a aba ABA_DADOS desta planilha.
@@ -15,8 +15,11 @@
  */
 
 // Pastas do Google Drive (podem ser trocadas pelo botão "📁 Pastas do Drive" no painel).
-var PASTA_RADS_PADRAO = '1K1jNXFhsz2rCxjT8qAEIm2uodP8NruVt';   // RADs de cada unidade
-var PASTA_NOTAS_PADRAO = '1ylX_cDzvczSj3wxz2fNKYUMfdngg5aBm';  // PDFs das notas fiscais
+// Pasta raiz no Drive. Dentro dela o script localiza sozinho (pelos nomes):
+//  - a pasta dos RADs (nome com "RAD"), a pasta das notas (nome com "NOTA", "NF" ou "FISCA")
+//  - e a planilha de pré-faturamento (Planilha Google com "FATUR" no nome).
+// Se não achar uma pasta específica, usa a raiz inteira (com todas as subpastas).
+var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
@@ -66,25 +69,75 @@ function idDaPasta_(texto) {
   return m ? m[1] : '';
 }
 
-/** Chamado pelo painel: salva as pastas (links ou IDs). Vazio = volta para a pasta padrão. */
-function salvarPastas(token, rads, notas) {
+/** Chamado pelo painel: troca a pasta raiz (link ou ID) e refaz a descoberta. Vazio = raiz padrão (PASTA_RAIZ). */
+function salvarPastas(token, raiz) {
   exigirGestor_(token);
-  var cfg = {};
-  [['rads', rads], ['notas', notas]].forEach(function (par) {
-    if (!String(par[1] || '').trim()) return;
-    var id = idDaPasta_(par[1]);
-    if (!id) throw new Error('Link de pasta inválido: ' + par[1]);
+  var props = PropertiesService.getScriptProperties();
+  if (String(raiz || '').trim()) {
+    var id = idDaPasta_(raiz);
+    if (!id) throw new Error('Link de pasta inválido: ' + raiz);
     DriveApp.getFolderById(id).getName(); // valida o acesso
-    cfg[par[0]] = id;
-  });
-  PropertiesService.getScriptProperties().setProperty('PASTAS_V2', JSON.stringify(cfg));
+    props.setProperty('RAIZ_ID', id);
+  } else props.deleteProperty('RAIZ_ID');
+  props.deleteProperty('DESCOBERTA');
+  descobrir_(true);
   return getConfig(token);
 }
 
+function raizId_() { return PropertiesService.getScriptProperties().getProperty('RAIZ_ID') || PASTA_RAIZ; }
+
+/**
+ * Procura, dentro da raiz (até 4 níveis), a pasta de RADs, a pasta de notas e a planilha de pré-faturamento.
+ * O resultado fica guardado (propriedades do script) e é refeito quando a raiz muda ou em "Pastas do Drive".
+ */
+function descobrir_(forcar) {
+  var props = PropertiesService.getScriptProperties();
+  var raiz = raizId_();
+  if (!forcar) {
+    try {
+      var d0 = JSON.parse(props.getProperty('DESCOBERTA') || 'null');
+      if (d0 && d0.raiz === raiz) return d0;
+    } catch (e) {}
+  }
+  var pastaRaiz = abrirPasta_(raiz, 'raiz');
+  var achado = { raiz: raiz, rads: '', notas: '', prefat: '', prefatXlsx: '' };
+  var nivel = [{ p: pastaRaiz, prof: 0 }];
+  while (nivel.length) {
+    var prox = [];
+    nivel.forEach(function (it) {
+      var n = normPrefat_(it.p.getName());
+      if (it.prof > 0) {
+        if (!achado.rads && /(^|[^a-z])rads?([^a-z]|$)/.test(n) && !/uniao/.test(n)) achado.rads = it.p.getId();
+        if (!achado.notas && /nota|(^|[^a-z])nfs?e?([^a-z]|$)|fisca/.test(n)) achado.notas = it.p.getId();
+      }
+      if (!achado.prefat) {
+        var planilhas = it.p.getFilesByType(MimeType.GOOGLE_SHEETS);
+        while (planilhas.hasNext()) {
+          var f = planilhas.next();
+          if (/fatur/.test(normPrefat_(f.getName()))) { achado.prefat = f.getId(); break; }
+        }
+      }
+      if (!achado.prefat && !achado.prefatXlsx) {
+        var outros = it.p.getFiles();
+        while (outros.hasNext()) {
+          var g = outros.next();
+          if (/fatur/.test(normPrefat_(g.getName())) && /\.xls/i.test(g.getName())) { achado.prefatXlsx = g.getName(); break; }
+        }
+      }
+      if (it.prof < 4) {
+        var subs = it.p.getFolders();
+        while (subs.hasNext()) { var s2 = subs.next(); if (s2.getName() !== PASTA_ZIP) prox.push({ p: s2, prof: it.prof + 1 }); }
+      }
+    });
+    nivel = prox;
+  }
+  props.setProperty('DESCOBERTA', JSON.stringify(achado));
+  return achado;
+}
+
 function idsPastas_() {
-  var cfg = {};
-  try { cfg = JSON.parse(PropertiesService.getScriptProperties().getProperty('PASTAS_V2') || '{}'); } catch (e) {}
-  return { rads: cfg.rads || PASTA_RADS_PADRAO, notas: cfg.notas || PASTA_NOTAS_PADRAO };
+  var d = descobrir_(false);
+  return { rads: d.rads || d.raiz, notas: d.notas || d.raiz, prefat: d.prefat, prefatXlsx: d.prefatXlsx, raiz: d.raiz };
 }
 
 function abrirPasta_(id, papel) {
@@ -136,8 +189,9 @@ function getFontes(token) {
       pdfs.push({ id: id, nome: nome, caminho: caminho, lido: !!(c && c.atualizado === arq.getLastUpdated().getTime()) });
     } else if (IGNORAR_RADS.test(nome)) {
       consolidados.push(caminho + nome); // planilha consolidada: os dados já estão nos RADs das unidades
-    } else if (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
-               /\.(xlsx|xlsm|xls|html?)$/i.test(nome) || /rad/i.test(nome)) {
+    } else if (/rad|relat/i.test(caminho + nome) && !/fatur/i.test(nome) &&
+               (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
+                /\.(xlsx|xlsm|xls|html?)$/i.test(nome))) {
       try {
         var rad = lerRadArquivo_(arq, mime);
         if (rad) { rad.nome = caminho + nome; rads.push(rad); }
@@ -408,23 +462,32 @@ function obterAba_() {
   throw new Error('Nenhuma pasta do Drive configurada e a aba de dados não foi encontrada. Configure a pasta no painel.');
 }
 
-/** Informa ao painel quais pastas estão configuradas. */
+/** Informa ao painel o que foi encontrado a partir da raiz. */
 function getConfig(token) {
   exigirGestor_(token);
   var ids = idsPastas_();
-  var info = function (id) {
-    try { var p = DriveApp.getFolderById(id); return { id: id, nome: p.getName(), url: p.getUrl() }; }
-    catch (e) { return { id: id, nome: '', url: 'https://drive.google.com/drive/folders/' + id, erro: 'sem acesso' }; }
+  var info = function (id, pasta) {
+    if (!id) return { id: '', nome: '', url: '', erro: 'não encontrada' };
+    try {
+      var p = pasta ? DriveApp.getFolderById(id) : DriveApp.getFileById(id);
+      return { id: id, nome: p.getName(), url: p.getUrl() };
+    } catch (e) { return { id: id, nome: '', url: '', erro: 'sem acesso' }; }
   };
-  return { rads: info(ids.rads), notas: info(ids.notas) };
+  return {
+    raiz: info(ids.raiz, true),
+    rads: ids.rads === ids.raiz ? { id: ids.raiz, nome: '(pasta “RAD” não encontrada — lendo a raiz toda)' } : info(ids.rads, true),
+    notas: ids.notas === ids.raiz ? { id: ids.raiz, nome: '(pasta de notas não encontrada — lendo a raiz toda)' } : info(ids.notas, true),
+    prefat: info(idPrefat_(), false), prefatXlsx: ids.prefatXlsx
+  };
 }
 
 /* ------------------------------------------------------------------ */
 /* Pré-faturamento: painel da planilha de verificação                  */
 /* ------------------------------------------------------------------ */
 
-// Planilha e aba do pré-faturamento (link: .../spreadsheets/d/<ID>/edit?gid=<GID>).
-var PREFAT_PLANILHA_ID = '1e_3NDsYYtxpRXZhoHpY7a4GZLcq9IxN-goOd4boonmU';
+// Planilha e aba do pré-faturamento. Normalmente é achada sozinha dentro da raiz (Planilha Google com
+// "FATUR" no nome); PREFAT_PLANILHA_ID só é usado se nenhuma for encontrada.
+var PREFAT_PLANILHA_ID = '';
 var PREFAT_ABA_GID = 734096426;
 
 // Colunas editáveis no painel (comparadas pelo nome do cabeçalho, sem acento e sem maiúsculas).
@@ -439,17 +502,29 @@ function normPrefat_(s) {
   return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+function idPrefat_() {
+  var d = {};
+  try { d = idsPastas_(); } catch (e) {}
+  return d.prefat || PREFAT_PLANILHA_ID;
+}
+
 function abrirPrefat_() {
-  var ss;
-  try { ss = SpreadsheetApp.openById(PREFAT_PLANILHA_ID); }
+  var ss, idPf = idPrefat_();
+  if (!idPf) {
+    var xl = '';
+    try { xl = idsPastas_().prefatXlsx; } catch (e) {}
+    throw new Error(xl ? 'A planilha de pré-faturamento “' + xl + '” está em Excel (.xlsx). Abra-a e use Arquivo › Salvar como Planilhas Google (na mesma pasta); depois clique em “Pastas do Drive” › OK.'
+                       : 'Planilha de pré-faturamento não encontrada na pasta raiz (procurei uma Planilha Google com “FATUR” no nome).');
+  }
+  try { ss = SpreadsheetApp.openById(idPf); }
   catch (e) {
     var mime = '';
-    try { mime = DriveApp.getFileById(PREFAT_PLANILHA_ID).getMimeType(); } catch (e2) {}
+    try { mime = DriveApp.getFileById(idPf).getMimeType(); } catch (e2) {}
     if (mime && mime !== MimeType.GOOGLE_SHEETS) {
       throw new Error('A planilha de pré-faturamento está em formato Excel (.xlsx) e não pode ser editada pelo painel. ' +
         'Abra-a e use Arquivo › Salvar como Planilhas Google; depois troque PREFAT_PLANILHA_ID no Code.gs pelo ID da nova planilha.');
     }
-    throw new Error('Sem acesso à planilha de pré-faturamento (' + PREFAT_PLANILHA_ID + '): ' + (e && e.message || e));
+    throw new Error('Sem acesso à planilha de pré-faturamento (' + idPf + '): ' + (e && e.message || e));
   }
   var abas = ss.getSheets(), aba = null;
   for (var i = 0; i < abas.length && !aba; i++) if (abas[i].getSheetId() === PREFAT_ABA_GID) aba = abas[i];
