@@ -283,6 +283,11 @@
   .btn.apagar:hover { background: #f6e3b4; }
   .btn.pago { background: var(--ok); color: #fff; border-color: var(--ok); font-weight: 600; min-width: 92px; }
   tr.rad-pago td { color: var(--muted); }
+  body.modo-sofi #btnInserirRad, body.modo-sofi #btnInserirNota, body.modo-sofi #btnPasta, body.modo-sofi #btnAbrir { display: none !important; }
+  body.modo-sofi #viewImpostos { padding-top: 0; }
+  body.modo-sofi #viewImpostos::before { content: 'Painel de Impostos — RAD'; display: block; font: 700 20px Georgia, serif; color: var(--text);
+    border-bottom: 2px solid var(--gold); padding-bottom: 6px; margin: 4px 0 14px; }
+  body.modo-sofi #viewSofi { padding-bottom: 8px; }
   .chip[aria-pressed="true"] { background: var(--gold); color: #17150f; border-color: var(--gold); }
   .chip .dot { box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
   .kpi { position: relative; overflow: hidden; border-radius: 8px; }
@@ -2115,13 +2120,15 @@ function mostrarView(v) {
                   acessos: 'Gestão de Acessos', usuario: 'Minhas notas — Pré-faturamento', login: 'Pré-faturamento — RAD' };
   document.getElementById('topoTitulo').textContent = titulos[v] || '';
   ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi'].forEach(function (k) {
-    document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = v !== k;
+    document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = v !== k && !(v === 'sofi' && k === 'impostos');
   });
+  // Na aba SOFI: pagamento dos RADs + painel de Impostos completo, sem os botões de inserir RADs/notas e de pastas.
+  document.body.classList.toggle('modo-sofi', v === 'sofi');
   if (v === 'acessos') acCarregar();
   if (v === 'sofi') { SOFI.nestaSessao = {}; if (SOFI.pagos) sofiRender(); sofiCarregar(); }
   // A planilha de pré-faturamento só é carregada quando o painel é aberto (economiza dados).
   if (v === 'prefat' && !PF.dados && !PF.carregando) pfCarregar();
-  if (v === 'impostos' && NOTAS.length) render();
+  if ((v === 'impostos' || v === 'sofi') && NOTAS.length) render();
   if (v === 'login' || v === 'usuario') document.getElementById('lateral').hidden = true;
   window.scrollTo(0, 0);
 }
