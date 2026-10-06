@@ -224,6 +224,16 @@
   .pager { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
   .chip .n { color: var(--muted); font-size: 12px; }
   .chip[aria-pressed="true"] .n { color: inherit; opacity: .8; }
+  /* Rolagem horizontal */
+  .rolagem-topo { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; position: sticky; top: 0; z-index: 3; background: var(--surface); padding: 4px 0; }
+  .rolagem-topo .btn { padding: 3px 9px; font-size: 12px; flex: 0 0 auto; }
+  .rolagem-topo .barra { flex: 1 1 auto; overflow-x: scroll; overflow-y: hidden; height: 14px; scrollbar-width: auto; scrollbar-color: var(--muted) var(--surface-2); }
+  .rolagem-topo .barra > div { height: 1px; }
+  .tbl-wrap::-webkit-scrollbar, .rolagem-topo .barra::-webkit-scrollbar { height: 12px; }
+  .tbl-wrap::-webkit-scrollbar-thumb, .rolagem-topo .barra::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 6px; }
+  .tbl-wrap::-webkit-scrollbar-track, .rolagem-topo .barra::-webkit-scrollbar-track { background: var(--surface-2); }
+  th.fixa, td.fixa { position: sticky; left: 0; z-index: 2; background: var(--surface); }
+  th.fixa { background: var(--surface-2); z-index: 4; }
   .empty { padding: 24px; text-align: center; color: var(--muted); }
 </style>
 </head>
@@ -295,11 +305,11 @@
     <section class="kpis" id="uKpis"></section>
     <section class="card">
       <div class="table-tools">
-        <div><h2>Notas da Unidade</h2><div class="hint" style="margin:0" id="uCont"></div></div>
+        <div><h2>Notas aguardando aprovação</h2><div class="hint" style="margin:0" id="uCont"></div></div>
         <div class="pager" id="uPager"></div>
       </div>
       <div class="tbl-wrap big-table"><table id="uTabela"><thead></thead><tbody></tbody></table></div>
-      <div class="hint" style="margin-top:8px">Somente consulta. Em caso de pendência, leia a observação do gestor e escreva sua resposta no campo <b>Resposta</b> (gravada ao sair do campo).</div>
+      <div class="hint" style="margin-top:8px">Somente consulta das notas <b>aguardando aprovação</b> da sua Unidade e Cia. Leia a observação do gestor e, se houver pendência, escreva no campo <b>Resposta</b> (gravada ao sair do campo). Use a barra acima da tabela para ver todas as colunas.</div>
     </section>
   </main>
 </div>
@@ -998,6 +1008,7 @@ function renderTabela(d) {
   }).join('') + '</tr>' : '';
   document.getElementById('contTabela').textContent = d.length + ' ordem(ns) · ' + soma(d, 'nNfs') + ' nota(s) fiscal(is). Clique no cabeçalho para ordenar.';
   window._tabelaAtual = d;
+  rolagemHorizontal('tblNotas');
 }
 function dataOrd(s) { var m = /(\d{2})\/(\d{2})\/(\d{4})\s*(\d{2})?:?(\d{2})?/.exec(s || ''); return m ? m[3] + m[2] + m[1] + (m[4] || '00') + (m[5] || '00') : ''; }
 
@@ -1523,6 +1534,7 @@ function renderNotasTomador() {
       '<td>' + (x.inferido ? '<span class="tag warn" title="Responsável ISSQN vazio no RAD, mas há ISSQN retido">Vazio no RAD</span>' : 'TOMADOR') + '</td>' +
       '<td>' + arq + '</td><td class="checks">' + conf + '</td></tr>';
   }).join('') : '<tr><td class="empty" colspan="12">Nenhuma nota de serviço com ISSQN retido pelo tomador nos filtros atuais.</td></tr>';
+  rolagemHorizontal('tblNf');
   document.querySelectorAll('#tblNf a[data-local]').forEach(function (a) {
     a.onclick = function (e) {
       e.preventDefault();
@@ -1596,6 +1608,33 @@ function configurarPasta() {
   }).catch(erroCarga);
 }
 
+/* ---------------- Rolagem horizontal (barra no topo da tabela) ---------------- */
+/** Põe uma barra de rolagem horizontal acima da tabela, sincronizada com a de baixo, e botões ◀ ▶. */
+function rolagemHorizontal(idTabela) {
+  var tab = document.getElementById(idTabela);
+  if (!tab) return;
+  var wrap = tab.closest('.tbl-wrap');
+  var topo = wrap.previousElementSibling;
+  if (!topo || !topo.classList.contains('rolagem-topo')) {
+    topo = document.createElement('div');
+    topo.className = 'rolagem-topo';
+    topo.innerHTML = '<button class="btn" data-d="-1" title="Colunas à esquerda" aria-label="Rolar para a esquerda">◀</button>' +
+      '<div class="barra"><div></div></div><button class="btn" data-d="1" title="Colunas à direita" aria-label="Rolar para a direita">▶</button>';
+    wrap.parentNode.insertBefore(topo, wrap);
+    var barra = topo.querySelector('.barra'), sync = false;
+    barra.onscroll = function () { if (sync) { sync = false; return; } sync = true; wrap.scrollLeft = barra.scrollLeft; };
+    wrap.addEventListener('scroll', function () { if (sync) { sync = false; return; } sync = true; barra.scrollLeft = wrap.scrollLeft; });
+    topo.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () { wrap.scrollBy({ left: +b.dataset.d * wrap.clientWidth * 0.8, behavior: 'smooth' }); };
+    });
+    window.addEventListener('resize', function () { rolagemHorizontal(idTabela); });
+  }
+  requestAnimationFrame(function () {
+    topo.querySelector('.barra > div').style.width = tab.scrollWidth + 'px';
+    topo.hidden = tab.scrollWidth <= wrap.clientWidth + 2;
+  });
+}
+
 /* ---------------- Navegação lateral ---------------- */
 function mostrarView(v) {
   document.querySelectorAll('.nav-btn').forEach(function (b) {
@@ -1632,7 +1671,7 @@ function pfCarregar(atualizar) {
     // Coluna "VERIFICAÇÃO" vira os botões de situação; demais listas e "UNIDADE" viram filtros.
     PF.statusCol = d.editaveis.filter(function (e) { return e.tipo === 'lista' && /^verificac/.test(pfNorm(d.cab[e.col])); }).map(function (e) { return e.col; })[0];
     PF.colsFiltro = d.cab.map(function (c, i) { return i; }).filter(function (i) {
-      return i !== PF.statusCol && (d.edit[i] && d.edit[i].tipo !== 'texto' || /^unidade/.test(pfNorm(d.cab[i])));
+      return i !== PF.statusCol && (d.edit[i] && d.edit[i].tipo !== 'texto' || /^unidade|(^|[^a-z])cia([^a-z]|$)|companhia/.test(pfNorm(d.cab[i])));
     });
     document.getElementById('pfOrigem').textContent = d.planilha + ' · aba “' + d.aba + '” · ' + d.linhas.length + ' registros · atualizado em ' + d.atualizadoEm;
     var a = document.getElementById('pfAbrir'); a.href = d.url; a.hidden = false;
@@ -1706,19 +1745,20 @@ function pfRender() {
     ' <button class="btn" data-p="1"' + (PF.pagina < paginas - 1 ? '' : ' disabled') + '>›</button>' : '';
   document.querySelectorAll('#pfPager button').forEach(function (b) { b.onclick = function () { PF.pagina += +b.dataset.p; pfRender(); }; });
 
-  document.querySelector('#pfTabela thead').innerHTML = '<tr><th class="n">Linha</th>' + d.cab.map(function (c, i) {
+  document.querySelector('#pfTabela thead').innerHTML = '<tr><th class="n fixa">Linha</th>' + d.cab.map(function (c, i) {
     if (i === d.colResposta) return '<th title="Escrita pelo usuário da Unidade — somente leitura na gestão">' + esc(c) + ' 💬</th>';
     return '<th' + (d.edit[i] ? ' class="ed" title="Editável — grava na planilha"' : '') + '>' + esc(c) + (d.edit[i] ? ' ✎' : '') + '</th>';
   }).join('') + '</tr>';
   document.querySelector('#pfTabela tbody').innerHTML = pag.length ? pag.map(function (i) {
     var l = d.linhas[i];
-    return '<tr><td class="n muted">' + (d.linhaIni + i) + '</td>' + d.cab.map(function (c, ci) {
+    return '<tr><td class="n muted fixa">' + (d.linhaIni + i) + '</td>' + d.cab.map(function (c, ci) {
       if (ci === d.colResposta) return '<td class="obs-gestor">' + esc(l[ci]) + '</td>';
       return '<td>' + (d.edit[ci] ? pfCampo(i, ci, l[ci]) : esc(l[ci])) + '</td>';
     }).join('') + '</tr>';
   }).join('') : '<tr><td class="empty" colspan="' + (d.cab.length + 1) + '">Nenhum registro nos filtros atuais.</td></tr>';
 
   document.querySelectorAll('#pfTabela .pf-sel').forEach(function (s) { s.onchange = function () { pfAlterar(s); }; });
+  rolagemHorizontal('pfTabela');
   document.querySelectorAll('#pfTabela .pf-obs').forEach(function (t) { t.onchange = function () { pfAlterar(t); }; });
 }
 
@@ -1874,26 +1914,25 @@ function uCarregar() {
 
 function uRender() {
   var d = U.dados, cs = d.colStatus, q = pfNorm(document.getElementById('uBusca').value);
-  var cont = { aprov: 0, pend: 0, anal: 0 };
-  d.linhas.forEach(function (l) { cont[situacao(cs > -1 ? l.v[cs] : '').k]++; });
-  var rot = { aprov: '✓ Aprovadas', pend: '! Pendentes', anal: '⏳ Em análise' };
-  document.getElementById('uChips').innerHTML = '<button class="chip" data-k="" aria-pressed="' + !U.filtro + '">Todas <span class="n">' + d.linhas.length + '</span></button>' +
-    ['pend', 'aprov', 'anal'].map(function (k) { return '<button class="chip" data-k="' + k + '" aria-pressed="' + (U.filtro === k) + '">' + rot[k] + ' <span class="n">' + cont[k] + '</span></button>'; }).join('');
+  var temResp = function (l) { return d.colResposta > -1 && String(l.v[d.colResposta]).trim() !== ''; };
+  var nResp = d.linhas.filter(temResp).length, nSem = d.linhas.length - nResp;
+  document.getElementById('uChips').innerHTML = [['', 'Todas', d.linhas.length], ['sem', 'Sem resposta', nSem], ['resp', 'Respondidas', nResp]].map(function (c) {
+    return '<button class="chip" data-k="' + c[0] + '" aria-pressed="' + ((U.filtro || '') === c[0]) + '">' + c[1] + ' <span class="n">' + c[2] + '</span></button>';
+  }).join('');
   document.querySelectorAll('#uChips .chip').forEach(function (b) { b.onclick = function () { U.filtro = b.dataset.k || null; U.pagina = 0; uRender(); }; });
-  var respondidas = d.linhas.filter(function (l) { return d.colResposta > -1 && l.v[d.colResposta]; }).length;
   document.getElementById('uKpis').innerHTML = [
-    { l: 'Notas da Unidade', v: d.linhas.length, d: d.filtroCia ? 'Cia ' + d.cia : '' },
-    { l: 'Aprovadas', v: cont.aprov, d: '' },
-    { l: 'Pendentes', v: cont.pend, d: 'precisam de resposta' },
-    { l: 'Respondidas', v: respondidas, d: '' }
+    { l: 'Aguardando aprovação', v: d.linhas.length, d: 'Unidade ' + d.unidade + (d.cia ? ' · ' + d.cia : '') },
+    { l: 'Sem resposta', v: nSem, d: 'verifique a observação do gestor' },
+    { l: 'Respondidas', v: nResp, d: '' }
   ].map(function (x) { return '<div class="kpi"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(int.format(x.v)) + '</div><div class="d">' + esc(x.d) + '</div></div>'; }).join('');
 
   var lin = d.linhas.filter(function (l) {
-    if (U.filtro && situacao(cs > -1 ? l.v[cs] : '').k !== U.filtro) return false;
+    if (U.filtro === 'sem' && temResp(l)) return false;
+    if (U.filtro === 'resp' && !temResp(l)) return false;
     return !q || pfNorm(l.v.join(' ')).indexOf(q) > -1;
   });
-  // Pendentes primeiro
-  lin.sort(function (a, b) { var o = { pend: 0, anal: 1, aprov: 2 }; return o[situacao(cs > -1 ? a.v[cs] : '').k] - o[situacao(cs > -1 ? b.v[cs] : '').k]; });
+  // Sem resposta primeiro
+  lin.sort(function (a, b) { return (temResp(a) ? 1 : 0) - (temResp(b) ? 1 : 0); });
   var paginas = Math.max(1, Math.ceil(lin.length / U.porPagina));
   U.pagina = Math.min(U.pagina, paginas - 1);
   var ini = U.pagina * U.porPagina, pag = lin.slice(ini, ini + U.porPagina);
@@ -1903,17 +1942,18 @@ function uRender() {
   document.querySelectorAll('#uPager button').forEach(function (b) { b.onclick = function () { U.pagina += +b.dataset.p; uRender(); }; });
 
   var cols = d.cab.map(function (c, i) { return i; }).filter(function (i) { return i !== d.colResposta && String(d.cab[i]).trim(); });
-  document.querySelector('#uTabela thead').innerHTML = '<tr><th>Situação</th>' + cols.map(function (i) {
+  document.querySelector('#uTabela thead').innerHTML = '<tr><th class="fixa">Situação</th>' + cols.map(function (i) {
     return '<th>' + esc(d.cab[i]) + (i === d.colObs ? ' (gestor)' : '') + '</th>';
   }).join('') + (d.colResposta > -1 ? '<th class="ed">Resposta ✎</th>' : '') + '</tr>';
   document.querySelector('#uTabela tbody').innerHTML = pag.length ? pag.map(function (l) {
-    var st = situacao(cs > -1 ? l.v[cs] : '');
-    return '<tr class="' + (st.k === 'pend' ? 'linha-pend' : '') + '"><td><span class="sit ' + st.k + '">' + st.ic + ' ' + esc(st.rot) + '</span></td>' +
+    var resp = temResp(l);
+    return '<tr class="' + (resp ? '' : 'linha-pend') + '"><td class="fixa"><span class="sit ' + (resp ? 'aprov' : 'anal') + '">' + (resp ? '✓ Respondida' : '⏳ Aguardando') + '</span></td>' +
       cols.map(function (i) { return '<td' + (i === d.colObs ? ' class="obs-gestor"' : '') + '>' + esc(l.v[i]) + '</td>'; }).join('') +
       (d.colResposta > -1 ? '<td><div class="pf-cel"><textarea class="pf-obs u-resp" data-l="' + l.linha + '" placeholder="' +
-        (st.k === 'pend' ? 'Responda ao questionamento…' : 'Resposta (opcional)…') + '">' + esc(l.v[d.colResposta]) + '</textarea><span class="pf-st"></span></div></td>' : '') + '</tr>';
+        (resp ? 'Resposta…' : 'Responda ao questionamento do gestor…') + '">' + esc(l.v[d.colResposta]) + '</textarea><span class="pf-st"></span></div></td>' : '') + '</tr>';
   }).join('') : '<tr><td class="empty" colspan="' + (cols.length + 2) + '">Nenhuma nota encontrada.</td></tr>';
   document.querySelectorAll('#uTabela .u-resp').forEach(function (t) { t.onchange = function () { uResponder(t); }; });
+  rolagemHorizontal('uTabela');
 }
 
 function uResponder(el) {

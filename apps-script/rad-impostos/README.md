@@ -85,7 +85,9 @@ O mesmo projeto atende dois públicos:
 Fluxo:
 1. O PM abre o link do App da Web › **Solicitar acesso** › informa Nome PM, Unidade, Cia, login e senha.
 2. O gestor abre **👥 Acessos**, confere/ajusta Unidade e Cia e clica **Aprovar** (ou Recusar). Depois pode bloquear, reativar, gerar senha temporária ou tornar o usuário gestor.
-3. O PM entra e vê as notas da Unidade/Cia: situação (Aprovada / Pendente / Em análise, a partir da coluna VERIFICAÇÃO), a OBS do gestor e o campo **Resposta**.
+3. O PM entra e vê **só as notas aguardando aprovação** da sua Unidade **e** Cia (sem as colunas de RAD, nº do RAD e PA).
+   Regras em `USU_*` no Code.gs (colunas de Unidade/Cia/situação, situação visível e colunas ocultas). Se não houver coluna
+   de Cia, a Cia precisa estar escrita junto da Unidade (ex.: "1ª CIA BPMRV"); senão a linha não aparece. Antes era: situação (Aprovada / Pendente / Em análise, a partir da coluna VERIFICAÇÃO), a OBS do gestor e o campo **Resposta**.
 4. A coluna **RESPOSTA** é criada automaticamente na planilha de pré-faturamento; cada resposta recebe uma nota na célula com quem respondeu e quando. Na gestão ela aparece só para leitura (💬).
 
 Administrador inicial: login **frotaCPE** (perfil Gestor, Unidade/Cia CPE), criado automaticamente na aba `_usuarios` na primeira

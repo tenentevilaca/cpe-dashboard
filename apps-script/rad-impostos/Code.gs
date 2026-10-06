@@ -777,7 +777,8 @@ function getOpcoesCadastro() {
   try {
     var aba = abrirPrefat_().aba;
     var v = aba.getDataRange().getDisplayValues(), h = cabecalhoPrefat_(v), cab = v[h];
-    var cu = colunaPorNome_(cab, /^unidade/), cc = colunaPorNome_(cab, /^cia\b|^companhia/);
+    var cu = colunaPorNome_(cab, USU_COL_UNIDADE), cc = colunaPorNome_(cab, USU_COL_CIA);
+    if (cc === cu) cc = -1;
     var uniq = function (c) {
       if (c < 0) return [];
       return v.slice(h + 1).map(function (l) { return String(l[c]).trim(); }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).sort();
@@ -891,26 +892,68 @@ function garantirColunaResposta_(aba) {
 
 function mesmaChave_(a, b) { return normPrefat_(a).replace(/[^a-z0-9]/g, '') === normPrefat_(b).replace(/[^a-z0-9]/g, ''); }
 
-/** Linhas da Unidade/Cia do usuário. Devolve só o necessário para a consulta. */
+/* Regras da visão do usuário (ajuste aqui se os nomes das colunas ou situações mudarem). */
+var USU_COL_UNIDADE = /^unidade|^upm\b|^opm\b|^batalhao/;
+var USU_COL_CIA = /(^|[^a-z])cia([^a-z]|$)|companhia|sub.?unidade|^fracao/;
+var USU_COL_STATUS = /verificac|status|situac|aprovac|parecer/;
+var USU_STATUS_VISIVEL = /aguard/;                 // o usuário só vê as notas "aguardando aprovação"
+var USU_OCULTAR = [/(^|[^a-z])rad([^a-z]|$)/, /(^|[^a-z])pa([^a-z]|$)/]; // colunas de RAD, nº do RAD e PA
+
+function tokens_(x) { return normPrefat_(x).split(/[^a-z0-9]+/).filter(String); }
+function contemTokens_(alvo, ref) {
+  var a = tokens_(alvo), r = tokens_(ref);
+  return r.length > 0 && r.every(function (t) { return a.indexOf(t) > -1; });
+}
+
+function colunasUsuario_(cab) {
+  var c = {
+    cu: colunaPorNome_(cab, USU_COL_UNIDADE),
+    cc: colunaPorNome_(cab, USU_COL_CIA),
+    cr: colunaPorNome_(cab, /^resposta/),
+    obs: colunaPorNome_(cab, /^obs/),
+    status: []
+  };
+  if (c.cc === c.cu) c.cc = -1;
+  cab.forEach(function (h, i) { if (USU_COL_STATUS.test(normPrefat_(h))) c.status.push(i); });
+  c.visiveis = cab.map(function (h, i) { return i; }).filter(function (i) {
+    var n = normPrefat_(cab[i]);
+    return n && !USU_OCULTAR.some(function (re) { return re.test(n); });
+  });
+  return c;
+}
+
+/** A linha é da Unidade e da Cia do usuário? Sem coluna de Cia, exige a Cia escrita junto da Unidade. */
+function linhaDoUsuario_(l, c, s) {
+  var textoUnidade = l[c.cu] + ' ' + (c.cc > -1 ? l[c.cc] : '');
+  if (!contemTokens_(textoUnidade, s.unidade)) return false;
+  return contemTokens_(c.cc > -1 ? l[c.cc] : l[c.cu], s.cia);
+}
+
+function aguardando_(l, c) {
+  return c.status.some(function (i) { return USU_STATUS_VISIVEL.test(normPrefat_(l[i])); });
+}
+
+/** Notas da Unidade/Cia do usuário que estão aguardando aprovação — só as colunas permitidas. */
 function getMinhasNotas(token) {
   var s = exigirUsuario_(token);
   var aba = abrirPrefat_().aba;
   garantirColunaResposta_(aba);
   var v = aba.getDataRange().getDisplayValues(), h = cabecalhoPrefat_(v), cab = v[h];
-  var cu = colunaPorNome_(cab, /^unidade/), cc = colunaPorNome_(cab, /^cia\b|^companhia/);
-  if (cu < 0) throw new Error('A planilha de pré-faturamento não tem a coluna UNIDADE.');
-  var cr = colunaPorNome_(cab, /^resposta/);
+  var c = colunasUsuario_(cab);
+  if (c.cu < 0) throw new Error('A planilha de pré-faturamento não tem a coluna UNIDADE.');
+  if (!c.status.length) throw new Error('Não encontrei a coluna de situação (VERIFICAÇÃO/STATUS) na planilha de pré-faturamento.');
   var linhas = [];
   for (var r = h + 1; r < v.length; r++) {
     var l = v[r];
-    if (!l.some(String)) continue;
-    if (!mesmaChave_(l[cu], s.unidade)) continue;
-    if (cc > -1 && !mesmaChave_(l[cc], s.cia)) continue;
-    linhas.push({ linha: r + 1, v: l });
+    if (!l.some(String) || !linhaDoUsuario_(l, c, s) || !aguardando_(l, c)) continue;
+    linhas.push({ linha: r + 1, v: c.visiveis.map(function (i) { return l[i]; }) });
   }
+  var pos = function (i) { return c.visiveis.indexOf(i); };
+  var st = c.status.filter(function (i) { return pos(i) > -1; });
   return {
-    cab: cab, linhas: linhas, colResposta: cr, colStatus: colunaPorNome_(cab, /^verificac/), colObs: colunaPorNome_(cab, /^obs/),
-    filtroCia: cc > -1, unidade: s.unidade, cia: s.cia, nome: s.nome_pm, atualizadoEm: agora_()
+    cab: c.visiveis.map(function (i) { return cab[i]; }), linhas: linhas,
+    colResposta: pos(c.cr), colStatus: st.length ? pos(st[0]) : -1, colObs: pos(c.obs),
+    filtroCia: c.cc > -1, unidade: s.unidade, cia: s.cia, nome: s.nome_pm, atualizadoEm: agora_()
   };
 }
 
@@ -920,12 +963,12 @@ function responder(token, linha, texto, anterior) {
   var aba = abrirPrefat_().aba;
   var topo = aba.getRange(1, 1, Math.min(15, Math.max(1, aba.getLastRow())), Math.max(1, aba.getLastColumn())).getDisplayValues();
   var h = cabecalhoPrefat_(topo), cab = topo[h];
-  var cu = colunaPorNome_(cab, /^unidade/), cc = colunaPorNome_(cab, /^cia\b|^companhia/), cr = colunaPorNome_(cab, /^resposta/);
-  if (cr < 0 || linha <= h + 1) throw new Error('Linha inválida.');
+  var c = colunasUsuario_(cab), cr = c.cr;
+  if (cr < 0 || c.cu < 0 || linha <= h + 1) throw new Error('Linha inválida.');
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var l = aba.getRange(linha, 1, 1, cab.length).getDisplayValues()[0];
-    if (!mesmaChave_(l[cu], s.unidade) || (cc > -1 && !mesmaChave_(l[cc], s.cia))) throw new Error('Sem permissão para esta linha.');
+    if (!linhaDoUsuario_(l, c, s) || !aguardando_(l, c)) throw new Error('Sem permissão para esta linha.');
     var cel = aba.getRange(linha, cr + 1);
     if (anterior != null && cel.getDisplayValue() !== anterior) return { conflito: true, atual: cel.getDisplayValue() };
     texto = String(texto || '').slice(0, 2000);
