@@ -497,8 +497,8 @@
     <section class="card" id="secNf">
       <div class="table-tools">
         <div>
-          <h2>Notas fiscais com ISSQN retido pelo tomador</h2>
-          <div class="hint" style="margin:0">Notas de serviço do RAD com responsável <b>TOMADOR</b> localizadas entre os PDFs pelo <b>número da nota + número da OS</b> encontrados no texto do PDF. CNPJ, valor do ISSQN e “Retido pelo Tomador” são conferências extras. Segue os filtros acima.</div>
+          <h2 id="nfTitulo">Notas fiscais</h2>
+          <div class="hint" style="margin:0" id="nfHint">Notas do RAD localizadas entre os PDFs pelo <b>número da nota + número da OS</b> encontrados no texto do PDF. Mostra as notas do <b>imposto selecionado no topo</b> e segue os demais filtros.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn primary" id="btnZip" disabled>⬇ Baixar notas encontradas (.zip)</button>
@@ -508,8 +508,8 @@
       <div class="hint" id="nfStatus"></div>
       <div class="tbl-wrap big-table" style="max-height:480px">
         <table id="tblNf"><thead><tr>
-          <th>Situação</th><th>Unidade</th><th>Estabelecimento</th><th>Cidade</th><th>NF Serviço</th><th>OS</th><th>Placa</th>
-          <th class="n">% ISSQN</th><th class="n">ISSQN</th><th>Resp. no RAD</th><th>Arquivo</th><th>Conferência no PDF</th>
+          <th class="fixa">Situação</th><th>Imposto</th><th>Tipo</th><th>Unidade</th><th>Estabelecimento</th><th>Cidade</th><th>Nº NF</th><th>OS</th><th>Placa</th>
+          <th class="n">Alíquota</th><th class="n">Valor do imposto</th><th>Arquivo</th><th>Conferência no PDF</th>
         </tr></thead><tbody></tbody></table>
       </div>
     </section>
@@ -1054,7 +1054,7 @@ function exportarCsv() {
       return typeof v === 'number' ? String(v).replace('.', ',') : v;
     });
   }));
-  var csv = '﻿' + linhas.map(function (l) {
+  var csv = '\ufeff' + linhas.map(function (l) {
     return l.map(function (v) { v = String(v == null ? '' : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';');
   }).join('\n');
   var a = document.createElement('a');
@@ -1345,7 +1345,47 @@ function tabelaDaPlanilha(wb) {
   return null;
 }
 
-/* ---------------- Notas fiscais com ISSQN retido pelo tomador ---------------- */
+/* ---------------- Notas fiscais por imposto ---------------- */
+/*
+ * Cada imposto diz em que nota ele incide: ICMS e IRRF Peça → NF de peça; ISSQN (retido pelo tomador) e
+ * IRRF Serviço → NF de serviço. A seção mostra/baixa as notas do imposto selecionado no topo ("Todos" = todas,
+ * sem repetir a mesma nota). Cada nota é identificada no PDF pelo nº da NF + nº da OS.
+ */
+var NF_IMP = {
+  icms:   { tipo: 'peca', rot: 'ICMS',                       valor: 'icms',   aplica: function (n) { return n.nfPeca && n.icms > 0; } },
+  irPeca: { tipo: 'peca', rot: 'IRRF Peça',                  valor: 'irPeca', aplica: function (n) { return n.nfPeca && n.irPeca > 0; } },
+  irServ: { tipo: 'serv', rot: 'IRRF Serviço',               valor: 'irServ', aplica: function (n) { return n.nfServ && n.irServ > 0; } },
+  iss:    { tipo: 'serv', rot: 'ISSQN retido pelo tomador',  valor: 'iss',    aplica: function (n) { return ehTomador(n); } }
+};
+var NF_ORDEM = ['icms', 'irPeca', 'irServ', 'iss'];
+function rotuloTipo(t) { return t === 'peca' ? 'Peça' : 'Serviço'; }
+
+/** Notas fiscais (documentos) em que incide o imposto escolhido. */
+function documentos(notas, sel) {
+  var ids = !sel || sel === 'todos' ? NF_ORDEM : [sel];
+  var docs = [], porChave = {};
+  notas.forEach(function (n) {
+    ids.forEach(function (id) {
+      var t = NF_IMP[id];
+      if (!t.aplica(n)) return;
+      var numero = t.tipo === 'peca' ? n.nfPeca : n.nfServ;
+      var k = n.os + '|' + t.tipo + '|' + numero;
+      if (!porChave[k]) { porChave[k] = { n: n, tipo: t.tipo, numero: numero, imps: [] }; docs.push(porChave[k]); }
+      porChave[k].imps.push(id);
+    });
+  });
+  return docs;
+}
+function aliquotaDoc(d) {
+  return d.imps.map(function (id) {
+    var n = d.n;
+    if (id === 'icms') return n.icmsObs ? 'ICMS deson. (' + P(n.pIcmsEfetiva) + ')' : 'ICMS ' + P(n.pIcms);
+    if (id === 'irPeca') return 'IRRF ' + P(n.pIrPeca);
+    if (id === 'irServ') return 'IRRF ' + P(n.pIrServ);
+    return 'ISSQN ' + P(n.pIss);
+  }).join(' · ');
+}
+function valorDoc(d) { return r2(d.imps.reduce(function (s, id) { return s + d.n[NF_IMP[id].valor]; }, 0)); }
 function ehTomador(n) {
   // RAD marca "TOMADOR"; quando o campo vem vazio mas há ISSQN retido, também é retenção pelo tomador.
   return n.nfServ && (n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0));
@@ -1360,12 +1400,14 @@ function urlPdf(p) { return p.url || (p.file ? '' : 'https://drive.google.com/fi
 
 /** O que o painel procura nos PDFs: nº das notas e OS, CNPJs e valores de ISSQN das notas de tomador. */
 function chavesBusca() {
+  // Sempre as notas de todos os impostos: trocar o imposto no topo não exige ler os PDFs de novo.
   var i = {}, c = {}, v = {};
-  NOTAS.filter(ehTomador).forEach(function (n) {
-    i[semZeros(n.nfServ)] = 1;
+  documentos(NOTAS, 'todos').forEach(function (d) {
+    var n = d.n;
+    i[semZeros(d.numero)] = 1;
     if (n.os) i[semZeros(n.os)] = 1;
     if (digitos(n.cnpj)) c[digitos(n.cnpj)] = 1;
-    if (n.iss > 0) v[brNum(n.iss)] = 1;
+    d.imps.forEach(function (id) { var x = n[NF_IMP[id].valor]; if (x > 0) v[brNum(x)] = 1; });
   });
   return { i: Object.keys(i), c: Object.keys(c), v: Object.keys(v) };
 }
@@ -1400,44 +1442,46 @@ function filtrarImpressao(fp, chaves) {
 }
 
 /** Verifica um PDF contra uma nota do RAD. ID da nota = número da NF + número da OS. */
-function conferir(n, pdf) {
+function conferir(d, pdf) {
+  var n = d.n;
   var nomeArq = normCab(pdf.nome);
   var numsArq = (pdf.nome.match(/\d+/g) || []).map(function (x) { return x.replace(/^0+(?=\d)/, ''); });
   var pal = palavrasEstab(n.estab);
   var fp = pdf.fp;
   var r = {
-    nomeNumero: numsArq.indexOf(semZeros(n.nfServ)) > -1,
+    nomeNumero: numsArq.indexOf(semZeros(d.numero)) > -1,
     nomeOs: !!n.os && numsArq.indexOf(semZeros(n.os)) > -1,
     nomeEstab: pal.length > 0 && pal.some(function (w) { return nomeArq.indexOf(w) > -1; }),
     lido: !!fp && fp.len > 30
   };
   if (r.lido) {
-    r.numero = fp.i.indexOf(semZeros(n.nfServ)) > -1;
+    r.numero = fp.i.indexOf(semZeros(d.numero)) > -1;
     r.os = !!n.os && fp.i.indexOf(semZeros(n.os)) > -1;
     r.cnpj = fp.c.indexOf(digitos(n.cnpj)) > -1;
-    r.tomador = !!fp.tom;
-    r.valorIss = n.iss > 0 && fp.v.indexOf(brNum(n.iss)) > -1;
+    r.valor = d.imps.some(function (id) { var x = n[NF_IMP[id].valor]; return x > 0 && fp.v.indexOf(brNum(x)) > -1; });
+    if (d.imps.indexOf('iss') > -1) r.tomador = !!fp.tom;
   }
   r.confirmada = !!(r.lido && r.numero && r.os);
-  // Só um dos dois no texto: aceita como "conferir" apenas se o CNPJ do prestador também estiver no PDF.
-  r.parcial = !!(r.lido && !r.confirmada && (r.numero || r.os) && r.cnpj);
+  // Só o nº da nota (sem a OS) + CNPJ do prestador: "conferir". Só a OS não basta — a NF de peça e a de serviço
+  // têm a mesma OS e o mesmo CNPJ, e uma seria confundida com a outra.
+  r.parcial = !!(r.lido && !r.confirmada && r.numero && r.cnpj);
   r.pontos = (r.confirmada ? 100 : 0) + (r.parcial ? 50 : 0) + (r.numero ? 15 : 0) + (r.os ? 15 : 0) + (r.cnpj ? 10 : 0) +
-             (r.tomador ? 5 : 0) + (r.valorIss ? 5 : 0) + (r.nomeNumero ? 10 : 0) + (r.nomeOs ? 10 : 0) + (r.nomeEstab ? 3 : 0);
+             (r.tomador ? 5 : 0) + (r.valor ? 5 : 0) + (r.nomeNumero ? 10 : 0) + (r.nomeOs ? 10 : 0) + (r.nomeEstab ? 3 : 0);
   return r;
 }
 
-function casarNotas(notas) {
-  return notas.filter(ehTomador).map(function (n) {
+function casarNotas(notas, sel) {
+  return documentos(notas, sel).map(function (d) {
     var melhor = null;
     PDFS.forEach(function (p) {
-      var r = conferir(n, p);
+      var r = conferir(d, p);
       // PDF lido: precisa do Nº + OS (ou de um deles + CNPJ). PDF sem texto: Nº no nome do arquivo + OS ou estabelecimento.
       var ok = r.lido ? (r.confirmada || r.parcial) : (r.nomeNumero && (r.nomeOs || r.nomeEstab));
       if (!ok) return;
       if (!melhor || r.pontos > melhor.r.pontos) melhor = { pdf: p, r: r };
     });
     var status = !melhor ? 'nao' : melhor.r.confirmada ? 'ok' : melhor.r.parcial ? 'parcial' : 'nome';
-    return { n: n, pdf: melhor && melhor.pdf, r: melhor ? melhor.r : {}, status: status, inferido: !n.respIss };
+    return { d: d, n: d.n, pdf: melhor && melhor.pdf, r: melhor ? melhor.r : {}, status: status, inferido: d.imps.indexOf('iss') > -1 && !d.n.respIss };
   });
 }
 
@@ -1455,7 +1499,7 @@ function buscarNotas() {
   NF.total = PDFS.filter(function (p) { return !p.fp; }).length;
   renderNotasTomador();
 
-  var faltam = function () { return casarNotas(NOTAS).some(function (x) { return x.status === 'nao' || x.status === 'nome'; }); };
+  var faltam = function () { return casarNotas(NOTAS, 'todos').some(function (x) { return x.status === 'nao' || x.status === 'nome'; }); };
   var nums = {};
   chaves.i.forEach(function (x) { nums[x] = 1; });
   var porNome = function (p) { return (p.nome.match(/\d+/g) || []).some(function (x) { return nums[x.replace(/^0+(?=\d)/, '')]; }); };
@@ -1518,18 +1562,21 @@ function textoPdfLocal(file) {
 
 var STATUS_NF = {
   ok: { rot: 'Encontrada (Nº + OS)', cls: 'ok', ic: '✓' },
-  parcial: { rot: 'Conferir: só Nº ou só OS', cls: 'warn', ic: '!' },
+  parcial: { rot: 'Conferir: Nº e CNPJ, sem OS', cls: 'warn', ic: '!' },
   nome: { rot: 'Encontrada pelo nome do arquivo', cls: 'warn', ic: '≈' },
   nao: { rot: 'Não encontrada', cls: 'bad', ic: '✕' }
 };
 function renderNotasTomador() {
-  var lista = casarNotas(filtrar());
+  var sel = state.imposto;
+  var lista = casarNotas(filtrar(), sel);
   NF.lista = lista;
+  var nomeImp = sel === 'todos' ? 'todos os impostos' : NF_IMP[sel].rot;
+  document.getElementById('nfTitulo').textContent = 'Notas fiscais — ' + nomeImp;
   var cont = { ok: 0, parcial: 0, nome: 0, nao: 0 };
   lista.forEach(function (x) { cont[x.status]++; });
   var semLeitura = PDFS.filter(function (p) { return !p.fp; }).length;
   document.getElementById('nfResumo').innerHTML =
-    '<span class="tag">' + lista.length + ' nota(s) de serviço com ISSQN retido pelo tomador</span>' +
+    '<span class="tag">' + lista.length + ' nota(s) fiscal(is) · ' + esc(nomeImp) + ' · ' + R(lista.reduce(function (s, x) { return s + valorDoc(x.d); }, 0)) + '</span>' +
     ['ok', 'parcial', 'nome', 'nao'].map(function (k) { return '<span class="tag ' + STATUS_NF[k].cls + '">' + STATUS_NF[k].ic + ' ' + cont[k] + ' ' + STATUS_NF[k].rot + '</span>'; }).join('') +
     '<span class="tag">' + PDFS.length + ' PDF(s) na fonte' + (semLeitura ? ' · ' + semLeitura + ' não precisaram ser lidos' : '') + '</span>';
 
@@ -1559,15 +1606,18 @@ function renderNotasTomador() {
               : '<a href="#" data-local="' + esc(x.pdf.id) + '">' + esc(x.pdf.nome) + '</a>';
       if (x.pdf.caminho) arq += '<div class="muted" style="font-size:11px">📁 ' + esc(x.pdf.caminho.replace(/\/$/, '')) + '</div>';
     }
-    var conf = x.pdf ? (x.r.lido ? ck(x.r.numero, 'Nº NF') + ck(x.r.os, 'OS') + ck(x.r.cnpj, 'CNPJ') + ck(x.r.valorIss, 'Valor ISS') + ck(x.r.tomador, 'Retido tomador')
+    var conf = x.pdf ? (x.r.lido ? ck(x.r.numero, 'Nº NF') + ck(x.r.os, 'OS') + ck(x.r.cnpj, 'CNPJ') + ck(x.r.valor, 'Valor do imposto') + ck(x.r.tomador, 'Retido tomador')
                                  : '<span class="muted">' + (x.pdf.fp ? 'PDF sem texto legível — só o nome do arquivo confere' : 'Ainda não lido') + '</span>') : '';
-    return '<tr><td><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +
+    var imps = x.d.imps.map(function (id) {
+      return '<span class="cat"><i style="background:var(' + imp(id).cor + ')"></i>' + esc(id === 'iss' ? 'ISSQN' : NF_IMP[id].rot) + '</span>';
+    }).join('<br>') + (x.inferido ? '<div><span class="tag warn" title="Responsável ISSQN vazio no RAD, mas há ISSQN retido">Resp. vazio no RAD</span></div>' : '');
+    return '<tr><td class="fixa"><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +
+      '<td>' + imps + '</td><td>' + rotuloTipo(x.d.tipo) + '</td>' +
       '<td>' + esc(n.unidade) + '</td><td title="' + esc(n.cnpj) + '">' + esc(n.estab) + '<div class="muted" style="font-size:11px">' + esc(n.cnpj) + '</div></td>' +
-      '<td>' + esc(n.cidade) + '</td><td><b>' + esc(n.nfServ) + '</b></td><td>' + esc(n.os) + '</td><td>' + esc(n.placa) + '</td>' +
-      '<td class="n">' + P(n.pIss) + '</td><td class="n">' + R(n.iss) + '</td>' +
-      '<td>' + (x.inferido ? '<span class="tag warn" title="Responsável ISSQN vazio no RAD, mas há ISSQN retido">Vazio no RAD</span>' : 'TOMADOR') + '</td>' +
+      '<td>' + esc(n.cidade) + '</td><td><b>' + esc(x.d.numero) + '</b></td><td>' + esc(n.os) + '</td><td>' + esc(n.placa) + '</td>' +
+      '<td class="n">' + esc(aliquotaDoc(x.d)) + '</td><td class="n">' + R(valorDoc(x.d)) + '</td>' +
       '<td>' + arq + '</td><td class="checks">' + conf + '</td></tr>';
-  }).join('') : '<tr><td class="empty" colspan="12">Nenhuma nota de serviço com ISSQN retido pelo tomador nos filtros atuais.</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="13">Nenhuma nota fiscal de ' + esc(nomeImp) + ' nos filtros atuais.</td></tr>';
   rolagemHorizontal('tblNf');
   document.querySelectorAll('#tblNf a[data-local]').forEach(function (a) {
     a.onclick = function (e) {
@@ -1581,11 +1631,14 @@ function renderNotasTomador() {
 function nomeZip() {
   var d = new Date(), dois = function (n) { return (n < 10 ? '0' : '') + n; };
   var uni = document.getElementById('fUnidade').value;
-  return 'notas_tomador' + (uni ? '_' + uni : '') + '_' + d.getFullYear() + dois(d.getMonth() + 1) + dois(d.getDate()) + '.zip';
+  var sel = state.imposto === 'todos' ? 'todos_impostos' : state.imposto === 'iss' ? 'ISSQN' : NF_IMP[state.imposto].rot;
+  return ('notas_' + sel + (uni ? '_' + uni : '') + '_' + d.getFullYear() + dois(d.getMonth() + 1) + dois(d.getDate())).replace(/[^\w\-]+/g, '_') + '.zip';
 }
+
 function nomeNoZip(x) {
-  return ['NF' + x.n.nfServ, 'OS' + x.n.os, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_') + '.pdf';
+  return ['NF' + x.d.numero, x.d.tipo === 'peca' ? 'PECA' : 'SERV', 'OS' + x.n.os, x.n.estab].join('_').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_') + '.pdf';
 }
+
 function baixarBlob(blob, nome) {
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = nome;
@@ -1599,10 +1652,21 @@ function baixarZip() {
   renderNotasTomador();
   var fim = function () { NF.zipando = false; renderNotasTomador(); };
   var nome = nomeZip();
-  var csv = '﻿Status;Unidade;Estabelecimento;CNPJ;NF Serviço;OS;Placa;% ISSQN;ISSQN;Arquivo original;Pasta;Arquivo no zip\n' + itens.map(function (x) {
-    return [STATUS_NF[x.status].rot, x.n.unidade, x.n.estab, x.n.cnpj, x.n.nfServ, x.n.os, x.n.placa, brNum(x.n.pIss), brNum(x.n.iss), x.pdf.nome, x.pdf.caminho || '', nomeNoZip(x)]
-      .map(function (v) { v = String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';');
-  }).join('\n');
+  // Relação (planilha) das notas do imposto selecionado, com os valores de cada imposto da nota.
+  var cel = function (v) { v = String(v == null ? '' : v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var cab = ['Situação', 'Imposto', 'Tipo da NF', 'Unidade', 'Estabelecimento', 'CNPJ', 'Município', 'Optante Simples', 'Nº NF', 'OS', 'Placa',
+             'Base da nota', 'Alíquota', 'ICMS', 'IRRF Peça', 'IRRF Serviço', 'ISSQN', 'Resp. ISSQN', 'Valor do imposto selecionado', 'Valor aprovado', 'Valor líquido',
+             'Arquivo original', 'Pasta', 'Arquivo no zip'];
+  var linhasCsv = itens.map(function (x) {
+    var n = x.n, peca = x.d.tipo === 'peca', tem = function (id) { return x.d.imps.indexOf(id) > -1 ? brNum(n[NF_IMP[id].valor]) : ''; };
+    return [STATUS_NF[x.status].rot, x.d.imps.map(function (id) { return NF_IMP[id].rot; }).join(' + '), rotuloTipo(x.d.tipo), n.unidade, n.estab, n.cnpj, n.cidade, n.simples,
+            x.d.numero, n.os, n.placa, brNum(peca ? n.basePeca : n.baseServ), aliquotaDoc(x.d), tem('icms'), tem('irPeca'), tem('irServ'), tem('iss'),
+            x.d.imps.indexOf('iss') > -1 ? (n.respIss || 'vazio') : '', brNum(valorDoc(x.d)), brNum(n.aprovado), brNum(n.liquido),
+            x.pdf.nome, x.pdf.caminho || '', nomeNoZip(x)].map(cel).join(';');
+  });
+  var total = itens.reduce(function (s, x) { return s + valorDoc(x.d); }, 0);
+  var csv = '\ufeff' + cab.join(';') + '\n' + linhasCsv.join('\n') + '\n' +
+            ['TOTAL', '', '', '', '', '', '', '', itens.length + ' nota(s)', '', '', '', '', '', '', '', '', '', brNum(total)].map(cel).join(';');
 
   if (MODO === 'appsscript') {
     // O .zip é montado e gravado no Drive; o navegador baixa direto de lá (sem trafegar pelo painel).

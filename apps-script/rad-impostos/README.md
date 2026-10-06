@@ -5,7 +5,9 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
 - **Diferenças de imposto por categoria** (ICMS, IRRF Peça, IRRF Serviço, ISSQN): valor informado × recalculado, alíquotas, base, Simples × não Simples.
 - **Dashboard visual** com indicadores, gráficos e a matriz alíquota × unidade.
 - **Filtros**: imposto, situação, alíquota, unidade, município, optante Simples, responsável ISSQN e busca livre.
-- **Notas fiscais com ISSQN retido pelo tomador**: para cada nota de serviço do RAD com responsável TOMADOR,
+- **Notas fiscais por imposto** (segue o imposto selecionado no topo): ICMS e IRRF Peça → NFs de peça; ISSQN retido pelo
+  tomador e IRRF Serviço → NFs de serviço; "Todos" → todas, sem repetir a mesma nota. O .zip e a relação CSV seguem a seleção.
+  Antes era só **Notas fiscais com ISSQN retido pelo tomador**: para cada nota de serviço do RAD com responsável TOMADOR,
   localiza o PDF correspondente e confere no texto do PDF o CNPJ do prestador, o número da nota, a OS,
   o valor do ISSQN e a expressão "Retido pelo Tomador". Botão **Baixar notas encontradas (.zip)** (inclui `relacao_notas.csv`).
 - **Tabela final** com todas as ordens (ordenável, exporta CSV).
