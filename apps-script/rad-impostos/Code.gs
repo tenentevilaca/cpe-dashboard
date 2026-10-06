@@ -1040,3 +1040,63 @@ function responder(token, linha, texto, anterior) {
     return { ok: true, valor: cel.getDisplayValue() };
   } finally { lock.releaseLock(); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Inserir RADs pelo painel (organizados por período)                  */
+/* ------------------------------------------------------------------ */
+
+/** Unidade e período escritos no cabeçalho do RAD. */
+function infoRad_(grade) {
+  var unidade = '', periodo = null;
+  grade.forEach(function (l) {
+    l.forEach(function (c, i) {
+      var t = String(c);
+      if (!unidade && /^(Nome|C[oó]digo) [OÓ]rg[aã]o \/ Entidade:?$/i.test(t)) unidade = l.slice(i + 1).filter(String)[0] || '';
+      var m = !periodo && /Per[ií]odo:\s*(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2})\/(\d{2})\/(\d{4})/i.exec(t);
+      if (m) periodo = { ini: m[3] + '-' + m[2] + '-' + m[1], fim: m[6] + '-' + m[5] + '-' + m[4], dia: +m[1], mes: m[3] + '-' + m[2] };
+    });
+  });
+  return { unidade: unidade.replace(/^\d+\s*[ºª°A-Z]?\s+/i, '').trim() || unidade, periodo: periodo };
+}
+
+function pastaFilha_(pai, nome) {
+  var it = pai.getFoldersByName(nome);
+  return it.hasNext() ? it.next() : pai.createFolder(nome);
+}
+
+/**
+ * Chamado pelo painel com os .xls baixados do sistema ({nome, base64}). Cada RAD é guardado na pasta de RADs,
+ * na subpasta do período ("2026-09 · 2ª quinzena"), com o nome "RAD <Unidade> <AAAA-MM> <1ª|2ª> quinzena.xls".
+ * Se já existir um RAD com o mesmo nome (mesma Unidade e período), o anterior vai para a lixeira.
+ */
+function salvarRads(token, arquivos) {
+  exigirGestor_(token);
+  var ids = idsPastas_();
+  var pastaRads;
+  if (ids.rads && ids.rads !== ids.raiz) pastaRads = DriveApp.getFolderById(ids.rads);
+  else {
+    pastaRads = pastaFilha_(DriveApp.getFolderById(ids.raiz), 'RADs');
+    PropertiesService.getScriptProperties().deleteProperty('DESCOBERTA');
+  }
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    return arquivos.map(function (a) {
+      try {
+        var blob = Utilities.newBlob(Utilities.base64Decode(a.base64), 'application/vnd.ms-excel', a.nome);
+        var html = blob.getDataAsString('UTF-8');
+        if (!/title-rad|Sint(&eacute;|é)tico da Despesa/i.test(html)) return { nome: a.nome, ok: false, msg: 'não é um RAD do sistema' };
+        var info = infoRad_(gradeDoHtml_(html));
+        if (!info.periodo) return { nome: a.nome, ok: false, msg: 'período não encontrado no RAD' };
+        var q = info.periodo.dia <= 15 ? '1ª quinzena' : '2ª quinzena';
+        var sub = pastaFilha_(pastaRads, info.periodo.mes + ' · ' + q);
+        var nome = ('RAD ' + (info.unidade || 'sem unidade') + ' ' + info.periodo.mes + ' ' + q + '.xls').replace(/[\\/:*?"<>|]/g, '-');
+        var antigos = sub.getFilesByName(nome), substituido = false;
+        while (antigos.hasNext()) { antigos.next().setTrashed(true); substituido = true; }
+        sub.createFile(blob.setName(nome));
+        return { nome: a.nome, ok: true, salvo: nome, pasta: sub.getName(), substituido: substituido };
+      } catch (e) {
+        return { nome: a.nome, ok: false, msg: String(e && e.message || e) };
+      }
+    });
+  } finally { lock.releaseLock(); }
+}

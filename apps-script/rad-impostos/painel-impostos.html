@@ -371,6 +371,8 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="btnTema" title="Alternar tema claro/escuro">◐ Tema</button>
+      <button class="btn" id="btnInserirRad" title="Guardar no Drive os RADs baixados do sistema (organizados por período)">⬆ Inserir RADs</button>
+      <input type="file" id="inRad" accept=".xls,.htm,.html" multiple hidden>
       <button class="btn" id="btnPasta" title="Pasta raiz do Drive (RADs, notas e planilha de pré-faturamento)">📁 Pastas do Drive</button>
       <button class="btn" id="btnAbrir" title="Abrir RADs, planilha ou PDFs das notas">📂 Abrir arquivos…</button>
       <button class="btn" id="btnAtualizar">↻ Atualizar dados</button>
@@ -403,6 +405,14 @@
       <div class="f">
         <label for="fAliquota">Alíquota</label>
         <select id="fAliquota"><option value="">Todas</option></select>
+      </div>
+      <div class="f">
+        <label for="fMes">Mês do RAD</label>
+        <select id="fMes"><option value="">Todos</option></select>
+      </div>
+      <div class="f">
+        <label for="fQuinzena">Quinzena</label>
+        <select id="fQuinzena"><option value="">Ambas</option><option value="1">1ª (dias 1 a 15)</option><option value="2">2ª (dia 16 ao fim)</option></select>
       </div>
       <div class="f">
         <label for="fUnidade">Unidade</label>
@@ -627,7 +637,8 @@ function preparar(n) {
   n.dLiquido = r2(n.liquido - n.cLiquido);
   n.temDif = [n.dIcms, n.dIrPeca, n.dIss, n.dIrServ, n.dLiquido].some(function (d) { return Math.abs(d) > TOLERANCIA; });
   n.nNfs = (n.nfPeca ? 1 : 0) + (n.nfServ ? 1 : 0);
-  n.busca = [n.placa, n.estab, n.cidade, n.nfPeca, n.nfServ, n.cnpj, n.os, n.modelo, n.resp].join(' ').toLowerCase();
+  n.perRot = n.periodo ? n.periodo.rotMes + ' · ' + n.periodo.q + 'ª' : '';
+  n.busca = [n.periodo ? n.periodo.rot : '', n.placa, n.estab, n.cidade, n.nfPeca, n.nfServ, n.cnpj, n.os, n.modelo, n.resp].join(' ').toLowerCase();
   return n;
 }
 function dif(n, t) { return n['d' + t.id.charAt(0).toUpperCase() + t.id.slice(1)]; }
@@ -639,6 +650,8 @@ function filtrar() {
   var sit = document.getElementById('fSituacao').value;
   var aliq = document.getElementById('fAliquota').value;
   var uni = document.getElementById('fUnidade').value;
+  var mes = document.getElementById('fMes').value;
+  var qz = document.getElementById('fQuinzena').value;
   var mun = document.getElementById('fMunicipio').value;
   var simp = document.getElementById('fSimples').value;
   var resp = document.getElementById('fResp').value;
@@ -647,6 +660,8 @@ function filtrar() {
 
   return NOTAS.filter(function (n) {
     if (uni && n.unidade !== uni) return false;
+    if (mes && (!n.periodo || n.periodo.mes !== mes)) return false;
+    if (qz && (!n.periodo || String(n.periodo.q) !== qz)) return false;
     if (mun && n.cidade !== mun) return false;
     if (simp && n.simples !== simp) return false;
     if (resp && (n.respIss || '(vazio)') !== resp) return false;
@@ -681,16 +696,21 @@ function montarFiltros() {
   });
 
   preencher('fUnidade', unicos(NOTAS.map(function (n) { return n.unidade; })));
+  var fm = document.getElementById('fMes'), atualMes = fm.value, meses = {};
+  NOTAS.forEach(function (n) { if (n.periodo) meses[n.periodo.mes] = n.periodo.rotMes; });
+  fm.innerHTML = '<option value="">Todos</option>' + Object.keys(meses).sort().reverse().map(function (k) {
+    return '<option value="' + k + '"' + (k === atualMes ? ' selected' : '') + '>' + esc(meses[k]) + '</option>';
+  }).join('');
   preencher('fMunicipio', unicos(NOTAS.map(function (n) { return n.cidade; })));
   preencher('fResp', unicos(NOTAS.map(function (n) { return n.respIss || '(vazio)'; })));
   montarAliquotas();
 
-  ['fSituacao', 'fAliquota', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp'].forEach(function (id) {
+  ['fSituacao', 'fAliquota', 'fMes', 'fQuinzena', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp'].forEach(function (id) {
     document.getElementById(id).onchange = render;
   });
   document.getElementById('fBusca').oninput = render;
   document.getElementById('btnLimpar').onclick = function () {
-    ['fSituacao', 'fAliquota', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
+    ['fSituacao', 'fAliquota', 'fMes', 'fQuinzena', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
       var el = document.getElementById(id); el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
     });
     state.imposto = 'todos';
@@ -973,6 +993,7 @@ function renderMatriz(d) {
 var COLUNAS = [
   { k: 'placa', t: 'Placa' },
   { k: 'unidade', t: 'Unidade' },
+  { k: 'perRot', t: 'Período (RAD)' },
   { k: 'estab', t: 'Estabelecimento' },
   { k: 'cidade', t: 'Cidade' },
   { k: 'simples', t: 'Simples' },
@@ -1121,7 +1142,11 @@ function exibir(notas) {
   document.getElementById('origem').textContent = (FONTE.origem || '') + (FONTE.nRads ? ' · ' + FONTE.nRads + ' RAD(s) lido(s)' : '') +
     ((FONTE.consolidados || []).length ? ' (' + FONTE.consolidados.length + ' “UNIAO RAD” desconsiderada(s))' : '') + ' · ' + NOTAS.length + ' ordens · ' +
     (unidades.length ? unidades.length + ' unidade(s): ' + unidades.join(', ') : '') +
-    (PDFS.length ? ' · ' + PDFS.length + ' PDF(s)' : '') + (FONTE.atualizadoEm ? ' · atualizado em ' + FONTE.atualizadoEm : '');
+    (PDFS.length ? ' · ' + PDFS.length + ' PDF(s)' : '') + (FONTE.atualizadoEm ? ' · atualizado em ' + FONTE.atualizadoEm : '') +
+    (function () {
+      var ps = {}; NOTAS.forEach(function (n) { if (n.periodo) ps[n.periodo.mes + n.periodo.q] = n.periodo.rotMes + ' ' + n.periodo.q + 'ª'; });
+      var k = Object.keys(ps).sort(); return k.length ? ' · períodos: ' + k.map(function (x) { return ps[x]; }).join(', ') : '';
+    })();
   var av = document.getElementById('avisos');
   av.innerHTML = (FONTE.avisos || []).map(function (a) { return '<div>⚠ ' + esc(a) + '</div>'; }).join('');
   av.hidden = !(FONTE.avisos || []).length;
@@ -1183,9 +1208,19 @@ function lerRadGrade(grade, nomeArquivo) {
   return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo };
 }
 
+/* ---------------- Período do RAD (quinzena) ---------------- */
+var MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+/** "16/09/2026 à 30/09/2026" → { mes: '2026-09', q: 2, rotMes: 'Set/2026', rot: 'Set/2026 · 2ª quinzena (16/09 a 30/09)' } */
+function lerPeriodo(txt) {
+  var m = /(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2})\/(\d{2})\/(\d{4})/.exec(String(txt || ''));
+  if (!m) return null;
+  var q = +m[1] <= 15 ? 1 : 2, rotMes = MESES[+m[2] - 1] + '/' + m[3];
+  return { mes: m[3] + '-' + m[2], q: q, rotMes: rotMes, rot: rotMes + ' · ' + q + 'ª quinzena (' + m[1] + '/' + m[2] + ' a ' + m[4] + '/' + m[5] + ')' };
+}
+
 /** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. */
 function notasDosRads(rads) {
-  var notas = [], vistas = {}, avisos = [], porUnidade = {};
+  var notas = [], vistas = {}, avisos = [];
   rads.forEach(function (r) {
     var rad;
     try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
@@ -1195,11 +1230,11 @@ function notasDosRads(rads) {
       vistas[k] = 1; return true;
     });
     if (!novas.length && rad.linhas.length) avisos.push('“' + r.nome + '” repete um RAD já lido (' + rad.unidade + ') e foi ignorado.');
-    porUnidade[rad.unidade] = rad.periodo;
+    var per = lerPeriodo(rad.periodo);
+    if (!per && rad.linhas.length && !rad.cab.some(function (c) { return /^unidade$/i.test(String(c).trim()); })) avisos.push('“' + r.nome + '”: período não encontrado no RAD.');
+    novas.forEach(function (n) { n.periodo = per; });
     notas = notas.concat(novas);
   });
-  var periodos = unicos(Object.keys(porUnidade).map(function (u) { return porUnidade[u]; }));
-  if (periodos.length > 1) avisos.push('Os RADs têm períodos diferentes: ' + periodos.join(' | '));
   return { notas: notas, avisos: avisos };
 }
 
@@ -1689,6 +1724,30 @@ function baixarZip() {
     }).then(function (blob) { baixarBlob(blob, nome); })
       .catch(function (e) { NF.erros = ['Erro ao gerar o .zip: ' + (e && e.message || e)]; }).then(fim);
   }
+}
+
+/* ---------------- Inserir RADs no Drive ---------------- */
+/** Envia os .xls baixados do sistema; o servidor guarda cada um na subpasta do seu período e recarrega o painel. */
+function inserirRads(files) {
+  files = Array.prototype.slice.call(files || []);
+  if (!files.length) return;
+  var b = document.getElementById('btnInserirRad'), rot = b.textContent;
+  b.disabled = true; b.textContent = '⏳ Enviando ' + files.length + ' RAD(s)…';
+  Promise.all(files.map(function (f) {
+    return new Promise(function (ok, erro) {
+      var fr = new FileReader();
+      fr.onload = function () { ok({ nome: f.name, base64: String(fr.result).split(',')[1] || '' }); };
+      fr.onerror = function () { erro(fr.error); };
+      fr.readAsDataURL(f);
+    });
+  })).then(function (arqs) { return chamar('salvarRads', arqs); }).then(function (res) {
+    var ok = res.filter(function (r) { return r.ok; }), falha = res.filter(function (r) { return !r.ok; });
+    alert((ok.length ? '✅ ' + ok.length + ' RAD(s) guardado(s):\n' + ok.map(function (r) {
+      return '• ' + r.salvo + '  (pasta “' + r.pasta + '”' + (r.substituido ? ', substituiu o anterior' : '') + ')';
+    }).join('\n') : '') + (falha.length ? '\n\n⚠ Não guardados:\n' + falha.map(function (r) { return '• ' + r.nome + ': ' + r.msg; }).join('\n') : ''));
+    if (ok.length) carregar();
+  }).catch(function (e) { alert('Erro ao enviar os RADs: ' + (e && e.message || e)); })
+    .then(function () { b.disabled = false; b.textContent = rot; });
 }
 
 /* ---------------- Pastas do Drive ---------------- */
@@ -2187,9 +2246,13 @@ document.addEventListener('DOMContentLoaded', function () {
     ['dragleave', 'drop'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
     document.addEventListener('drop', function (e) { if (e.dataTransfer.files.length) lerArquivos(e.dataTransfer.files); });
     document.getElementById('btnPasta').hidden = true;
+    document.getElementById('btnInserirRad').hidden = true;
   } else {
     document.getElementById('btnAbrir').hidden = true;
     document.getElementById('btnPasta').onclick = configurarPasta;
+    var inRad = document.getElementById('inRad');
+    document.getElementById('btnInserirRad').onclick = function () { inRad.click(); };
+    inRad.onchange = function () { inserirRads(inRad.files); inRad.value = ''; };
   }
   document.getElementById('btnCsv').onclick = exportarCsv;
   document.getElementById('btnZip').onclick = baixarZip;

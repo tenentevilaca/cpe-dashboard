@@ -100,3 +100,11 @@ Envie o link gerado aos PMs. Abra o painel uma vez pelo menu da planilha antes (
 
 Segurança: senhas guardadas só como hash com sal na aba oculta `_usuarios`; sessão de 6 h; 5 tentativas erradas bloqueiam o login por 10 min;
 o servidor confere Unidade/Cia em toda leitura e gravação. A coluna CIA é reconhecida pelo cabeçalho "CIA"/"Companhia"; sem ela, o filtro é só por Unidade.
+
+## Períodos (quinzenas) e inclusão de RADs
+
+- O painel lê o período escrito em cada RAD ("Período: 16/09/2026 à 30/09/2026") e oferece os filtros **Mês do RAD** e
+  **Quinzena** (1ª: dias 1–15; 2ª: dia 16 ao fim). A tabela final ganhou a coluna "Período (RAD)".
+- **⬆ Inserir RADs** (gestão, App da Web): escolha os .xls baixados do sistema; cada um é guardado na pasta de RADs, na
+  subpasta do período (ex.: "2026-09 · 2ª quinzena"), com o nome "RAD <Unidade> <AAAA-MM> <1ª|2ª> quinzena.xls".
+  Reenviar o RAD da mesma Unidade e período substitui o anterior (o antigo vai para a lixeira).
