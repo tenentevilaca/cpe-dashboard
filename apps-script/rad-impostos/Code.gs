@@ -156,7 +156,7 @@ function abrirPasta_(id, papel) {
  *  - modo "planilha": { cab, linhas } da aba de dados.
  */
 function getFontes(token) {
-  exigirGestor_(token);
+  exigirLeitura_(token);
   var tz = Session.getScriptTimeZone();
   var agora = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
   var ids = idsPastas_();
@@ -333,7 +333,7 @@ function filtrarImpressao_(fp, chaves) {
 
 /** Chamado pelo painel: impressões já guardadas no cache, filtradas pelas chaves. */
 function impressoesCache(token, ids, chaves) {
-  exigirGestor_(token);
+  exigirLeitura_(token);
   var cache = lerCache_(), out = {};
   ids.forEach(function (id) { if (cache[id]) out[id] = filtrarImpressao_(cache[id].fp, chaves); });
   return out;
@@ -344,7 +344,7 @@ function impressoesCache(token, ids, chaves) {
  * Devolve { fps: {id: impressão filtrada}, pendentes: [ids não processados], erros: {id: msg} }.
  */
 function lerImpressoesPdf(token, ids, chaves) {
-  exigirGestor_(token);
+  exigirLeitura_(token);
   var inicio = Date.now();
   var cache = lerCache_();
   var fps = {}, pendentes = [], erros = {}, novos = [];
@@ -426,7 +426,7 @@ function gravarCache_(linhas, cache) {
  * Os .zip gerados antes são enviados para a lixeira.
  */
 function gerarZip(token, itens, nomeZip, csv) {
-  exigirGestor_(token);
+  exigirLeitura_(token);
   var usados = {};
   var blobs = itens.map(function (it) {
     var blob = DriveApp.getFileById(it.id).getBlob();
@@ -756,6 +756,14 @@ function exigirGestor_(token) {
   throw new Error('Acesso restrito à gestão. Entre com um login de gestor.');
 }
 
+/** Leitura dos dados de impostos/notas: gestão e SOFI. */
+function exigirLeitura_(token) {
+  if (gestorGoogle_()) return { perfil: 'GESTOR', nome: gestorGoogle_() };
+  var s = sessao_(token);
+  if (s && (s.perfil === 'GESTOR' || s.perfil === 'SOFI')) return s;
+  throw new Error('Acesso restrito à gestão e à SOFI.');
+}
+
 function exigirUsuario_(token) {
   var s = sessao_(token);
   if (!s) throw new Error('Sessão expirada. Entre novamente.');
@@ -865,7 +873,7 @@ function decidirUsuario(token, login, acao, dados) {
     dados = dados || {};
     if (dados.unidade != null) u.unidade = String(dados.unidade).trim();
     if (dados.cia != null) u.cia = String(dados.cia).trim();
-    if (dados.perfil === 'GESTOR' || dados.perfil === 'USUARIO') u.perfil = dados.perfil;
+    if (['GESTOR', 'SOFI', 'USUARIO'].indexOf(dados.perfil) > -1) u.perfil = dados.perfil;
     var resp = { ok: true };
     if (acao === 'APROVAR' || acao === 'REATIVAR') u.status = 'APROVADO';
     else if (acao === 'RECUSAR') u.status = 'RECUSADO';
@@ -1139,5 +1147,55 @@ function salvarNota(token, arq, destino) {
     var novo = sub.createFile(Utilities.newBlob(bytes, MimeType.PDF, nome));
     var caminho = (pastaNotas.getId() === ids.notas ? '' : pastaNotas.getName() + '/') + sub.getName() + '/';
     return { nome: arq.nome, ok: true, pasta: sub.getName(), pdf: { id: novo.getId(), nome: nome, caminho: caminho, lido: false } };
+  } finally { lock.releaseLock(); }
+}
+
+/* ------------------------------------------------------------------ */
+/* SOFI: controle de pagamento dos RADs                                */
+/* ------------------------------------------------------------------ */
+/*
+ * Cada RAD = Unidade + período (ex.: "BPMRV|2026-09-16|2026-09-30"). Os totais são calculados no painel a partir
+ * dos RADs lidos; aqui fica só o registro de pagamento, na aba oculta "_rads_pagos" da planilha do painel.
+ */
+var ABA_PAGOS = '_rads_pagos';
+var PAGOS_CAB = ['chave', 'unidade', 'periodo', 'qtd_os', 'valor_aprovado', 'impostos', 'taxa_adm', 'valor_liquido', 'pago', 'pago_em', 'pago_por'];
+
+function abaPagos_() {
+  var ss = painelSS_();
+  var aba = ss.getSheetByName(ABA_PAGOS);
+  if (!aba) {
+    aba = ss.insertSheet(ABA_PAGOS);
+    aba.getRange(1, 1, 1, PAGOS_CAB.length).setValues([PAGOS_CAB]);
+    aba.hideSheet();
+  }
+  return aba;
+}
+
+/** Situação de pagamento de todos os RADs já marcados: { chave: {pago, em, por} }. */
+function listarPagamentos(token) {
+  exigirLeitura_(token);
+  var aba = abaPagos_(), n = aba.getLastRow(), out = {};
+  if (n < 2) return out;
+  aba.getRange(2, 1, n - 1, PAGOS_CAB.length).getDisplayValues().forEach(function (l) {
+    out[l[0]] = { pago: l[8] === 'SIM', em: l[9], por: l[10] };
+  });
+  return out;
+}
+
+/** Marca (pago = true) ou desmarca um RAD como pago pela SOFI, guardando os totais do momento. */
+function marcarPago(token, chave, resumo, pago) {
+  var s = exigirLeitura_(token);
+  var quem = s.nome_pm || s.nome || s.login || '';
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var aba = abaPagos_(), n = aba.getLastRow();
+    var chaves = n > 1 ? aba.getRange(2, 1, n - 1, 1).getValues().map(function (l) { return String(l[0]); }) : [];
+    var r = resumo || {};
+    var linha = [chave, r.unidade || '', r.periodo || '', r.qtd || 0, r.aprovado || 0, r.impostos || 0, r.adm || 0, r.liquido || 0,
+                 pago ? 'SIM' : 'NÃO', pago ? agora_() : '', pago ? quem : ''];
+    var i = chaves.indexOf(chave);
+    if (i > -1) aba.getRange(i + 2, 1, 1, PAGOS_CAB.length).setValues([linha]);
+    else aba.appendRow(linha);
+    return { ok: true, pago: !!pago, em: linha[9], por: linha[10] };
   } finally { lock.releaseLock(); }
 }

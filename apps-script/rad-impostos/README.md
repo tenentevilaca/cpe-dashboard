@@ -103,11 +103,25 @@ o servidor confere Unidade/Cia em toda leitura e gravação. A coluna CIA é rec
 
 ## Períodos (quinzenas) e inclusão de RADs
 
-- O painel lê o período escrito em cada RAD ("Período: 16/09/2026 à 30/09/2026") e oferece os filtros **Mês do RAD** e
-  **Quinzena** (1ª: dias 1–15; 2ª: dia 16 ao fim). A tabela final ganhou a coluna "Período (RAD)".
+- O painel lê o período escrito em cada RAD ("Período: 16/09/2026 à 30/09/2026") e oferece o filtro **Período do RAD**,
+  agrupado por mês (mês inteiro, 1ª e 2ª quinzena), só com períodos existentes e a quantidade de ordens de cada um. Se o RAD
+  não tiver o período no cabeçalho, a quinzena vem da data de aprovação da ordem. A tabela final tem a coluna "Período (RAD)".
 - **⬆ Inserir RADs** (gestão, App da Web): escolha os .xls baixados do sistema; cada um é guardado na pasta de RADs, na
   subpasta do período (ex.: "2026-09 · 2ª quinzena"), com o nome "RAD <Unidade> <AAAA-MM> <1ª|2ª> quinzena.xls".
   Reenviar o RAD da mesma Unidade e período substitui o anterior (o antigo vai para a lixeira).
 - **⬆ Inserir notas (PDF)** (gestão, App da Web): escolha um ou vários PDFs; são guardados na pasta de notas, na subpasta da
   quinzena dos filtros "Mês do RAD"/"Quinzena" (ou da quinzena atual, se não houver filtro). PDF repetido (mesmo nome e tamanho)
   não é duplicado. Logo após o envio o painel procura as notas nesses PDFs, sem recarregar tudo. Limite: 20 MB por PDF.
+
+## SOFI — pagamento dos RADs
+
+Perfil **SOFI** (definido pelo gestor em Acessos): vê o painel de Impostos RAD (sem os botões de inserir/pastas) e a aba
+**🏦 SOFI**, com a tabela dos RADs (Unidade × quinzena) ainda não pagos — Nº de OS, valor aprovado, impostos retidos, taxa
+adm. e valor líquido — e o botão **✓ Pago** (o RAD sai da lista). **📋 Consultar RADs** mostra todos, pagos e a pagar, com
+data e responsável do pagamento, opção de desfazer e exportação CSV. O registro fica na aba oculta `_rads_pagos`.
+O gestor também vê a aba SOFI.
+
+## Visual
+
+Identidade "Gestão à Vista CPE": menu lateral preto ("Painel de Gestão"), barra superior preta com o escudo PMMG/CPE em
+vetor (colorido) e faixa dourada de status, fundo bege e indicadores com barra lateral.

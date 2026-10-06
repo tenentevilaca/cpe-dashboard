@@ -9,44 +9,48 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #f4f4f1;
-    --surface: #fcfcfb;
-    --surface-2: #f0efec;
-    --border: #e2e1dc;
-    --text: #0b0b0b;
-    --text-2: #52514e;
-    --muted: #7d7c77;
-    --grid: #e8e7e2;
-    --accent: #2a78d6;
+    /* Identidade visual "Gestão à Vista CPE": preto, dourado e bege */
+    --ink: #0b0b0b;
+    --gold: #a08f63;
+    --gold-2: #c4b287;
+    --bg: #efebe0;
+    --surface: #ffffff;
+    --surface-2: #f5f1e6;
+    --border: #e0dacb;
+    --text: #2b2a27;
+    --text-2: #5a5850;
+    --muted: #8a8678;
+    --grid: #ebe6d8;
+    --accent: #7d6c3f;
     --icms: #2a78d6;
     --irpeca: #eb6834;
     --irserv: #1baf7a;
     --iss: #eda100;
-    --ok: #0f7b3e;
-    --ok-bg: #e3f3e8;
+    --ok: #2e7d32;
+    --ok-bg: #e4f2e5;
     --bad: #b42318;
-    --bad-bg: #fdecea;
+    --bad-bg: #fbe9e7;
     --warn: #8a5a00;
-    --warn-bg: #fdf3dc;
-    --hl: #eef4fc;
+    --warn-bg: #fbf1d9;
+    --hl: #f6efdc;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #33332f;
-      --text: #ffffff; --text-2: #c3c2b7; --muted: #8f8e86; --grid: #2c2c29;
-      --accent: #3987e5; --icms: #3987e5; --irpeca: #d95926; --irserv: #199e70; --iss: #c98500;
+      --bg: #141311; --surface: #1c1b18; --surface-2: #25231f; --border: #3a372f;
+      --text: #f3efe4; --text-2: #c9c2ae; --muted: #948d79; --grid: #2e2b25;
+      --accent: #c4b287; --icms: #3987e5; --irpeca: #d95926; --irserv: #199e70; --iss: #c98500;
       --ok: #5fd08e; --ok-bg: #16301f; --bad: #ff8a80; --bad-bg: #3a1a17;
-      --warn: #f2c04f; --warn-bg: #352a10; --hl: #1d2a3a;
+      --warn: #f2c04f; --warn-bg: #352a10; --hl: #2c2717;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #33332f;
-    --text: #ffffff; --text-2: #c3c2b7; --muted: #8f8e86; --grid: #2c2c29;
-    --accent: #3987e5; --icms: #3987e5; --irpeca: #d95926; --irserv: #199e70; --iss: #c98500;
+    --bg: #141311; --surface: #1c1b18; --surface-2: #25231f; --border: #3a372f;
+    --text: #f3efe4; --text-2: #c9c2ae; --muted: #948d79; --grid: #2e2b25;
+    --accent: #c4b287; --icms: #3987e5; --irpeca: #d95926; --irserv: #199e70; --iss: #c98500;
     --ok: #5fd08e; --ok-bg: #16301f; --bad: #ff8a80; --bad-bg: #3a1a17;
-    --warn: #f2c04f; --warn-bg: #352a10; --hl: #1d2a3a;
+    --warn: #f2c04f; --warn-bg: #352a10; --hl: #2c2717;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -265,14 +269,57 @@
   th.fixa, td.fixa { position: sticky; left: 0; z-index: 2; background: var(--surface); }
   th.fixa { background: var(--surface-2); z-index: 4; }
   .empty { padding: 24px; text-align: center; color: var(--muted); }
+
+  /* ===== Tema Gestão à Vista CPE ===== */
+  body { background: var(--bg); }
+  h1, h2, .topo-tit { font-family: Georgia, "Times New Roman", serif; }
+  .wrap > header h1 { display: none; }          /* o título fica na barra superior */
+  .wrap > header .sub { font-size: 13px; }
+  .f.f-periodo { flex: 2 1 260px; }
+  .btn { border-radius: 6px; }
+  .btn.primary { background: var(--gold); border-color: var(--gold); color: #17150f; font-weight: 600; }
+  .btn.primary:hover { background: var(--gold-2); border-color: var(--gold-2); }
+  .chip[aria-pressed="true"] { background: var(--gold); color: #17150f; border-color: var(--gold); }
+  .chip .dot { box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+  .kpi { position: relative; overflow: hidden; border-radius: 8px; }
+  .kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--ink); }
+  .kpi.gold::before { background: var(--gold); }
+  .kpi .l { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .card, .filters { border-radius: 8px; box-shadow: 0 1px 2px rgba(60,50,20,.05); }
+  .card h2 { border-bottom: 2px solid var(--gold); padding-bottom: 6px; display: inline-block; margin-bottom: 6px; }
+  th { background: var(--surface-2); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+  /* menu lateral escuro */
+  .lateral { background: var(--ink); border-right: 0; padding-top: 18px; }
+  .lateral .marca { color: var(--gold-2); font-size: 10.5px; letter-spacing: .28em; text-transform: uppercase; padding: 4px 12px 14px; border-bottom: 1px solid #23211c; margin-bottom: 8px; }
+  .nav-btn { color: #e9e3d3; border-radius: 8px; }
+  .nav-btn:hover { background: #1d1b17; color: #fff; }
+  .nav-btn[aria-current="page"] { background: var(--gold-2); color: #15130e; }
+  .nav-btn small { color: #9d957f; }
+  .nav-btn[aria-current="page"] small { color: #4a4330; }
+  .nav-rodape { border-top-color: #23211c; }
+  .quem { color: #b9b19a; }
+  /* barra superior */
+  .topo { background: var(--ink); color: #fff; border-bottom: 3px solid var(--gold); }
+  .topo-in { display: flex; align-items: center; gap: 14px; padding: 12px 24px; max-width: 1440px; margin: 0 auto; }
+  .topo .escudo { width: 52px; height: 60px; flex: 0 0 auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+  .topo-sub { color: var(--gold-2); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .topo-tit { font-size: 22px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .topo-st { background: var(--gold); color: #17150f; text-align: center; font-size: 12px; font-weight: 600; padding: 5px 12px; }
+  .topo-st.erro { background: var(--bad); color: #fff; }
+  .login-card .escudo { width: 84px; height: 98px; display: block; margin: 0 auto 10px; }
+  .login-card h1 { display: block; text-align: center; }
+  .login-card .sub { text-align: center; }
+  @media (max-width: 760px) { .topo-in { padding: 10px 12px; } .topo .escudo { width: 40px; height: 46px; } .topo-tit { font-size: 17px; } .lateral .marca { display: none; } }
 </style>
 </head>
 <body>
 <div class="layout">
 <nav class="lateral" id="lateral" aria-label="Painéis" hidden>
+  <div class="marca">Painel de Gestão</div>
   <button class="nav-btn" data-view="impostos" aria-current="page"><span class="ic">📊</span><span class="tx">Impostos RAD</span></button>
-  <button class="nav-btn so-drive" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento<small>gestão</small></span></button>
-  <button class="nav-btn so-drive" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
+  <button class="nav-btn so-drive" data-view="sofi"><span class="ic">🏦</span><span class="tx">SOFI<small>pagamento dos RADs</small></span></button>
+  <button class="nav-btn so-drive so-gestor" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento<small>gestão</small></span></button>
+  <button class="nav-btn so-drive so-gestor" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
   <div class="nav-rodape so-drive">
     <div class="quem" id="navQuem"></div>
     <button class="nav-btn" id="navSenha" hidden><span class="ic">🔑</span><span class="tx">Trocar senha</span></button>
@@ -280,9 +327,110 @@
   </div>
 </nav>
 <div class="conteudo">
+<div class="topo" id="topo">
+  <div class="topo-in">
+    <svg class="escudo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 232" role="img" aria-label="Escudo PMMG CPE">
+  <defs>
+    <clipPath id="esc-in"><path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z"/></clipPath>
+  </defs>
+  <!-- borda preta -->
+  <path d="M100 3C143 3 177 9 193 19V119C193 175 152 207 100 229C48 207 7 175 7 119V19C23 9 57 3 100 3Z" fill="#1c1c1a" stroke="#c4b287" stroke-width="3"/>
+  <!-- campo creme -->
+  <path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z" fill="#efe6cc"/>
+  <g clip-path="url(#esc-in)">
+    <!-- montanhas verdes -->
+    <path d="M19 150 L52 112 L66 124 L84 98 L100 112 L118 92 L136 118 L150 106 L181 142 V230 H19Z" fill="#3e7d3a"/>
+    <path d="M52 112 L60 121 L66 124 L58 128Z M118 92 L126 104 L120 108Z" fill="#5c9a4f"/>
+    <path d="M19 178 Q100 160 181 178 V230 H19Z" fill="#336b30"/>
+  </g>
+  <!-- PMMG / CPE -->
+  <text x="100" y="62" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="44" letter-spacing="1" fill="#1c1c1a">PMMG</text>
+  <text x="100" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#1c1c1a">CPE</text>
+  <!-- louros dourados -->
+  <g fill="#c99a2e" stroke="#8a6a1c" stroke-width=".6">
+    <g id="louro">
+      <path d="M58 168 Q36 140 46 98" fill="none" stroke="#8a6a1c" stroke-width="2.4"/>
+      <ellipse cx="45" cy="104" rx="4" ry="9" transform="rotate(-20 45 104)"/>
+      <ellipse cx="42" cy="118" rx="4" ry="9" transform="rotate(-35 42 118)"/>
+      <ellipse cx="43" cy="132" rx="4" ry="9" transform="rotate(-50 43 132)"/>
+      <ellipse cx="47" cy="145" rx="4" ry="9" transform="rotate(-62 47 145)"/>
+      <ellipse cx="54" cy="157" rx="4" ry="9" transform="rotate(-75 54 157)"/>
+      <ellipse cx="53" cy="108" rx="3.5" ry="8" transform="rotate(20 53 108)"/>
+      <ellipse cx="52" cy="122" rx="3.5" ry="8" transform="rotate(10 52 122)"/>
+      <ellipse cx="54" cy="136" rx="3.5" ry="8" transform="rotate(0 54 136)"/>
+      <ellipse cx="59" cy="149" rx="3.5" ry="8" transform="rotate(-15 59 149)"/>
+    </g>
+    <use href="#louro" transform="translate(200 0) scale(-1 1)"/>
+  </g>
+  <!-- espada -->
+  <rect x="97.6" y="88" width="4.8" height="104" fill="#1c1c1a"/>
+  <path d="M100 74 L104 92 H96Z" fill="#1c1c1a"/>
+  <rect x="84" y="160" width="32" height="5" rx="1.5" fill="#1c1c1a"/>
+  <circle cx="100" cy="195" r="4" fill="#1c1c1a"/>
+  <!-- triângulo vermelho com fuzis cruzados -->
+  <path d="M100 94 L132 150 H68Z" fill="#c62828" stroke="#1c1c1a" stroke-width="3" stroke-linejoin="round"/>
+  <g stroke="#1c1c1a" stroke-width="2.2" stroke-linecap="round" fill="none">
+    <path d="M84 140 L115 122"/><path d="M116 140 L85 122"/>
+    <path d="M115 122 l4 -1.5"/><path d="M85 122 l-4 -1.5"/>
+    <path d="M86 140 l-3 3"/><path d="M114 140 l3 3"/>
+  </g>
+</svg>
+    <div>
+      <div class="topo-sub" id="topoSub">Estado-Maior do CPE | Exercício</div>
+      <div class="topo-tit" id="topoTitulo">Painel de Impostos — RAD</div>
+    </div>
+  </div>
+  <div class="topo-st" id="topoStatus" hidden></div>
+</div>
 <!-- ================= Login / cadastro ================= -->
 <div class="wrap" id="viewLogin" hidden>
   <div class="login-card">
+    <svg class="escudo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 232" role="img" aria-label="Escudo PMMG CPE">
+  <defs>
+    <clipPath id="esc-in2"><path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z"/></clipPath>
+  </defs>
+  <!-- borda preta -->
+  <path d="M100 3C143 3 177 9 193 19V119C193 175 152 207 100 229C48 207 7 175 7 119V19C23 9 57 3 100 3Z" fill="#1c1c1a" stroke="#c4b287" stroke-width="3"/>
+  <!-- campo creme -->
+  <path d="M100 14C136 14 166 19 181 27V118C181 165 146 194 100 214C54 194 19 165 19 118V27C34 19 64 14 100 14Z" fill="#efe6cc"/>
+  <g clip-path="url(#esc-in2)">
+    <!-- montanhas verdes -->
+    <path d="M19 150 L52 112 L66 124 L84 98 L100 112 L118 92 L136 118 L150 106 L181 142 V230 H19Z" fill="#3e7d3a"/>
+    <path d="M52 112 L60 121 L66 124 L58 128Z M118 92 L126 104 L120 108Z" fill="#5c9a4f"/>
+    <path d="M19 178 Q100 160 181 178 V230 H19Z" fill="#336b30"/>
+  </g>
+  <!-- PMMG / CPE -->
+  <text x="100" y="62" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="44" letter-spacing="1" fill="#1c1c1a">PMMG</text>
+  <text x="100" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#1c1c1a">CPE</text>
+  <!-- louros dourados -->
+  <g fill="#c99a2e" stroke="#8a6a1c" stroke-width=".6">
+    <g id="louro2">
+      <path d="M58 168 Q36 140 46 98" fill="none" stroke="#8a6a1c" stroke-width="2.4"/>
+      <ellipse cx="45" cy="104" rx="4" ry="9" transform="rotate(-20 45 104)"/>
+      <ellipse cx="42" cy="118" rx="4" ry="9" transform="rotate(-35 42 118)"/>
+      <ellipse cx="43" cy="132" rx="4" ry="9" transform="rotate(-50 43 132)"/>
+      <ellipse cx="47" cy="145" rx="4" ry="9" transform="rotate(-62 47 145)"/>
+      <ellipse cx="54" cy="157" rx="4" ry="9" transform="rotate(-75 54 157)"/>
+      <ellipse cx="53" cy="108" rx="3.5" ry="8" transform="rotate(20 53 108)"/>
+      <ellipse cx="52" cy="122" rx="3.5" ry="8" transform="rotate(10 52 122)"/>
+      <ellipse cx="54" cy="136" rx="3.5" ry="8" transform="rotate(0 54 136)"/>
+      <ellipse cx="59" cy="149" rx="3.5" ry="8" transform="rotate(-15 59 149)"/>
+    </g>
+    <use href="#louro2" transform="translate(200 0) scale(-1 1)"/>
+  </g>
+  <!-- espada -->
+  <rect x="97.6" y="88" width="4.8" height="104" fill="#1c1c1a"/>
+  <path d="M100 74 L104 92 H96Z" fill="#1c1c1a"/>
+  <rect x="84" y="160" width="32" height="5" rx="1.5" fill="#1c1c1a"/>
+  <circle cx="100" cy="195" r="4" fill="#1c1c1a"/>
+  <!-- triângulo vermelho com fuzis cruzados -->
+  <path d="M100 94 L132 150 H68Z" fill="#c62828" stroke="#1c1c1a" stroke-width="3" stroke-linejoin="round"/>
+  <g stroke="#1c1c1a" stroke-width="2.2" stroke-linecap="round" fill="none">
+    <path d="M84 140 L115 122"/><path d="M116 140 L85 122"/>
+    <path d="M115 122 l4 -1.5"/><path d="M85 122 l-4 -1.5"/>
+    <path d="M86 140 l-3 3"/><path d="M114 140 l3 3"/>
+  </g>
+</svg>
     <h1>Pré-faturamento — RAD</h1>
     <p class="sub">Consulta das notas da sua Unidade e Cia.</p>
     <div class="tabs" role="tablist">
@@ -363,6 +511,40 @@
   </section>
 </div>
 
+<!-- ================= SOFI: pagamento dos RADs ================= -->
+<div class="wrap" id="viewSofi" hidden>
+  <header>
+    <div>
+      <h1>SOFI — Pagamento dos RADs</h1>
+      <div class="sub">Totais de cada RAD (Unidade × quinzena) calculados a partir dos RADs lidos. Ao marcar “Pago”, o RAD sai da lista.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="sofiConsultar">📋 Consultar RADs</button>
+      <button class="btn" id="sofiAtualizar">↻ Atualizar</button>
+    </div>
+  </header>
+  <div id="sofiLoading" class="pf-loading"><span class="ampulheta">⏳</span> Carregando os RADs…</div>
+  <main id="sofiApp" hidden>
+    <section class="kpis" id="sofiKpis"></section>
+    <section class="card">
+      <div class="table-tools">
+        <div><h2>RADs a pagar</h2><div class="hint" style="margin:0" id="sofiCont"></div></div>
+      </div>
+      <div class="tbl-wrap"><table id="sofiTabela"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    </section>
+    <section class="card" id="sofiConsulta" hidden>
+      <div class="table-tools">
+        <div><h2>Todos os RADs</h2><div class="hint" style="margin:0">Pagos e a pagar. Um RAD marcado por engano pode ser desfeito aqui.</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="sofiFiltro" class="pf-sel"><option value="">Todos</option><option value="apagar">A pagar</option><option value="pago">Pagos</option></select>
+          <button class="btn primary" id="sofiCsv">⬇ Exportar CSV</button>
+        </div>
+      </div>
+      <div class="tbl-wrap big-table"><table id="sofiTodos"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    </section>
+  </main>
+</div>
+
 <div class="wrap" id="viewImpostos" hidden>
   <header>
     <div>
@@ -408,13 +590,9 @@
         <label for="fAliquota">Alíquota</label>
         <select id="fAliquota"><option value="">Todas</option></select>
       </div>
-      <div class="f">
-        <label for="fMes">Mês do RAD</label>
-        <select id="fMes"><option value="">Todos</option></select>
-      </div>
-      <div class="f">
-        <label for="fQuinzena">Quinzena</label>
-        <select id="fQuinzena"><option value="">Ambas</option><option value="1">1ª (dias 1 a 15)</option><option value="2">2ª (dia 16 ao fim)</option></select>
+      <div class="f f-periodo">
+        <label for="fPeriodo">Período do RAD</label>
+        <select id="fPeriodo"><option value="">Todos os períodos</option></select>
       </div>
       <div class="f">
         <label for="fUnidade">Unidade</label>
@@ -620,6 +798,9 @@ function impostosAtivos() { return state.imposto === 'todos' ? IMPOSTOS : [imp(s
 
 /* ---------------- Preparação dos dados ---------------- */
 function preparar(n) {
+  // Planilha consolidada (sem cabeçalho de RAD): período pela data de aprovação.
+  if (n.periodo === undefined) n.periodo = periodoPorData(n.data);
+  if (!n.radChave) n.radChave = n.unidade + '|' + (n.periodo ? n.periodo.ini + '|' + n.periodo.fim : 'sem-periodo');
   n.respIss = String(n.respIss || '').toUpperCase();
   n.issRetido = n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0) ? n.iss : 0;
   n.basePeca = r2(n.vPeca + n.icms + n.irPeca);
@@ -648,12 +829,36 @@ function aliqDe(n, t) { return t.id === 'icms' ? n.pIcmsEfetiva : n[t.aliq]; }
 function rotuloAliq(n, t) { return t.id === 'icms' && n.icmsObs ? 'Desonerado' : P(n[t.aliq]); }
 
 /* ---------------- Filtros ---------------- */
+function periodoConfere(n, per) {
+  if (per === 'sem') return !n.periodo;
+  if (!n.periodo) return false;
+  var p = per.split(':');
+  return p[0] === 'm' ? n.periodo.mes === p[1] : n.periodo.mes === p[1] && String(n.periodo.q) === p[2];
+}
+/** Lista de períodos agrupada por mês, só com o que existe nos RADs e com a quantidade de ordens. */
+function montarPeriodos() {
+  var el = document.getElementById('fPeriodo'), atual = el.value, meses = {}, sem = 0;
+  NOTAS.forEach(function (n) {
+    if (!n.periodo) { sem++; return; }
+    var m = meses[n.periodo.mes] = meses[n.periodo.mes] || { rot: n.periodo.rotMes, total: 0, q: { 1: 0, 2: 0 } };
+    m.total++; m.q[n.periodo.q]++;
+  });
+  var html = '<option value="">Todos os períodos (' + NOTAS.length + ')</option>';
+  Object.keys(meses).sort().reverse().forEach(function (k) {
+    var m = meses[k];
+    html += '<optgroup label="' + esc(m.rot) + '"><option value="m:' + k + '">' + esc(m.rot) + ' — mês inteiro (' + m.total + ')</option>';
+    [1, 2].forEach(function (q) { if (m.q[q]) html += '<option value="q:' + k + ':' + q + '">' + esc(m.rot) + ' — ' + q + 'ª quinzena (' + m.q[q] + ')</option>'; });
+    html += '</optgroup>';
+  });
+  if (sem) html += '<option value="sem">Sem período identificado (' + sem + ')</option>';
+  el.innerHTML = html;
+  if ([].some.call(el.options, function (o) { return o.value === atual; })) el.value = atual;
+}
 function filtrar() {
   var sit = document.getElementById('fSituacao').value;
   var aliq = document.getElementById('fAliquota').value;
   var uni = document.getElementById('fUnidade').value;
-  var mes = document.getElementById('fMes').value;
-  var qz = document.getElementById('fQuinzena').value;
+  var per = document.getElementById('fPeriodo').value; // "", "m:AAAA-MM", "q:AAAA-MM:1|2" ou "sem"
   var mun = document.getElementById('fMunicipio').value;
   var simp = document.getElementById('fSimples').value;
   var resp = document.getElementById('fResp').value;
@@ -662,8 +867,7 @@ function filtrar() {
 
   return NOTAS.filter(function (n) {
     if (uni && n.unidade !== uni) return false;
-    if (mes && (!n.periodo || n.periodo.mes !== mes)) return false;
-    if (qz && (!n.periodo || String(n.periodo.q) !== qz)) return false;
+    if (per && !periodoConfere(n, per)) return false;
     if (mun && n.cidade !== mun) return false;
     if (simp && n.simples !== simp) return false;
     if (resp && (n.respIss || '(vazio)') !== resp) return false;
@@ -698,21 +902,17 @@ function montarFiltros() {
   });
 
   preencher('fUnidade', unicos(NOTAS.map(function (n) { return n.unidade; })));
-  var fm = document.getElementById('fMes'), atualMes = fm.value, meses = {};
-  NOTAS.forEach(function (n) { if (n.periodo) meses[n.periodo.mes] = n.periodo.rotMes; });
-  fm.innerHTML = '<option value="">Todos</option>' + Object.keys(meses).sort().reverse().map(function (k) {
-    return '<option value="' + k + '"' + (k === atualMes ? ' selected' : '') + '>' + esc(meses[k]) + '</option>';
-  }).join('');
+  montarPeriodos();
   preencher('fMunicipio', unicos(NOTAS.map(function (n) { return n.cidade; })));
   preencher('fResp', unicos(NOTAS.map(function (n) { return n.respIss || '(vazio)'; })));
   montarAliquotas();
 
-  ['fSituacao', 'fAliquota', 'fMes', 'fQuinzena', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp'].forEach(function (id) {
+  ['fSituacao', 'fAliquota', 'fPeriodo', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp'].forEach(function (id) {
     document.getElementById(id).onchange = render;
   });
   document.getElementById('fBusca').oninput = render;
   document.getElementById('btnLimpar').onclick = function () {
-    ['fSituacao', 'fAliquota', 'fMes', 'fQuinzena', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
+    ['fSituacao', 'fAliquota', 'fPeriodo', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
       var el = document.getElementById(id); el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
     });
     state.imposto = 'todos';
@@ -1119,6 +1319,7 @@ function carregar() {
   }
   loading.hidden = false;
   loading.textContent = 'Lendo os RADs e as notas…';
+  statusTopo('⏳ Sincronizando dados com o Drive (RADs e notas fiscais)…');
   chamar('getFontes').then(function (res) {
     var notas, avisos = [];
     if (res.modo === 'drive') {
@@ -1158,8 +1359,11 @@ function exibir(notas) {
   montarFiltros();
   render();
   buscarNotas();
+  if (VIEW === 'sofi') sofiCarregar();
+  statusTopo('✓ Dados atualizados' + (FONTE.atualizadoEm ? ' em ' + FONTE.atualizadoEm : '') + ' · ' + NOTAS.length + ' ordens');
 }
 function erroCarga(e) {
+  statusTopo('Erro ao carregar: ' + (e && e.message ? e.message : e), true);
   var l = document.getElementById('loading');
   l.hidden = false;
   l.textContent = 'Erro ao carregar: ' + (e && e.message ? e.message : e);
@@ -1217,7 +1421,17 @@ function lerPeriodo(txt) {
   var m = /(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2})\/(\d{2})\/(\d{4})/.exec(String(txt || ''));
   if (!m) return null;
   var q = +m[1] <= 15 ? 1 : 2, rotMes = MESES[+m[2] - 1] + '/' + m[3];
-  return { mes: m[3] + '-' + m[2], q: q, rotMes: rotMes, rot: rotMes + ' · ' + q + 'ª quinzena (' + m[1] + '/' + m[2] + ' a ' + m[4] + '/' + m[5] + ')' };
+  return { mes: m[3] + '-' + m[2], q: q, rotMes: rotMes, ini: m[3] + '-' + m[2] + '-' + m[1], fim: m[6] + '-' + m[5] + '-' + m[4],
+           rot: rotMes + ' · ' + q + 'ª quinzena (' + m[1] + '/' + m[2] + ' a ' + m[4] + '/' + m[5] + ')' };
+}
+/** Sem período no cabeçalho do RAD: usa a data de aprovação da ordem para definir a quinzena (estimado). */
+function periodoPorData(data) {
+  var m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(String(data || ''));
+  if (!m) return null;
+  var q = +m[1] <= 15 ? 1 : 2, ult = new Date(+m[3], +m[2], 0).getDate();
+  var p = lerPeriodo((q === 1 ? '01' : '16') + '/' + m[2] + '/' + m[3] + ' a ' + (q === 1 ? '15' : String(ult)) + '/' + m[2] + '/' + m[3]);
+  p.estimado = true;
+  return p;
 }
 
 /** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. */
@@ -1233,8 +1447,13 @@ function notasDosRads(rads) {
     });
     if (!novas.length && rad.linhas.length) avisos.push('“' + r.nome + '” repete um RAD já lido (' + rad.unidade + ') e foi ignorado.');
     var per = lerPeriodo(rad.periodo);
-    if (!per && rad.linhas.length && !rad.cab.some(function (c) { return /^unidade$/i.test(String(c).trim()); })) avisos.push('“' + r.nome + '”: período não encontrado no RAD.');
-    novas.forEach(function (n) { n.periodo = per; });
+    if (!per && rad.linhas.length) avisos.push('“' + r.nome + '”: período não encontrado no cabeçalho do RAD — usada a data de aprovação de cada ordem.');
+    novas.forEach(function (n) {
+      n.periodo = per || periodoPorData(n.data);
+      n.radArquivo = r.nome;
+      // Identificação do RAD para a SOFI: Unidade + período.
+      n.radChave = n.unidade + '|' + (n.periodo ? n.periodo.ini + '|' + n.periodo.fim : 'sem-periodo');
+    });
     notas = notas.concat(novas);
   });
   return { notas: notas, avisos: avisos };
@@ -1759,8 +1978,9 @@ function inserirRads(files) {
 /** Quinzena de destino: a dos filtros Mês/Quinzena, se escolhidos; senão a quinzena de hoje. */
 function destinoNotas() {
   var hoje = new Date(), dois = function (n) { return (n < 10 ? '0' : '') + n; };
-  var mes = document.getElementById('fMes').value || (hoje.getFullYear() + '-' + dois(hoje.getMonth() + 1));
-  var q = +document.getElementById('fQuinzena').value || (hoje.getDate() <= 15 ? 1 : 2);
+  var per = document.getElementById('fPeriodo').value.split(':');
+  var mes = per[0] === 'm' || per[0] === 'q' ? per[1] : (hoje.getFullYear() + '-' + dois(hoje.getMonth() + 1));
+  var q = per[0] === 'q' ? +per[2] : (hoje.getDate() <= 15 ? 1 : 2);
   var m = mes.split('-');
   return { mes: mes, q: q, rot: MESES[+m[1] - 1] + '/' + m[0] + ' · ' + q + 'ª quinzena' };
 }
@@ -1770,7 +1990,7 @@ function inserirNotas(files) {
   if (!files.length) return;
   var dest = destinoNotas();
   if (!confirm('Guardar ' + files.length + ' PDF(s) na pasta de notas, quinzena “' + dest.rot + '”?\n\n' +
-               'Para outra quinzena, cancele e escolha antes “Mês do RAD” e “Quinzena” nos filtros.')) return;
+               'Para outra quinzena, cancele e escolha antes a quinzena em “Período do RAD” nos filtros.')) return;
   var grandes = files.filter(function (f) { return f.size > 20 * 1024 * 1024; });
   files = files.filter(function (f) { return f.size <= 20 * 1024 * 1024; });
   var b = document.getElementById('btnInserirNota'), rot = b.textContent, res = [], i = 0;
@@ -1845,15 +2065,134 @@ function rolagemHorizontal(idTabela) {
   });
 }
 
+/* ---------------- Faixa de status da barra superior ---------------- */
+function statusTopo(msg, erro) {
+  var el = document.getElementById('topoStatus');
+  el.hidden = !msg; el.textContent = msg || ''; el.classList.toggle('erro', !!erro);
+}
+
+/* ---------------- SOFI: pagamento dos RADs ---------------- */
+var VIEW = '';
+var SOFI = { pagos: null, consulta: false, carregando: false };
+
+/** Totais de cada RAD (Unidade + período) a partir das ordens lidas. */
+function radsResumo() {
+  var g = {};
+  NOTAS.forEach(function (n) {
+    var k = n.radChave;
+    var r = g[k] = g[k] || { chave: k, unidade: n.unidade, periodo: n.periodo, qtd: 0, aprovado: 0, impostos: 0, adm: 0, liquido: 0, arquivos: {} };
+    r.qtd++; r.aprovado += n.aprovado; r.impostos += n.totalImp; r.adm += n.adm; r.liquido += n.liquido;
+    if (n.radArquivo) r.arquivos[n.radArquivo] = 1;
+  });
+  return Object.keys(g).map(function (k) {
+    var r = g[k];
+    ['aprovado', 'impostos', 'adm', 'liquido'].forEach(function (c) { r[c] = r2(r[c]); });
+    r.rotPeriodo = r.periodo ? r.periodo.rot + (r.periodo.estimado ? ' (pela data de aprovação)' : '') : 'Sem período';
+    r.ordem = (r.periodo ? r.periodo.ini : '0000') + r.unidade;
+    return r;
+  }).sort(function (a, b) { return a.ordem < b.ordem ? -1 : 1; });
+}
+
+function sofiCarregar() {
+  var l = document.getElementById('sofiLoading');
+  if (!NOTAS.length) { l.hidden = false; document.getElementById('sofiApp').hidden = true; return; } // exibir() chama de novo
+  if (SOFI.carregando) return;
+  SOFI.carregando = true;
+  l.hidden = false;
+  chamar('listarPagamentos').then(function (p) {
+    SOFI.pagos = p; l.hidden = true; document.getElementById('sofiApp').hidden = false; sofiRender();
+  }).catch(function (e) { l.textContent = 'Erro: ' + (e && e.message || e); })
+    .then(function () { SOFI.carregando = false; });
+}
+
+function sofiRender() {
+  var rads = radsResumo(), pagos = SOFI.pagos || {};
+  var aPagar = rads.filter(function (r) { return !(pagos[r.chave] && pagos[r.chave].pago); });
+  var pagosL = rads.filter(function (r) { return pagos[r.chave] && pagos[r.chave].pago; });
+  var tot = function (l, c) { return r2(l.reduce(function (s, r) { return s + r[c]; }, 0)); };
+  document.getElementById('sofiKpis').innerHTML = [
+    { l: 'RADs a pagar', v: int.format(aPagar.length), d: 'de ' + rads.length + ' RAD(s) lidos', c: 'gold' },
+    { l: 'Valor líquido a pagar', v: Rk(tot(aPagar, 'liquido')), d: R(tot(aPagar, 'liquido')) },
+    { l: 'Impostos retidos (a pagar)', v: Rk(tot(aPagar, 'impostos')), d: R(tot(aPagar, 'impostos')) },
+    { l: 'RADs pagos', v: int.format(pagosL.length), d: R(tot(pagosL, 'liquido')) + ' líquidos' }
+  ].map(function (x) { return '<div class="kpi ' + (x.c || '') + '"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>'; }).join('');
+
+  var cab = '<tr><th>Unidade</th><th>Período</th><th class="n">Nº de OS</th><th class="n">Valor aprovado</th><th class="n">Impostos retidos</th><th class="n">Taxa adm.</th><th class="n">Valor líquido</th>';
+  var linha = function (r) {
+    return '<td><b>' + esc(r.unidade) + '</b></td><td>' + esc(r.rotPeriodo) + '</td><td class="n">' + r.qtd + '</td><td class="n">' + R(r.aprovado) +
+      '</td><td class="n">' + R(r.impostos) + '</td><td class="n">' + R(r.adm) + '</td><td class="n"><b>' + R(r.liquido) + '</b></td>';
+  };
+  var rodape = function (l, extra) {
+    return l.length ? '<tr><td>Total</td><td></td><td class="n">' + tot(l, 'qtd') + '</td><td class="n">' + R(tot(l, 'aprovado')) + '</td><td class="n">' + R(tot(l, 'impostos')) +
+      '</td><td class="n">' + R(tot(l, 'adm')) + '</td><td class="n">' + R(tot(l, 'liquido')) + '</td>' + extra + '</tr>' : '';
+  };
+  document.querySelector('#sofiTabela thead').innerHTML = cab + '<th>Ação</th></tr>';
+  document.querySelector('#sofiTabela tbody').innerHTML = aPagar.length ? aPagar.map(function (r) {
+    return '<tr>' + linha(r) + '<td><button class="btn primary" data-pagar="' + esc(r.chave) + '">✓ Pago</button></td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="8">Nenhum RAD pendente de pagamento. 🎉</td></tr>';
+  document.querySelector('#sofiTabela tfoot').innerHTML = rodape(aPagar, '<td></td>');
+  document.getElementById('sofiCont').textContent = aPagar.length + ' RAD(s) aguardando pagamento';
+
+  var cons = document.getElementById('sofiConsulta');
+  cons.hidden = !SOFI.consulta;
+  document.getElementById('sofiConsultar').textContent = SOFI.consulta ? '✕ Fechar consulta' : '📋 Consultar RADs';
+  if (SOFI.consulta) {
+    var f = document.getElementById('sofiFiltro').value;
+    var lista = rads.filter(function (r) { var pg = !!(pagos[r.chave] && pagos[r.chave].pago); return !f || (f === 'pago') === pg; });
+    document.querySelector('#sofiTodos thead').innerHTML = cab + '<th>Situação</th><th>Pago em</th><th>Por</th><th>Arquivo(s) RAD</th><th></th></tr>';
+    document.querySelector('#sofiTodos tbody').innerHTML = lista.length ? lista.map(function (r) {
+      var pg = pagos[r.chave] && pagos[r.chave].pago;
+      return '<tr>' + linha(r) + '<td>' + (pg ? '<span class="tag ok">✓ Pago</span>' : '<span class="tag warn">A pagar</span>') + '</td>' +
+        '<td>' + esc(pg ? pagos[r.chave].em : '') + '</td><td>' + esc(pg ? pagos[r.chave].por : '') + '</td>' +
+        '<td class="muted" style="white-space:normal;max-width:260px">' + esc(Object.keys(r.arquivos).join(', ')) + '</td>' +
+        '<td>' + (pg ? '<button class="btn" data-desfazer="' + esc(r.chave) + '">Desfazer</button>' : '<button class="btn primary" data-pagar="' + esc(r.chave) + '">✓ Pago</button>') + '</td></tr>';
+    }).join('') : '<tr><td class="empty" colspan="12">Nenhum RAD.</td></tr>';
+    document.querySelector('#sofiTodos tfoot').innerHTML = rodape(lista, '<td></td><td></td><td></td><td></td><td></td>');
+    rolagemHorizontal('sofiTodos');
+  }
+  document.querySelectorAll('#viewSofi button[data-pagar]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.pagar, true); }; });
+  document.querySelectorAll('#viewSofi button[data-desfazer]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.desfazer, false); }; });
+  rolagemHorizontal('sofiTabela');
+}
+
+function sofiMarcar(b, chave, pago) {
+  var r = radsResumo().filter(function (x) { return x.chave === chave; })[0];
+  if (!r) return;
+  var msg = pago ? 'Confirmar o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '?\nValor líquido: ' + R(r.liquido)
+                 : 'Desfazer o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '? Ele volta para “RADs a pagar”.';
+  if (!confirm(msg)) return;
+  b.disabled = true; b.textContent = '⏳';
+  chamar('marcarPago', chave, { unidade: r.unidade, periodo: r.rotPeriodo, qtd: r.qtd, aprovado: r.aprovado, impostos: r.impostos, adm: r.adm, liquido: r.liquido }, pago)
+    .then(function (res) { SOFI.pagos[chave] = { pago: res.pago, em: res.em, por: res.por }; sofiRender(); })
+    .catch(function (e) { alert('Não foi possível registrar: ' + (e && e.message || e)); sofiRender(); });
+}
+
+function sofiCsv() {
+  var pagos = SOFI.pagos || {}, f = document.getElementById('sofiFiltro').value;
+  var cel = function (v) { v = String(v == null ? '' : v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var linhas = radsResumo().filter(function (r) { var pg = !!(pagos[r.chave] && pagos[r.chave].pago); return !f || (f === 'pago') === pg; }).map(function (r) {
+    var pg = pagos[r.chave] && pagos[r.chave].pago;
+    return [r.unidade, r.rotPeriodo, r.qtd, brNum(r.aprovado), brNum(r.impostos), brNum(r.adm), brNum(r.liquido), pg ? 'Pago' : 'A pagar',
+            pg ? pagos[r.chave].em : '', pg ? pagos[r.chave].por : '', Object.keys(r.arquivos).join(', ')].map(cel).join(';');
+  });
+  var csv = '\ufeffUnidade;Período;Nº de OS;Valor aprovado;Impostos retidos;Taxa adm.;Valor líquido;Situação;Pago em;Por;Arquivo(s) RAD\n' + linhas.join('\n');
+  baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'rads_sofi.csv');
+}
+
 /* ---------------- Navegação lateral ---------------- */
 function mostrarView(v) {
   document.querySelectorAll('.nav-btn').forEach(function (b) {
     if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  ['impostos', 'prefat', 'acessos', 'usuario', 'login'].forEach(function (k) {
+  VIEW = v;
+  var titulos = { impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
+                  acessos: 'Gestão de Acessos', usuario: 'Minhas notas — Pré-faturamento', login: 'Pré-faturamento — RAD' };
+  document.getElementById('topoTitulo').textContent = titulos[v] || '';
+  ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi'].forEach(function (k) {
     document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = v !== k;
   });
   if (v === 'acessos') acCarregar();
+  if (v === 'sofi') sofiCarregar();
   // A planilha de pré-faturamento só é carregada quando o painel é aberto (economiza dados).
   if (v === 'prefat' && !PF.dados && !PF.carregando) pfCarregar();
   if (v === 'impostos' && NOTAS.length) render();
@@ -2031,7 +2370,15 @@ function iniciar() {
   if (window.TOKEN_INICIAL) { guardarToken(window.TOKEN_INICIAL); window.TOKEN_INICIAL = ''; } // aberto pelo menu da planilha
   chamar('getSessao').then(function (s) {
     SESSAO = s;
-    if (s && s.perfil === 'GESTOR') {
+    if (s && s.perfil === 'SOFI') {
+      document.getElementById('lateral').hidden = false;
+      document.querySelectorAll('.so-gestor').forEach(function (el) { el.hidden = true; });
+      ['btnInserirRad', 'btnInserirNota', 'btnPasta'].forEach(function (id) { document.getElementById(id).hidden = true; });
+      document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · SOFI';
+      document.getElementById('navSair').hidden = false; document.getElementById('navSenha').hidden = false;
+      mostrarView('sofi');
+      carregar();
+    } else if (s && s.perfil === 'GESTOR') {
       document.getElementById('lateral').hidden = false;
       document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · gestor';
       document.getElementById('navSair').hidden = !!s.google;
@@ -2260,7 +2607,8 @@ function acRender() {
     return '<tr class="acc" data-l="' + esc(u.login) + '"><td><span class="tag ' + (tag[u.status] || '') + '">' + esc(u.status) + '</span></td>' +
       '<td>' + esc(u.nome) + '</td><td>' + esc(u.login) + '</td>' +
       '<td><input data-f="unidade" value="' + esc(u.unidade) + '" list="dlUnidades"></td><td><input data-f="cia" value="' + esc(u.cia) + '" list="dlCias"></td>' +
-      '<td><select data-f="perfil"><option' + (u.perfil !== 'GESTOR' ? ' selected' : '') + ' value="USUARIO">Usuário</option><option' + (u.perfil === 'GESTOR' ? ' selected' : '') + ' value="GESTOR">Gestor</option></select></td>' +
+      '<td><select data-f="perfil">' + [['USUARIO', 'Usuário (Unidade)'], ['SOFI', 'SOFI'], ['GESTOR', 'Gestor']].map(function (o) {
+        return '<option value="' + o[0] + '"' + ((u.perfil || 'USUARIO') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td>' +
       '<td>' + esc(u.solicitado) + '</td><td>' + esc(u.acesso || '—') + '</td><td><div class="acoes">' + acoes + '</div></td></tr>';
   }).join('') : '<tr><td class="empty" colspan="9">Nenhum usuário nesta situação.</td></tr>';
   document.querySelectorAll('#acTabela button[data-a]').forEach(function (b) {
@@ -2281,6 +2629,7 @@ function acRender() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('topoSub').textContent = 'Estado-Maior do CPE | Exercício ' + new Date().getFullYear();
   tipEl = document.getElementById('tip');
   document.querySelectorAll('.nav-btn').forEach(function (b) { b.onclick = function () { mostrarView(b.dataset.view); }; });
   document.getElementById('pfAtualizar').onclick = function () { PF.dados = null; pfCarregar(true); };
@@ -2325,6 +2674,10 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('uAtualizar').onclick = uCarregar;
   document.getElementById('uBusca').oninput = function () { if (U.dados) { U.pagina = 0; uRender(); } };
   document.getElementById('acAtualizar').onclick = acCarregar;
+  document.getElementById('sofiConsultar').onclick = function () { SOFI.consulta = !SOFI.consulta; sofiRender(); };
+  document.getElementById('sofiAtualizar').onclick = function () { SOFI.pagos = null; carregar(); };
+  document.getElementById('sofiFiltro').onchange = sofiRender;
+  document.getElementById('sofiCsv').onclick = sofiCsv;
   document.getElementById('navSenha').onclick = function () { document.getElementById('uSenha').onclick(); };
   document.getElementById('uSenha').onclick = function () {
     var at = prompt('Senha atual:'); if (at == null) return;
