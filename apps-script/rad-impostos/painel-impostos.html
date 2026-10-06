@@ -224,6 +224,36 @@
   .pager { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
   .chip .n { color: var(--muted); font-size: 12px; }
   .chip[aria-pressed="true"] .n { color: inherit; opacity: .8; }
+  /* Celular: campos com 16px (evita o zoom automático do iPhone), alvos de toque maiores */
+  select, input, textarea { touch-action: manipulation; }
+  @media (max-width: 760px), (pointer: coarse) {
+    .f select, .f input, .login-card .f input, .login-card select, .pf-sel, .pf-obs, .acc input, .acc select { font-size: 16px; min-height: 42px; }
+    .btn, .chip { min-height: 38px; }
+    .filters { position: static; }
+    .wrap { padding: 12px 12px 32px; }
+    .dupla { grid-template-columns: 1fr; }
+    .login-card { margin: 12px auto; padding: 18px; }
+    header { align-items: flex-start; }
+    h1 { font-size: 19px; }
+    .f { min-width: 0; flex-basis: 100%; }
+  }
+  .login-card select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%; }
+  /* Celular: notas do usuário em cartões (sem rolagem lateral) */
+  @media (max-width: 760px) {
+    #uApp .rolagem-topo { display: none !important; }
+    #uTabela thead { display: none; }
+    #uTabela, #uTabela tbody, #uTabela tr, #uTabela td { display: block; width: 100%; }
+    #uTabela tr { border: 1px solid var(--border); border-radius: 12px; margin: 0 0 12px; padding: 8px 12px; background: var(--surface); }
+    #uTabela tr.linha-pend { border-left: 4px solid var(--bad); }
+    #uTabela tr.linha-pend td:first-child { box-shadow: none; }
+    #uTabela td { border: 0; padding: 5px 0; white-space: normal; display: flex; gap: 10px; justify-content: space-between; position: static; max-width: none; }
+    #uTabela td::before { content: attr(data-rot); font-size: 12px; font-weight: 600; color: var(--text-2); flex: 0 0 42%; text-transform: uppercase; }
+    #uTabela td.obs-gestor { background: var(--hl); border-radius: 8px; padding: 6px 8px; }
+    #uTabela td.td-resp { display: block; }
+    #uTabela td.td-resp::before { display: block; margin-bottom: 4px; }
+    #uTabela .pf-obs { width: 100%; max-width: none; }
+    #uApp .tbl-wrap { border: 0; overflow: visible; max-height: none; }
+  }
   /* Rolagem horizontal */
   .rolagem-topo { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; position: sticky; top: 0; z-index: 3; background: var(--surface); padding: 4px 0; }
   .rolagem-topo .btn { padding: 3px 9px; font-size: 12px; flex: 0 0 auto; }
@@ -268,8 +298,12 @@
       <p class="hint">Preencha seus dados. O gestor confere e libera o acesso só às notas da sua Unidade e Cia.</p>
       <div class="f"><label for="cdNome">Nome PM</label><input id="cdNome" required placeholder="Ex.: 3º SGT PM FULANO DE TAL"></div>
       <div class="dupla">
-        <div class="f"><label for="cdUnidade">Unidade</label><input id="cdUnidade" list="dlUnidades" required></div>
-        <div class="f"><label for="cdCia">Cia</label><input id="cdCia" list="dlCias" required></div>
+        <div class="f"><label for="cdUnidadeSel">Unidade</label>
+          <select id="cdUnidadeSel" required><option value="">Carregando…</option></select>
+          <input id="cdUnidade" placeholder="Digite a Unidade" hidden></div>
+        <div class="f"><label for="cdCiaSel">Cia</label>
+          <select id="cdCiaSel" required><option value="">Escolha a Unidade</option></select>
+          <input id="cdCia" placeholder="Ex.: 6ª CIA" hidden></div>
       </div>
       <datalist id="dlUnidades"></datalist><datalist id="dlCias"></datalist>
       <div class="f"><label for="cdLogin">Login (ex.: seu nº PM)</label><input id="cdLogin" autocomplete="username" required></div>
@@ -1852,10 +1886,34 @@ function abaLogin(cad) {
   if (cad && !abaLogin.opcoes) {
     abaLogin.opcoes = true;
     chamar('getOpcoesCadastro').then(function (o) {
+      CAD = o;
       document.getElementById('dlUnidades').innerHTML = o.unidades.map(function (u) { return '<option value="' + esc(u) + '">'; }).join('');
       document.getElementById('dlCias').innerHTML = o.cias.map(function (u) { return '<option value="' + esc(u) + '">'; }).join('');
-    }).catch(function () {});
+      preencherSelect('cdUnidadeSel', o.unidades, 'Selecione a Unidade');
+      atualizarCiasCadastro();
+    }).catch(function () { preencherSelect('cdUnidadeSel', [], 'Selecione'); atualizarCiasCadastro(); });
   }
+}
+/* Listas nativas (<select>): abrem certo no celular (Android e iPhone). "Outra…" libera digitação. */
+var CAD = { unidades: [], cias: [], ciasPorUnidade: {} }, OUTRA = '__outra__';
+function preencherSelect(id, valores, rotulo) {
+  document.getElementById(id).innerHTML = '<option value="">' + esc(rotulo) + '</option>' +
+    valores.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '<option value="' + OUTRA + '">Outra… (digitar)</option>';
+}
+function atualizarCiasCadastro() {
+  var un = document.getElementById('cdUnidadeSel').value;
+  var lista = (CAD.ciasPorUnidade && CAD.ciasPorUnidade[un]) || CAD.cias || [];
+  preencherSelect('cdCiaSel', lista.slice().sort(function (a, b) { return a.localeCompare(b, 'pt-BR', { numeric: true }); }), lista.length ? 'Selecione a Cia' : 'Selecione');
+  campoLivre('cdCia', false);
+}
+function campoLivre(base, on) {
+  var inp = document.getElementById(base);
+  inp.hidden = !on; inp.required = on;
+  if (on) inp.focus();
+}
+function valorCadastro(base) {
+  var sel = document.getElementById(base + 'Sel').value;
+  return sel === OUTRA ? document.getElementById(base).value.trim() : sel;
 }
 function configurarLogin() {
   document.getElementById('tabEntrar').onclick = function () { abaLogin(false); };
@@ -1870,13 +1928,16 @@ function configurarLogin() {
       iniciar();
     }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
   };
+  document.getElementById('cdUnidadeSel').onchange = function () { campoLivre('cdUnidade', this.value === OUTRA); atualizarCiasCadastro(); };
+  document.getElementById('cdCiaSel').onchange = function () { campoLivre('cdCia', this.value === OUTRA); };
   document.getElementById('formCadastro').onsubmit = function (e) {
     e.preventDefault();
     var v = function (id) { return document.getElementById(id).value; };
     if (v('cdSenha') !== v('cdSenha2')) { msgLogin('As senhas não conferem.'); return; }
     var b = this.querySelector('button'); b.disabled = true; msgLogin('⏳ Enviando…', true);
-    chamar('solicitarAcesso', { nome: v('cdNome'), unidade: v('cdUnidade'), cia: v('cdCia'), login: v('cdLogin'), senha: v('cdSenha') }).then(function () {
+    chamar('solicitarAcesso', { nome: v('cdNome'), unidade: valorCadastro('cdUnidade'), cia: valorCadastro('cdCia'), login: v('cdLogin'), senha: v('cdSenha') }).then(function () {
       document.getElementById('formCadastro').reset();
+      campoLivre('cdUnidade', false); atualizarCiasCadastro();
       abaLogin(false);
       msgLogin('✅ Solicitação enviada. Você poderá entrar assim que o gestor aprovar o acesso.', true);
     }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
@@ -1947,11 +2008,12 @@ function uRender() {
   }).join('') + (d.colResposta > -1 ? '<th class="ed">Resposta ✎</th>' : '') + '</tr>';
   document.querySelector('#uTabela tbody').innerHTML = pag.length ? pag.map(function (l) {
     var resp = temResp(l);
-    return '<tr class="' + (resp ? '' : 'linha-pend') + '"><td class="fixa"><span class="sit ' + (resp ? 'aprov' : 'anal') + '">' + (resp ? '✓ Respondida' : '⏳ Aguardando') + '</span></td>' +
-      cols.map(function (i) { return '<td' + (i === d.colObs ? ' class="obs-gestor"' : '') + '>' + esc(l.v[i]) + '</td>'; }).join('') +
-      (d.colResposta > -1 ? '<td><div class="pf-cel"><textarea class="pf-obs u-resp" data-l="' + l.linha + '" placeholder="' +
+    return '<tr class="' + (resp ? '' : 'linha-pend') + '"><td class="fixa" data-rot="Situação"><span class="sit ' + (resp ? 'aprov' : 'anal') + '">' + (resp ? '✓ Respondida' : '⏳ Aguardando') + '</span></td>' +
+      cols.map(function (i) { return '<td data-rot="' + esc(d.cab[i]) + (i === d.colObs ? ' (gestor)' : '') + '"' + (i === d.colObs ? ' class="obs-gestor"' : '') + '>' + esc(l.v[i]) + '</td>'; }).join('') +
+      (d.colResposta > -1 ? '<td data-rot="Resposta" class="td-resp"><div class="pf-cel"><textarea class="pf-obs u-resp" data-l="' + l.linha + '" placeholder="' +
         (resp ? 'Resposta…' : 'Responda ao questionamento do gestor…') + '">' + esc(l.v[d.colResposta]) + '</textarea><span class="pf-st"></span></div></td>' : '') + '</tr>';
-  }).join('') : '<tr><td class="empty" colspan="' + (cols.length + 2) + '">Nenhuma nota encontrada.</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="' + (cols.length + 2) + '">' + (d.linhas.length ? 'Nenhuma nota nos filtros atuais.' :
+    'Nenhuma nota aguardando aprovação para a Unidade ' + esc(d.unidade) + ' / ' + esc(d.cia) + '. Se você sabe que há notas, peça ao gestor para conferir seu cadastro (botão “Testar” em Acessos).') + '</td></tr>';
   document.querySelectorAll('#uTabela .u-resp').forEach(function (t) { t.onchange = function () { uResponder(t); }; });
   rolagemHorizontal('uTabela');
 }
@@ -1972,6 +2034,19 @@ function uResponder(el) {
 }
 
 /* ---------------- Gestão de acessos ---------------- */
+/** Mostra quantas linhas o usuário vê e onde o filtro para (Unidade → Cia → situação). */
+function acTestar(b) {
+  var rot = b.textContent; b.disabled = true; b.textContent = '⏳';
+  chamar('diagnosticoUsuario', b.dataset.l).then(function (d) {
+    var lista = function (o) { var k = Object.keys(o); return k.length ? k.slice(0, 12).map(function (x) { return '   • ' + (x || '(vazio)') + ': ' + o[x]; }).join('\n') : '   (nenhum)'; };
+    alert('Teste de acesso — ' + b.dataset.l + '\nUnidade: ' + d.unidade + ' · Cia: ' + d.cia + '\n\n' +
+      'Colunas usadas: Unidade = ' + d.colUnidade + ' · Cia = ' + d.colCia + ' · Situação = ' + (d.colStatus.join(', ') || '(não encontrada)') + '\n\n' +
+      'Linhas na planilha: ' + d.total + '\n→ da Unidade: ' + d.daUnidade + '\n→ da Cia: ' + d.daCia + '\n→ aguardando aprovação (o que o usuário vê): ' + d.aguardando + '\n\n' +
+      (d.daUnidade ? 'Cias encontradas nessa Unidade:\n' + lista(d.ciasDaUnidade) : 'Unidades na planilha:\n' + lista(d.unidadesNaPlanilha)) +
+      (d.daCia ? '\n\nSituações dessa Cia:\n' + lista(d.situacoesDaCia) : '') +
+      '\n\nSe o número estiver errado, ajuste a Unidade/Cia do usuário aqui em Acessos (Salvar) para ficar igual à planilha.');
+  }).catch(function (e) { alert('Erro: ' + (e && e.message || e)); }).then(function () { b.disabled = false; b.textContent = rot; });
+}
 var AC = { lista: null, filtro: 'PENDENTE' };
 function acContarPendentes() {
   chamar('listarUsuarios').then(function (l) {
@@ -2004,7 +2079,7 @@ function acRender() {
   document.querySelector('#acTabela tbody').innerHTML = lin.length ? lin.map(function (u) {
     var a = function (acao, rot, cls) { return '<button class="btn ' + (cls || '') + '" data-a="' + acao + '" data-l="' + esc(u.login) + '">' + rot + '</button>'; };
     var acoes = u.status === 'PENDENTE' ? a('APROVAR', '✓ Aprovar', 'primary') + a('RECUSAR', '✕ Recusar')
-              : u.status === 'APROVADO' ? a('SALVAR', 'Salvar') + a('SENHA', 'Nova senha') + a('BLOQUEAR', 'Bloquear')
+              : u.status === 'APROVADO' ? a('SALVAR', 'Salvar') + a('TESTAR', '🔍 Testar') + a('SENHA', 'Nova senha') + a('BLOQUEAR', 'Bloquear')
               : a('REATIVAR', 'Reativar');
     return '<tr class="acc" data-l="' + esc(u.login) + '"><td><span class="tag ' + (tag[u.status] || '') + '">' + esc(u.status) + '</span></td>' +
       '<td>' + esc(u.nome) + '</td><td>' + esc(u.login) + '</td>' +
@@ -2016,6 +2091,7 @@ function acRender() {
     b.onclick = function () {
       var tr = b.closest('tr'), g = function (f) { return tr.querySelector('[data-f="' + f + '"]').value; };
       var acao = b.dataset.a;
+      if (acao === 'TESTAR') { acTestar(b); return; }
       if (acao === 'RECUSAR' && !confirm('Recusar o pedido de ' + b.dataset.l + '?')) return;
       if (acao === 'BLOQUEAR' && !confirm('Bloquear o acesso de ' + b.dataset.l + '?')) return;
       if (acao === 'APROVAR' && (!g('unidade') || !g('cia')) && !confirm('Unidade ou Cia em branco. Aprovar mesmo assim?')) return;

@@ -784,6 +784,13 @@ function getOpcoesCadastro() {
       return v.slice(h + 1).map(function (l) { return String(l[c]).trim(); }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).sort();
     };
     o.unidades = uniq(cu); o.cias = uniq(cc);
+    o.ciasPorUnidade = {};
+    if (cu > -1 && cc > -1) v.slice(h + 1).forEach(function (l) {
+      var un = String(l[cu]).trim(), ci = String(l[cc]).trim();
+      if (!un || !ci) return;
+      o.ciasPorUnidade[un] = o.ciasPorUnidade[un] || [];
+      if (o.ciasPorUnidade[un].indexOf(ci) < 0) o.ciasPorUnidade[un].push(ci);
+    });
   } catch (e) {}
   return o;
 }
@@ -896,7 +903,8 @@ function mesmaChave_(a, b) { return normPrefat_(a).replace(/[^a-z0-9]/g, '') ===
 var USU_COL_UNIDADE = /^unidade|^upm\b|^opm\b|^batalhao/;
 var USU_COL_CIA = /(^|[^a-z])cia([^a-z]|$)|companhia|sub.?unidade|^fracao/;
 var USU_COL_STATUS = /verificac|status|situac|aprovac|parecer/;
-var USU_STATUS_VISIVEL = /aguard/;                 // o usuário só vê as notas "aguardando aprovação"
+// o usuário só vê as notas aguardando aprovação ("AGUARDANDO APROVAÇÃO", "PARA APROVAÇÃO", "EM APROVAÇÃO"…)
+var USU_STATUS_VISIVEL = /aguard|para (a )?aprov|em aprov|a aprovar|aprovacao pendente|pendente de aprov/;
 var USU_OCULTAR = [/(^|[^a-z])rad([^a-z]|$)/, /(^|[^a-z])pa([^a-z]|$)/]; // colunas de RAD, nº do RAD e PA
 
 function tokens_(x) { return normPrefat_(x).split(/[^a-z0-9]+/).filter(String); }
@@ -922,15 +930,70 @@ function colunasUsuario_(cab) {
   return c;
 }
 
-/** A linha é da Unidade e da Cia do usuário? Sem coluna de Cia, exige a Cia escrita junto da Unidade. */
+function compacto_(x) { return normPrefat_(x).replace(/[^a-z0-9]/g, ''); }
+function semPrefixoUnidade_(k) { return k.replace(/^\d*(bpm|bpe|bpmamb|batalhao|cia|pm)/, ''); }
+
+/** "BPMRV" = "BPM RV" = "RV" (sem o prefixo BPM); também aceita a sigla dentro de um texto maior ("6ª CIA BPMRV"). */
+function unidadeConfere_(celula, unidade) {
+  var kc = compacto_(celula), ku = compacto_(unidade);
+  if (!ku || !kc) return false;
+  if (kc === ku || contemTokens_(celula, unidade)) return true;
+  var sc = semPrefixoUnidade_(kc), su = semPrefixoUnidade_(ku);
+  if (su && sc === su) return true;
+  return tokens_(celula).some(function (t) { var st = semPrefixoUnidade_(t); return t === ku || (su && st === su); });
+}
+
+/** "6 cia" = "6ª CIA" = "6ªCIA" = "6ª Cia PM", mas não "16ª CIA". Sem número, compara por palavras. */
+function ciaConfere_(celula, cia) {
+  var n = (String(cia).match(/\d+/) || [])[0];
+  var t = normPrefat_(celula);
+  if (!n) return contemTokens_(celula, cia) || compacto_(celula) === compacto_(cia);
+  n = String(+n);
+  var temNumero = new RegExp('(^|[^0-9])0*' + n + '(?![0-9])').test(t);
+  if (!temNumero) return false;
+  // Na coluna própria de Cia basta o número; num texto junto da Unidade, exige "cia"/"companhia" perto do número.
+  return /cia|companhia/.test(t) ? new RegExp('(^|[^0-9])0*' + n + '\\D{0,4}(cia|companhia)').test(t) || /^\D*\d+\D*$/.test(t) : true;
+}
+
+/** A linha é da Unidade e da Cia do usuário? Sem coluna de Cia, a Cia precisa estar escrita junto da Unidade. */
 function linhaDoUsuario_(l, c, s) {
-  var textoUnidade = l[c.cu] + ' ' + (c.cc > -1 ? l[c.cc] : '');
-  if (!contemTokens_(textoUnidade, s.unidade)) return false;
-  return contemTokens_(c.cc > -1 ? l[c.cc] : l[c.cu], s.cia);
+  var textoUnidade = String(l[c.cu]) + ' ' + (c.cc > -1 ? l[c.cc] : '');
+  if (!unidadeConfere_(textoUnidade, s.unidade) && !unidadeConfere_(l[c.cu], s.unidade)) return false;
+  return ciaConfere_(c.cc > -1 ? l[c.cc] : l[c.cu], s.cia);
 }
 
 function aguardando_(l, c) {
   return c.status.some(function (i) { return USU_STATUS_VISIVEL.test(normPrefat_(l[i])); });
+}
+
+/** Gestão: mostra por que um usuário vê (ou não) as linhas da planilha. */
+function diagnosticoUsuario(token, login) {
+  exigirGestor_(token);
+  var u = lerUsuarios_().filter(function (x) { return x.login === normLogin_(login); })[0];
+  if (!u) throw new Error('Usuário não encontrado.');
+  var aba = abrirPrefat_().aba;
+  var v = aba.getDataRange().getDisplayValues(), h = cabecalhoPrefat_(v), cab = v[h];
+  var c = colunasUsuario_(cab), s = { unidade: u.unidade, cia: u.cia };
+  var out = { unidade: u.unidade, cia: u.cia, colUnidade: c.cu > -1 ? cab[c.cu] : '(não encontrada)', colCia: c.cc > -1 ? cab[c.cc] : '(não encontrada — Cia procurada no texto da Unidade)',
+              colStatus: c.status.map(function (i) { return cab[i]; }), total: 0, daUnidade: 0, daCia: 0, aguardando: 0,
+              ciasDaUnidade: {}, situacoesDaCia: {}, unidadesNaPlanilha: {} };
+  for (var r = h + 1; r < v.length; r++) {
+    var l = v[r];
+    if (!l.some(String)) continue;
+    out.total++;
+    if (c.cu > -1) out.unidadesNaPlanilha[l[c.cu]] = (out.unidadesNaPlanilha[l[c.cu]] || 0) + 1;
+    var textoUnidade = String(l[c.cu]) + ' ' + (c.cc > -1 ? l[c.cc] : '');
+    if (!(unidadeConfere_(textoUnidade, s.unidade) || unidadeConfere_(l[c.cu], s.unidade))) continue;
+    out.daUnidade++;
+    var vc = c.cc > -1 ? l[c.cc] : l[c.cu];
+    out.ciasDaUnidade[vc] = (out.ciasDaUnidade[vc] || 0) + 1;
+    if (!ciaConfere_(vc, s.cia)) continue;
+    out.daCia++;
+    var st = c.status.map(function (i) { return l[i]; }).filter(String).join(' / ') || '(vazio)';
+    out.situacoesDaCia[st] = (out.situacoesDaCia[st] || 0) + 1;
+    if (aguardando_(l, c)) out.aguardando++;
+  }
+  return out;
 }
 
 /** Notas da Unidade/Cia do usuário que estão aguardando aprovação — só as colunas permitidas. */
