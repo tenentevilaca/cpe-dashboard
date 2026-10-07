@@ -158,6 +158,8 @@
   .drop h2 { color: var(--text); font-size: 17px; margin-bottom: 6px; }
   .drop p { margin: 0 0 16px; }
   .avisos { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
+  .resp-cards { margin: 4px 0 12px; }
+  .resp-cards .kpi .v small { font-size: 13px; font-weight: 500; color: var(--muted); }
   .nf-resumo { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
   .nf-resumo .tag:not(.ok):not(.bad):not(.warn) { background: var(--surface-2); color: var(--text-2); }
   td.checks .tag { margin: 1px 2px 1px 0; font-size: 11px; }
@@ -618,6 +620,7 @@
           <button class="btn primary" id="btnZip" disabled>⬇ Baixar notas encontradas (.zip)</button>
         </div>
       </div>
+      <div class="kpis resp-cards" id="nfResp"></div>
       <div class="nf-resumo" id="nfResumo"></div>
       <div class="hint" id="nfStatus"></div>
       <div class="tbl-wrap big-table" style="max-height:480px">
@@ -699,7 +702,7 @@ var IMPOSTOS = [
 ];
 var TOLERANCIA = 0.05; // R$ — diferenças de arredondamento abaixo disso são ignoradas
 
-var state = { imposto: 'todos', aliqTab: 'iss', sort: { key: 'aprovado', dir: -1 } };
+var state = { imposto: 'todos', aliqTab: 'iss', sort: { key: 'cidade', dir: 1 } };
 var NOTAS = [];
 var charts = {};
 
@@ -770,9 +773,10 @@ function montarPeriodos() {
   var html = '<option value="">Todos os períodos (' + NOTAS.length + ')</option>';
   Object.keys(meses).sort().reverse().forEach(function (k) {
     var m = meses[k];
-    html += '<optgroup label="' + esc(m.rot) + '"><option value="m:' + k + '">' + esc(m.rot) + ' — mês inteiro (' + m.total + ')</option>';
-    [1, 2].forEach(function (q) { if (m.q[q]) html += '<option value="q:' + k + ':' + q + '">' + esc(m.rot) + ' — ' + q + 'ª quinzena (' + m.q[q] + ')</option>'; });
-    html += '</optgroup>';
+    // sempre as duas quinzenas separadas + o mês inteiro, mesmo que alguma ainda não tenha RAD
+    html += '<optgroup label="' + esc(m.rot) + '">';
+    [1, 2].forEach(function (q) { html += '<option value="q:' + k + ':' + q + '">' + esc(m.rot) + ' — ' + q + 'ª quinzena (' + m.q[q] + ')</option>'; });
+    html += '<option value="m:' + k + '">' + esc(m.rot) + ' — mês inteiro (' + m.total + ')</option></optgroup>';
   });
   if (sem) html += '<option value="sem">Sem período identificado (' + sem + ')</option>';
   el.innerHTML = html;
@@ -1157,7 +1161,7 @@ function renderTabela(d) {
     var x = a[s.key], y = b[s.key];
     if (s.key === 'data') { x = dataOrd(x); y = dataOrd(y); }
     if (typeof x === 'number' && typeof y === 'number') return (x - y) * s.dir;
-    return String(x).localeCompare(String(y), 'pt-BR', { numeric: true }) * s.dir;
+    return (String(x).localeCompare(String(y), 'pt-BR', { numeric: true }) * s.dir) || ordemMunicipio(a, b);
   });
   var hl = function (c) { return c.imp && state.imposto === c.imp ? ' hl' : ''; };
   document.querySelector('#tblNotas thead').innerHTML = '<tr>' + COLUNAS.map(function (c) {
@@ -1752,6 +1756,34 @@ function textoPdfLocal(file) {
   });
 }
 
+function ordemMunicipio(a, b) {
+  return String(a.cidade || '').localeCompare(String(b.cidade || ''), 'pt-BR') || String(a.estab || '').localeCompare(String(b.estab || ''), 'pt-BR');
+}
+// Responsáveis pelo ISSQN contados por CNPJ distinto (notas de serviço nos filtros atuais).
+// Tomador = o órgão retém e recolhe o ISSQN à prefeitura; Prestador = a oficina recolhe.
+function renderResponsaveis(notas) {
+  var g = { tomador: { cnpj: {}, nfs: 0, mun: {}, iss: 0 }, prestador: { cnpj: {}, nfs: 0, mun: {}, iss: 0 } };
+  notas.forEach(function (n) {
+    if (!n.nfServ) return;
+    var k = ehTomador(n) ? 'tomador' : n.respIss === 'PRESTADOR' ? 'prestador' : null;
+    if (!k) return;
+    var c = digitos(n.cnpj) || ('sem:' + n.estab);
+    g[k].cnpj[c] = 1; g[k].nfs++; g[k].iss += n.iss || 0;
+    if (n.cidade) g[k].mun[n.cidade] = 1;
+  });
+  var nt = Object.keys(g.tomador.cnpj).length, np = Object.keys(g.prestador.cnpj).length;
+  var ambos = Object.keys(g.tomador.cnpj).filter(function (c) { return g.prestador.cnpj[c]; }).length;
+  var card = function (cls, rot, x, n) {
+    return '<div class="kpi ' + cls + '"><div class="l">' + rot + '</div><div class="v">' + n + ' <small>CNPJ' + (n === 1 ? '' : 's') + '</small></div>' +
+      '<div class="d">' + x.nfs + ' NF(s) de serviço · ' + Object.keys(x.mun).length + ' município(s) · ISSQN ' + R(x.iss) + '</div></div>';
+  };
+  document.getElementById('nfResp').innerHTML =
+    card('gold', 'Responsável ISSQN: Tomador (prefeituras)', g.tomador, nt) +
+    card('', 'Responsável ISSQN: Prestador', g.prestador, np) +
+    '<div class="kpi"><div class="l">Total de responsáveis</div><div class="v">' + (nt + np - ambos) + ' <small>CNPJs</small></div>' +
+    '<div class="d">' + (ambos ? ambos + ' CNPJ(s) aparecem nos dois grupos' : 'Contagem por CNPJ distinto, nos filtros atuais') + '</div></div>';
+}
+
 var STATUS_NF = {
   ok: { rot: 'Encontrada (Nº + OS)', cls: 'ok', ic: '✓' },
   parcial: { rot: 'Conferir: Nº e CNPJ, sem OS', cls: 'warn', ic: '!' },
@@ -1760,8 +1792,10 @@ var STATUS_NF = {
 };
 function renderNotasTomador() {
   var sel = state.imposto;
-  var lista = casarNotas(filtrar(), sel);
+  var filtradas = filtrar();
+  var lista = casarNotas(filtradas, sel).sort(function (a, b) { return ordemMunicipio(a.n, b.n) || String(a.d.numero).localeCompare(String(b.d.numero), 'pt-BR', { numeric: true }); });
   NF.lista = lista;
+  renderResponsaveis(filtradas);
   var nomeImp = sel === 'todos' ? 'todos os impostos' : NF_IMP[sel].rot;
   document.getElementById('nfTitulo').textContent = 'Notas fiscais — ' + nomeImp;
   var cont = { ok: 0, parcial: 0, nome: 0, nao: 0 };

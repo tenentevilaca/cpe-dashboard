@@ -10,7 +10,9 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
   Antes era só **Notas fiscais com ISSQN retido pelo tomador**: para cada nota de serviço do RAD com responsável TOMADOR,
   localiza o PDF correspondente e confere no texto do PDF o CNPJ do prestador, o número da nota, a OS,
   o valor do ISSQN e a expressão "Retido pelo Tomador". Botão **Baixar notas encontradas (.zip)** (inclui `relacao_notas.csv`).
-- **Tabela final** com todas as ordens (ordenável, exporta CSV).
+- **Card de responsáveis pelo ISSQN** (acima da tabela de notas fiscais): quantidade de CNPJs distintos com responsável
+  **Tomador** (ISSQN retido e recolhido à prefeitura) e **Prestador**, com NFs, municípios e ISSQN de cada grupo; segue os filtros.
+- **Tabela final** com todas as ordens (ordenável, exporta CSV). Ela e a tabela de notas fiscais vêm classificadas por **município**.
 
 ## Opção 1 — Google Drive + Apps Script (recomendado)
 
@@ -104,13 +106,13 @@ o servidor confere Unidade/Cia em toda leitura e gravação. A coluna CIA é rec
 ## Períodos (quinzenas) e inclusão de RADs
 
 - O painel lê o período escrito em cada RAD ("Período: 16/09/2026 à 30/09/2026") e oferece o filtro **Período do RAD**,
-  agrupado por mês (mês inteiro, 1ª e 2ª quinzena), só com períodos existentes e a quantidade de ordens de cada um. Se o RAD
+  agrupado por mês — sempre 1ª quinzena, 2ª quinzena e mês inteiro (mesmo que uma quinzena ainda não tenha RAD), com a quantidade de ordens de cada um. Se o RAD
   não tiver o período no cabeçalho, a quinzena vem da data de aprovação da ordem. A tabela final tem a coluna "Período (RAD)".
 - **⬆ Inserir RADs** (gestão, App da Web): escolha os .xls baixados do sistema; cada um é guardado na pasta de RADs, na
   subpasta do período (ex.: "2026-09 · 2ª quinzena"), com o nome "RAD <Unidade> <AAAA-MM> <1ª|2ª> quinzena.xls".
   Reenviar o RAD da mesma Unidade e período substitui o anterior (o antigo vai para a lixeira).
 - **⬆ Inserir notas (PDF)** (gestão, App da Web): escolha um ou vários PDFs; são guardados na pasta de notas, na subpasta da
-  quinzena dos filtros "Mês do RAD"/"Quinzena" (ou da quinzena atual, se não houver filtro). PDF repetido (mesmo nome e tamanho)
+  quinzena escolhida no filtro "Período do RAD" (ou da quinzena atual, se não houver filtro). PDF repetido (mesmo nome e tamanho)
   não é duplicado. Logo após o envio o painel procura as notas nesses PDFs, sem recarregar tudo. Limite: 20 MB por PDF.
 
 ## SOFI — pagamento dos RADs
