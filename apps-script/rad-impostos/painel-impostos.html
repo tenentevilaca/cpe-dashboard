@@ -157,6 +157,20 @@
   .drop.over { border-color: var(--accent); background: var(--hl); }
   .drop h2 { color: var(--text); font-size: 17px; margin-bottom: 6px; }
   .drop p { margin: 0 0 16px; }
+  .rel-arq { margin-bottom: 16px; }
+  .tut { line-height: 1.55; font-size: 14px; }
+  .tut h2 { font: 700 18px Georgia, serif; margin-bottom: 8px; }
+  .tut h3 { font-size: 14px; margin: 0 0 4px; }
+  .tut ul, .tut ol { padding-left: 20px; margin: 6px 0; }
+  .tut li { margin: 4px 0; }
+  .tut code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .tut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .tut-faq dt { font-weight: 600; margin-top: 10px; }
+  .tut-faq dd { margin: 2px 0 0 0; color: var(--text-2); }
+  .tut-indice { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tut-indice a { padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--text); }
+  .rel-arq summary { cursor: pointer; font-weight: 600; }
+  .rel-arq[open] summary { margin-bottom: 10px; }
   .avisos { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
   .resp-cards { margin: 4px 0 12px; }
   .resp-cards .kpi .v small { font-size: 13px; font-weight: 500; color: var(--muted); }
@@ -337,6 +351,7 @@
   <button class="nav-btn so-drive" data-view="almox"><span class="ic">📦</span><span class="tx">Almoxarifado<small>pagamento dos RADs</small></span></button>
   <button class="nav-btn so-drive so-gestor" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento<small>gestão</small></span></button>
   <button class="nav-btn so-drive so-gestor" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
+  <button class="nav-btn" data-view="tutorial"><span class="ic">📘</span><span class="tx">Tutorial<small>como usar o painel</small></span></button>
   <div class="nav-rodape so-drive">
     <div class="quem" id="navQuem"></div>
     <button class="nav-btn" id="navSenha" hidden><span class="ic">🔑</span><span class="tx">Trocar senha</span></button>
@@ -400,6 +415,7 @@
       <div class="sub" id="uOrigem"></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="uTutorial">📘 Como usar</button>
       <button class="btn" id="uSenha">🔑 Trocar senha</button>
       <button class="btn" id="uAtualizar">↻ Atualizar</button>
       <button class="btn" id="uSair">⎋ Sair</button>
@@ -424,6 +440,138 @@
 </div>
 
 <!-- ================= Gestão de acessos ================= -->
+<!-- ================= Tutorial ================= -->
+<div class="wrap" id="viewTutorial" hidden>
+  <header>
+    <div>
+      <h1>Tutorial — como funciona o painel</h1>
+      <div class="sub">O que o painel faz, de onde vêm os dados e como usar cada parte.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="tutVoltar" hidden>← Voltar</button>
+    </div>
+  </header>
+  <nav class="card tut-indice" id="tutIndice" aria-label="Índice do tutorial"></nav>
+
+  <section class="card tut" id="tut-oque" data-perfis="GESTOR SOFI ALMOX">
+    <h2>1. O que o painel faz</h2>
+    <p>O painel lê os <b>RADs</b> (Relatório Sintético da Despesa) de cada Unidade e as <b>notas fiscais em PDF</b> e confere, ordem por ordem,
+      os impostos retidos: <b>ICMS</b>, <b>IRRF de peça</b>, <b>IRRF de serviço</b> e <b>ISSQN</b>. Ele recalcula cada imposto
+      (base × alíquota), compara com o valor informado no RAD e aponta diferenças e ordens fora das regras fiscais.
+      Também localiza o PDF de cada nota e permite baixar as notas filtradas num .zip.</p>
+  </section>
+
+  <section class="card tut" id="tut-dados" data-perfis="GESTOR SOFI ALMOX">
+    <h2>2. De onde vêm os dados</h2>
+    <ul>
+      <li>Tudo vem de <b>uma pasta do Google Drive</b>, lida com <b>todas as subpastas</b>: os RADs (<code>.xls</code> exportado do sistema)
+        e as notas fiscais (<code>.pdf</code>). O padrão das subpastas é <b>“RAD MMAAAA-Q”</b> (ex.: <i>RAD 052026-1</i> = maio/2026, 1ª quinzena)
+        e <b>“NOTAS FISCAIS”</b>.</li>
+      <li>Basta colocar o arquivo novo na pasta e clicar em <b>↻ Atualizar dados</b>: ele entra no painel.</li>
+      <li><b>Período do RAD</b>: lido do cabeçalho do RAD (“Período: 01/05/2026 à 15/05/2026”). Se não houver, vem do nome da subpasta
+        (“RAD 052026-1”); em último caso, da data de aprovação de cada ordem.</li>
+      <li><b>RAD duplicado</b>: se dois arquivos tiverem o mesmo conteúdo (mesma Unidade, período, ordens e valores), um deles é
+        desconsiderado, qualquer que seja o nome. Arquivos “UNIAO RAD” (junção dos demais) são ignorados.</li>
+      <li>No topo da aba Impostos, o quadro <b>📂 Arquivos lidos da pasta</b> mostra cada arquivo encontrado: se foi computado, se era
+        duplicado, de onde veio o período e quantas ordens trouxe. Se um RAD não aparecer no painel, confira primeiro esse quadro.</li>
+    </ul>
+  </section>
+
+  <section class="card tut" id="tut-regras" data-perfis="GESTOR SOFI ALMOX">
+    <h2>3. Regras fiscais aplicadas</h2>
+    <div class="tut-grid">
+      <div><h3>Nota fiscal de peça</h3><ul>
+        <li><b>IRRF de peça</b> e <b>desoneração de ICMS</b> — só quando a empresa <b>não</b> é optante pelo Simples.</li>
+        <li><b>Não tem tomador</b> nem ISSQN.</li></ul></div>
+      <div><h3>Nota fiscal de serviço</h3><ul>
+        <li><b>IRRF de serviço</b> — só quando a empresa <b>não</b> é optante pelo Simples.</li>
+        <li><b>ISSQN</b>: o responsável (<b>prestador</b> ou <b>tomador</b>) depende da legislação do município e vem na NF de serviço.</li>
+        <li>Se o responsável for o <b>tomador</b>, pode haver <b>ou não</b> retenção.</li></ul></div>
+    </div>
+    <p>Cada ordem recebe na tabela final a coluna <b>Regras fiscais</b>: <span class="tag ok">✓</span> conforme,
+      <span class="tag bad">✕ erro</span> (ex.: IRRF em empresa do Simples) ou <span class="tag warn">! verificar</span>
+      (ex.: empresa fora do Simples sem IRRF). Diferenças de cálculo abaixo de R$ 0,05 são consideradas arredondamento.</p>
+  </section>
+
+  <section class="card tut" id="tut-impostos" data-perfis="GESTOR SOFI ALMOX">
+    <h2>4. Aba Impostos RAD — passo a passo</h2>
+    <ol>
+      <li><b>Escolha o imposto</b> nos botões do topo (Todos, ICMS, IRRF Peça, IRRF Serviço, ISSQN). Tudo abaixo passa a mostrar só aquele imposto.</li>
+      <li><b>Filtre</b>:
+        <ul>
+          <li><b>Situação</b>: com/sem retenção, com diferença, fora das regras fiscais ou só os avisos;</li>
+          <li><b>Período do RAD</b>: cada mês tem 1ª quinzena, 2ª quinzena e mês inteiro;</li>
+          <li><b>Unidade</b>, <b>Município</b>, <b>Optante Simples</b>, <b>Alíquota</b> (com um imposto escolhido);</li>
+          <li><b>Responsável ISSQN</b> (tomador/prestador): vale só para notas de serviço;</li>
+          <li><b>Buscar</b>: placa, estabelecimento, nº da NF, cidade ou CNPJ.</li>
+        </ul></li>
+      <li><b>Indicadores e gráficos</b>: totais retidos, diferenças, distribuição por imposto, alíquota e Unidade.</li>
+      <li><b>Notas fiscais</b>: o painel procura cada nota nos PDFs pelo <b>número da nota + número da OS</b>.
+        <span class="tag ok">✓ Encontrada</span> = os dois conferem; <span class="tag warn">! Conferir</span> = conferem o nº e o CNPJ, mas não a OS;
+        <span class="tag bad">✕ Não encontrada</span> = o PDF não está na pasta. O botão <b>⬇ Baixar notas encontradas</b> gera um .zip com os PDFs e uma relação em CSV.</li>
+      <li><b>Card de responsáveis pelo ISSQN</b>: quantos CNPJs distintos têm o <b>tomador</b> (prefeituras) ou o <b>prestador</b> como responsável.</li>
+      <li><b>Tabela final</b>: todas as ordens, ordenadas por município (clique no título de uma coluna para mudar a ordem) e <b>⬇ CSV</b> para exportar.</li>
+    </ol>
+  </section>
+
+  <section class="card tut" id="tut-inserir" data-perfis="GESTOR">
+    <h2>5. Inserir RADs e notas (gestão)</h2>
+    <ul>
+      <li><b>⬆ Inserir RADs</b>: selecione os <code>.xls</code> baixados do sistema (vários de uma vez). Cada um é guardado na pasta do Drive,
+        na subpasta da sua quinzena, com o nome “RAD &lt;Unidade&gt; &lt;AAAA-MM&gt; &lt;quinzena&gt;”.</li>
+      <li><b>⬆ Inserir notas (PDF)</b>: selecione os PDFs; eles vão para a subpasta da quinzena escolhida no filtro Período do RAD.
+        PDF repetido (mesmo nome e tamanho) não é duplicado.</li>
+    </ul>
+  </section>
+
+  <section class="card tut" id="tut-pagamento" data-perfis="GESTOR SOFI ALMOX">
+    <h2>6. SOFI e Almoxarifado — pagamento dos RADs</h2>
+    <ol>
+      <li>A tabela <b>RADs a pagar</b> mostra cada RAD (Unidade × quinzena) com nº de OS, valor aprovado, impostos, taxa adm. e valor líquido.</li>
+      <li>Quando o RAD for pago, clique em <b>A pagar</b> e confirme: o botão vira <b>✓ Pago</b>. Na próxima atualização ele sai da lista.</li>
+      <li><b>📋 Consultar RADs</b> mostra todos (pagos e a pagar), com data e responsável. Clicar em <b>✓ Pago</b> desfaz o pagamento. Exporta em CSV.</li>
+      <li>SOFI e Almoxarifado têm <b>controles independentes</b>: o que um marca não altera o outro. Abaixo da tabela fica o painel de Impostos completo.</li>
+    </ol>
+  </section>
+
+  <section class="card tut" id="tut-prefat" data-perfis="GESTOR">
+    <h2>7. Pré-faturamento (gestão)</h2>
+    <p>Mostra a planilha de pré-faturamento. Os campos <b>Última verificação</b>, <b>Data da verificação</b>, <b>Verificação</b> e <b>OBS</b>
+      podem ser alterados no painel e são <b>gravados direto na planilha</b> (✓ gravado). Se outra pessoa tiver mudado a mesma célula, nada é sobrescrito.</p>
+  </section>
+
+  <section class="card tut" id="tut-usuario" data-perfis="GESTOR USUARIO">
+    <h2>8. Minhas notas (usuário da Unidade)</h2>
+    <ul>
+      <li>Para entrar: na tela inicial, <b>Solicitar acesso</b> (nome, login, senha, Unidade e Cia). Depois que a gestão aprovar, entre com login e senha.</li>
+      <li>Aparecem só as notas <b>aguardando aprovação</b> da <b>sua Unidade e Cia</b>.</li>
+      <li>O único campo editável é <b>RESPOSTA</b>: escreva e saia do campo para gravar.</li>
+    </ul>
+  </section>
+
+  <section class="card tut" id="tut-acessos" data-perfis="GESTOR">
+    <h2>9. Acessos (gestão)</h2>
+    <p>Lista os pedidos de acesso. Escolha o <b>perfil</b> — <b>Usuário</b> (Unidade/Cia), <b>SOFI</b>, <b>Almoxarifado</b> ou <b>Gestor</b> —, confira Unidade e Cia
+      e clique em <b>Aprovar</b>. Também é possível bloquear, reativar e gerar senha temporária.</p>
+  </section>
+
+  <section class="card tut" id="tut-faq" data-perfis="GESTOR SOFI ALMOX USUARIO">
+    <h2>10. Perguntas frequentes</h2>
+    <dl class="tut-faq">
+      <dt>Coloquei um RAD na pasta e ele não aparece.</dt>
+      <dd>Clique em <b>↻ Atualizar dados</b> e abra <b>📂 Arquivos lidos da pasta</b>: lá aparece se ele foi lido, se era duplicado ou se deu erro.</dd>
+      <dt>Apareceu “Code.gs publicado está desatualizado”.</dt>
+      <dd>A gestão precisa colar o Code.gs novo no Apps Script e publicar uma nova versão (Implantar › Gerenciar implantações › Nova versão).</dd>
+      <dt>A nota aparece como “Não encontrada”.</dt>
+      <dd>O PDF dela não está na pasta, ou o PDF não tem o nº da nota e da OS legíveis. Coloque o PDF na pasta (ou use ⬆ Inserir notas).</dd>
+      <dt>Por que o filtro de tomador não mostra notas de peça?</dt>
+      <dd>Porque tomador/prestador do ISSQN é informação da nota de serviço; nota de peça não tem tomador.</dd>
+      <dt>Esqueci a senha.</dt>
+      <dd>Peça à gestão uma senha temporária (aba Acessos) e troque-a em 🔑 Trocar senha.</dd>
+    </dl>
+  </section>
+</div>
+
 <div class="wrap" id="viewAcessos" hidden>
   <header>
     <div><h1>Acessos</h1><div class="sub">Pedidos de acesso dos PMs e usuários liberados. Cada usuário vê só a sua Unidade e Cia.</div></div>
@@ -500,6 +648,14 @@
   </div>
 
   <div id="avisos" class="avisos" hidden></div>
+  <details class="card rel-arq" id="relArquivos" hidden>
+    <summary id="relResumo">Arquivos lidos da pasta</summary>
+    <div class="hint" id="relPasta"></div>
+    <div class="tbl-wrap" style="max-height:420px"><table id="tblRel"><thead><tr>
+      <th>Situação</th><th>Arquivo (subpasta/nome)</th><th>Unidade</th><th>Período</th><th>Período lido de</th><th class="n">Ordens</th><th>Observação</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="hint" id="relOutros"></div>
+  </details>
   <main id="app" hidden>
     <!-- Filtros -->
     <section class="filters" aria-label="Filtros">
@@ -1308,6 +1464,8 @@ function carregar() {
     if (res.modo === 'drive') {
       var r = notasDosRads(res.rads);
       notas = r.notas; avisos = r.avisos;
+      if (res.versao !== VERSAO_PAINEL) avisos.unshift('O Code.gs publicado está desatualizado (versão ' + (res.versao || 'antiga') + '; o painel espera ' + VERSAO_PAINEL +
+        '). Cole o Code.gs novo no Apps Script e publique uma nova versão — sem isso a pasta de RADs pode não ser a correta.');
       if (!res.rads.length) avisos.push('Nenhum RAD encontrado na pasta de RADs.');
       if (!res.pdfs.length) avisos.push('Nenhum PDF encontrado na pasta de notas.');
       if ((res.ignorados || []).length) avisos.push('Arquivos ignorados por não serem RAD: ' + res.ignorados.join(', '));
@@ -1317,7 +1475,8 @@ function carregar() {
       PDFS = [];
     }
     FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos,
-              nRads: (res.rads || []).length, consolidados: res.consolidados || [] };
+              nRads: (res.rads || []).length, consolidados: res.consolidados || [],
+              relatorio: r ? r.relatorio : [], ignorados: res.ignorados || [], outros: res.outros || [], pastaRads: res.pastaRads };
     exibir(notas);
   }).catch(erroCarga);
 }
@@ -1336,6 +1495,7 @@ function exibir(notas) {
   var av = document.getElementById('avisos');
   av.innerHTML = (FONTE.avisos || []).map(function (a) { return '<div>⚠ ' + esc(a) + '</div>'; }).join('');
   av.hidden = !(FONTE.avisos || []).length;
+  renderRelatorioArquivos();
   document.getElementById('loading').hidden = true;
   document.getElementById('drop').hidden = true;
   document.getElementById('app').hidden = false;
@@ -1386,7 +1546,8 @@ function lerRadGrade(grade, nomeArquivo) {
     l = l.map(function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); });
     l.forEach(function (v, i) {
       if (!orgao && /^(Nome|Código) Órgão \/ Entidade:?$/i.test(v)) orgao = l.slice(i + 1).filter(String)[0] || '';
-      var m = !periodo && /Período:\s*(.+)$/i.exec(v); if (m) periodo = m[1];
+      var m = !periodo && /Per[ií]odo:\s*(.+)$/i.exec(v); if (m) periodo = m[1];
+      if (!periodo && /^Per[ií]odo:?$/i.test(v)) periodo = l.slice(i + 1).filter(String).join(' ');
     });
     if (normCab(l[0]) === 'placa') { cab = l; return; }
     // Linhas de dados: ao menos 8 células preenchidas (descarta cabeçalhos de página e a linha de totais).
@@ -1417,36 +1578,92 @@ function periodoPorData(data) {
   return p;
 }
 
-/** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. */
+var VERSAO_PAINEL = '2026-10-07b'; // deve ser igual a VERSAO_CODIGO do Code.gs
+
+/** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
+function renderRelatorioArquivos() {
+  var box = document.getElementById('relArquivos'), rel = FONTE.relatorio || [];
+  box.hidden = !rel.length;
+  if (!rel.length) return;
+  var c = { lido: 0, duplicado: 0, erro: 0, vazio: 0 };
+  rel.forEach(function (x) { c[x.status]++; });
+  var pastas = {};
+  PDFS.forEach(function (p) { var k = (p.caminho || '').replace(/\/$/, '') || '(pasta principal)'; pastas[k] = (pastas[k] || 0) + 1; });
+  document.getElementById('relResumo').textContent = '📂 Arquivos lidos da pasta — ' + c.lido + ' RAD(s) computado(s)' +
+    (c.duplicado ? ' · ' + c.duplicado + ' duplicado(s) desconsiderado(s)' : '') + (c.erro + c.vazio ? ' · ' + (c.erro + c.vazio) + ' com problema' : '') +
+    ' · ' + PDFS.length + ' PDF(s) de notas (clique para ver)';
+  var pr = FONTE.pastaRads;
+  document.getElementById('relPasta').innerHTML = pr ? 'Pasta lida (com todas as subpastas): <a href="' + esc(pr.url) + '" target="_blank" rel="noopener">' + esc(pr.nome) + '</a>' : '';
+  var st = { lido: ['ok', '✓ Computado'], duplicado: ['warn', '≡ Duplicado'], erro: ['bad', '✕ Erro'], vazio: ['bad', '∅ Sem ordens'] };
+  document.querySelector('#tblRel tbody').innerHTML = rel.map(function (x) {
+    return '<tr><td><span class="tag ' + st[x.status][0] + '">' + st[x.status][1] + '</span></td><td>' + esc(x.nome) + '</td><td>' + esc(x.unidade) +
+      '</td><td>' + esc(x.periodo || '—') + '</td><td>' + esc(x.origemPer || '') + '</td><td class="n">' + (x.ordens || '') + '</td><td class="muted" style="white-space:normal">' + esc(x.obs) + '</td></tr>';
+  }).join('');
+  var outros = (FONTE.ignorados || []).map(function (x) { return 'não é RAD: ' + x; }).concat((FONTE.consolidados || []).map(function (x) { return '“UNIAO RAD” ignorada: ' + x; }))
+    .concat((FONTE.outros || []).map(function (x) { return 'não lido: ' + x; }));
+  document.getElementById('relOutros').innerHTML =
+    (Object.keys(pastas).length ? '<b>PDFs por subpasta:</b> ' + Object.keys(pastas).sort().map(function (k) { return esc(k) + ' (' + pastas[k] + ')'; }).join(' · ') : '') +
+    (outros.length ? '<br><b>Outros arquivos:</b> ' + outros.map(esc).join(' · ') : '');
+}
+
+/**
+ * Período pelo nome da subpasta/arquivo, no padrão das pastas do Drive: "RAD 052026-1" = maio/2026, 1ª quinzena.
+ * Usado quando o RAD não traz o período no cabeçalho.
+ */
+function periodoDoCaminho(nome) {
+  var m = /(?:^|\D)(0[1-9]|1[0-2])[\s._-]?(20\d{2})[\s._-]+([12])(?:\D|$)/.exec(String(nome || ''));
+  if (!m) return null;
+  var ult = new Date(+m[2], +m[1], 0).getDate();
+  return lerPeriodo((m[3] === '1' ? '01' : '16') + '/' + m[1] + '/' + m[2] + ' a ' + (m[3] === '1' ? '15' : String(ult)) + '/' + m[1] + '/' + m[2]);
+}
+
+/** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. Devolve também o relatório arquivo a arquivo. */
 function notasDosRads(rads) {
-  var notas = [], vistas = {}, avisos = [], conteudos = {};
+  var notas = [], vistas = {}, avisos = [], conteudos = {}, relatorio = [];
   // Ordem estável (pelo caminho/nome): entre arquivos duplicados fica sempre o mesmo.
-  rads = rads.slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true }); });
+  // Cópias ("(1)", "cópia", "copy") ficam por último: entre duplicados, fica o arquivo original.
+  var copia = function (n) { return /\(\d+\)|c[oó]pia|copy/i.test(String(n).split('/').pop()) ? 1 : 0; };
+  rads = rads.slice().sort(function (a, b) { return copia(a.nome) - copia(b.nome) || String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true }); });
   rads.forEach(function (r) {
+    var rel = { nome: r.nome, status: 'lido', unidade: '', periodo: '', ordens: 0, obs: '' };
+    relatorio.push(rel);
     var rad;
-    try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
+    try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); }
+    catch (e) { avisos.push(e.message); rel.status = 'erro'; rel.obs = e.message; return; }
+    rel.unidade = rad.unidade;
+    // Período: cabeçalho do RAD → nome da subpasta ("RAD 052026-1") → data de aprovação de cada ordem.
+    var per = lerPeriodo(rad.periodo), origemPer = 'cabeçalho do RAD';
+    if (!per) { per = periodoDoCaminho(r.nome); origemPer = 'nome da pasta'; }
+    if (!per) origemPer = 'data de aprovação';
+    rel.periodo = per ? per.rot : '';
+    rel.origemPer = origemPer;
+    var todas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade);
+    if (!todas.length) { rel.status = 'vazio'; rel.obs = 'nenhuma ordem na tabela do RAD'; return; }
     // Duplicidade pelo CONTEÚDO (não pelo nome): mesma Unidade, mesmo período e as mesmas ordens com os mesmos valores.
     // O arquivo repetido é desconsiderado inteiro, mesmo que esteja em outra subpasta ou com outro nome.
-    var todas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade);
-    var assinatura = rad.unidade + '#' + (rad.periodo || '') + '#' + todas.map(function (n) {
+    var identRad = rad.unidade + '|' + (per ? per.ini + '|' + per.fim : rad.periodo || '');
+    var assinatura = identRad + '#' + todas.map(function (n) {
       return [n.os, n.nfPeca, n.nfServ, n.placa, n.aprovado, n.liquido].join('|');
     }).sort().join(';');
-    if (todas.length && conteudos[assinatura]) {
+    if (conteudos[assinatura]) {
       avisos.push('“' + r.nome + '” tem o mesmo conteúdo de “' + conteudos[assinatura] + '” (RAD duplicado) e foi desconsiderado.');
-      return;
+      rel.status = 'duplicado'; rel.obs = 'mesmo conteúdo de “' + conteudos[assinatura] + '”'; return;
     }
     conteudos[assinatura] = r.nome;
     // Ordem repetida só é descartada dentro do mesmo RAD (mesma Unidade e período): assim um RAD enviado duas vezes não
     // duplica valores, mas uma OS que aparece em quinzenas diferentes continua contando em cada RAD.
-    var identRad = rad.unidade + '|' + (rad.periodo || '');
     var novas = todas.filter(function (n) {
       var k = [identRad, n.os, n.nfPeca, n.nfServ, n.placa].join('|');
       if (vistas[k]) return false;
       vistas[k] = 1; return true;
     });
-    if (!novas.length && rad.linhas.length) avisos.push('“' + r.nome + '” repete um RAD já lido (' + rad.unidade + ') e foi ignorado.');
-    var per = lerPeriodo(rad.periodo);
-    if (!per && rad.linhas.length) avisos.push('“' + r.nome + '”: período não encontrado no cabeçalho do RAD — usada a data de aprovação de cada ordem.');
+    if (!novas.length) {
+      avisos.push('“' + r.nome + '” repete um RAD já lido (' + rad.unidade + ') e foi ignorado.');
+      rel.status = 'duplicado'; rel.obs = 'todas as ordens já estavam em outro RAD da mesma Unidade e período'; return;
+    }
+    if (novas.length < todas.length) rel.obs = (todas.length - novas.length) + ' ordem(ns) repetida(s) desconsiderada(s)';
+    if (!per) avisos.push('“' + r.nome + '”: período não encontrado no cabeçalho nem no nome da pasta — usada a data de aprovação de cada ordem.');
+    rel.ordens = novas.length;
     novas.forEach(function (n) {
       n.periodo = per || periodoPorData(n.data);
       n.radArquivo = r.nome;
@@ -1455,7 +1672,7 @@ function notasDosRads(rads) {
     });
     notas = notas.concat(novas);
   });
-  return { notas: notas, avisos: avisos };
+  return { notas: notas, avisos: avisos, relatorio: relatorio };
 }
 
 /** Converte cabeçalho + linhas (RAD ou planilha consolidada) no formato usado pelo painel. */
@@ -1586,7 +1803,7 @@ function lerArquivos(files) {
         buscarNotas();
         return;
       }
-      FONTE = { modo: 'offline', origem: origem.join(' + ') || 'Arquivos locais', atualizadoEm: '', avisos: avisos };
+      FONTE = { modo: 'offline', origem: origem.join(' + ') || 'Arquivos locais', atualizadoEm: '', avisos: avisos, relatorio: r.relatorio };
       exibir(notas.map(function (n) { delete n._p; return n; }));
     });
   }).catch(function (e) { erroCarga(e); if (!NOTAS.length) document.getElementById('drop').hidden = false; });
@@ -2240,10 +2457,10 @@ function mostrarView(v) {
     if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   VIEW = v;
-  var titulos = { impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', almox: 'Almoxarifado — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
+  var titulos = { tutorial: 'Tutorial do painel', impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', almox: 'Almoxarifado — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
                   acessos: 'Gestão de Acessos', usuario: 'Minhas notas — Pré-faturamento', login: 'Pré-faturamento — RAD' };
   document.getElementById('topoTitulo').textContent = titulos[v] || '';
-  ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi'].forEach(function (k) {
+  ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi', 'tutorial'].forEach(function (k) {
     var setorial = v === 'sofi' || v === 'almox';
     document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = !(v === k || (setorial && (k === 'sofi' || k === 'impostos')));
   });
@@ -2251,6 +2468,7 @@ function mostrarView(v) {
   var setorial = v === 'sofi' || v === 'almox';
   document.body.classList.toggle('modo-sofi', setorial);
   if (v === 'acessos') acCarregar();
+  if (v === 'tutorial') montarTutorial();
   if (setorial) {
     var setor = setorAtual();
     document.getElementById('sofiTitulo').textContent = SETORES[setor] + ' — Pagamento dos RADs';
@@ -2265,6 +2483,22 @@ function mostrarView(v) {
   if ((v === 'impostos' || setorial) && NOTAS.length) render();
   if (v === 'login' || v === 'usuario') document.getElementById('lateral').hidden = true;
   window.scrollTo(0, 0);
+}
+
+/* ---------------- Tutorial ---------------- */
+var TUT_VOLTAR = '';
+/** Mostra as seções do tutorial que interessam ao perfil de quem está logado (gestão e modo offline veem todas). */
+function montarTutorial() {
+  var perfil = MODO === 'offline' ? 'GESTOR' : (SESSAO && SESSAO.perfil) || 'GESTOR';
+  var secoes = [].slice.call(document.querySelectorAll('#viewTutorial section.tut'));
+  secoes.forEach(function (sec) { sec.hidden = perfil !== 'GESTOR' && (sec.dataset.perfis || '').split(' ').indexOf(perfil) < 0; });
+  document.getElementById('tutIndice').innerHTML = secoes.filter(function (sec) { return !sec.hidden; }).map(function (sec) {
+    return '<a href="#' + sec.id + '">' + esc(sec.querySelector('h2').textContent) + '</a>';
+  }).join('');
+  document.querySelectorAll('#tutIndice a').forEach(function (a) {
+    a.onclick = function (e) { e.preventDefault(); document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  });
+  document.getElementById('tutVoltar').hidden = !TUT_VOLTAR;
 }
 
 /* ---------------- Pré-faturamento ---------------- */
@@ -2444,7 +2678,7 @@ function iniciar() {
       document.querySelectorAll('.so-gestor').forEach(function (el) { el.hidden = true; });
       // SOFI continua vendo também a aba Impostos; o Almoxarifado vê só a própria aba.
       document.querySelectorAll('#lateral .nav-btn[data-view]').forEach(function (b) {
-        if (b.dataset.view !== propria && !(propria === 'sofi' && b.dataset.view === 'impostos')) b.hidden = true;
+        if (b.dataset.view !== propria && b.dataset.view !== 'tutorial' && !(propria === 'sofi' && b.dataset.view === 'impostos')) b.hidden = true;
       });
       ['btnInserirRad', 'btnInserirNota', 'btnPasta'].forEach(function (id) { document.getElementById(id).hidden = true; });
       document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · ' + SETORES[s.perfil];
@@ -2753,6 +2987,9 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('sofiFiltro').onchange = sofiRender;
   document.getElementById('sofiCsv').onclick = sofiCsv;
   document.getElementById('navSenha').onclick = function () { document.getElementById('uSenha').onclick(); };
+  // Usuário da Unidade não tem barra lateral: abre o tutorial por um botão e volta para "Minhas notas".
+  document.getElementById('uTutorial').onclick = function () { TUT_VOLTAR = 'usuario'; mostrarView('tutorial'); };
+  document.getElementById('tutVoltar').onclick = function () { var v = TUT_VOLTAR; TUT_VOLTAR = ''; mostrarView(v || 'impostos'); };
   document.getElementById('uSenha').onclick = function () {
     var at = prompt('Senha atual:'); if (at == null) return;
     var nv = prompt('Nova senha (mínimo 6 caracteres):'); if (nv == null) return;

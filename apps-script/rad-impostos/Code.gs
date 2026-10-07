@@ -25,6 +25,9 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 // painel também são gravados nela. Se ficar vazia, volta a valer a descoberta automática dentro da raiz.
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
+// Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
+var VERSAO_CODIGO = '2026-10-07b';
+
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
 
@@ -179,7 +182,7 @@ function getFontes(token) {
 
   var pastaRads = abrirPasta_(ids.rads, 'RADs');
   var pastaNotas = ids.notas === ids.rads ? null : abrirPasta_(ids.notas, 'notas'); // mesma pasta: lida uma vez só
-  var rads = [], pdfs = [], vistos = {}, ignorados = [], consolidados = [];
+  var rads = [], pdfs = [], vistos = {}, ignorados = [], consolidados = [], outros = [];
   var cache = lerCache_();
 
   var tratar = function (arq, caminho) {
@@ -194,6 +197,8 @@ function getFontes(token) {
       pdfs.push({ id: id, nome: nome, caminho: caminho, lido: !!(c && c.atualizado === arq.getLastUpdated().getTime()) });
     } else if (IGNORAR_RADS.test(nome)) {
       consolidados.push(caminho + nome); // planilha consolidada: os dados já estão nos RADs das unidades
+    } else if (/fatur/i.test(nome)) {
+      outros.push(caminho + nome + ' (pré-faturamento)');
     } else if (/rad|relat/i.test(caminho + nome) && !/fatur/i.test(nome) &&
                (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
                 /\.(xlsx|xlsm|xls|html?)$/i.test(nome))) {
@@ -204,6 +209,8 @@ function getFontes(token) {
       } catch (e) {
         ignorados.push(caminho + nome + ' (erro: ' + (e && e.message || e) + ')');
       }
+    } else {
+      outros.push(caminho + nome + ' (' + mime + ')');
     }
   };
   if (pastaRads) listarArquivos_(pastaRads, '', tratar);
@@ -212,7 +219,8 @@ function getFontes(token) {
   var nomes = pastaNotas ? [pastaRads && 'RADs: “' + pastaRads.getName() + '”', 'Notas: “' + pastaNotas.getName() + '”'].filter(String)
                          : [pastaRads && 'RADs e notas: “' + pastaRads.getName() + '”'].filter(String);
   return {
-    modo: 'drive', origem: nomes.join(' · '), atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados
+    modo: 'drive', origem: nomes.join(' · '), atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados,
+    outros: outros, versao: VERSAO_CODIGO, pastaRads: pastaRads ? { id: pastaRads.getId(), nome: pastaRads.getName(), url: pastaRads.getUrl() } : null
   };
 }
 

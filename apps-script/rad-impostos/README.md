@@ -14,6 +14,13 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
   **Tomador** (ISSQN retido e recolhido à prefeitura) e **Prestador**, com NFs, municípios e ISSQN de cada grupo; segue os filtros.
 - **Tabela final** com todas as ordens (ordenável, exporta CSV). Ela e a tabela de notas fiscais vêm classificadas por **município**.
 
+## Tutorial e conferência da pasta
+
+- Aba lateral **📘 Tutorial** (e botão **📘 Como usar** na tela do usuário): explica o painel para cada perfil.
+- Quadro **📂 Arquivos lidos da pasta** (aba Impostos): cada RAD encontrado, se foi computado ou desconsiderado (duplicado/erro),
+  de onde veio o período (cabeçalho, nome da subpasta "RAD MMAAAA-Q" ou data de aprovação) e quantas ordens trouxe; PDFs por subpasta.
+- `VERSAO_CODIGO` (Code.gs) e `VERSAO_PAINEL` (Index.html) devem ser iguais: se o Code.gs publicado for antigo, o painel avisa.
+
 ## Regras fiscais
 
 As orientações fiscais do CPE (peça × serviço, Simples, tomador/prestador do ISSQN) estão em

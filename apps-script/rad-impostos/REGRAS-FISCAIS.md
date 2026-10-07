@@ -24,6 +24,8 @@ e nos filtros de Situação **Fora das regras fiscais** / **Regras: verificar**.
 | NF de serviço sem responsável ISSQN informado | aviso (verificar) |
 
 ## RADs
-- Fonte única: pasta `PASTA_FONTES` do Drive (com subpastas), junto com as notas em PDF.
+- Fonte única: pasta `PASTA_FONTES` do Drive (com subpastas), junto com as notas em PDF. Subpastas no padrão "RAD MMAAAA-Q".
+- Período: cabeçalho do RAD → nome da subpasta ("RAD 052026-1" = maio/2026, 1ª quinzena) → data de aprovação.
+- O quadro "📂 Arquivos lidos da pasta" mostra, arquivo a arquivo, o que foi computado, duplicado ou com erro.
 - RAD duplicado pelo **conteúdo** (mesma Unidade, período, ordens e valores) é desconsiderado.
 - Arquivos "UNIAO RAD" são ignorados.
