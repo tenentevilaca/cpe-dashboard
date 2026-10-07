@@ -21,6 +21,10 @@
 // Se não achar uma pasta específica, usa a raiz inteira (com todas as subpastas).
 var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 
+// Pasta única dos RADs e das notas fiscais (PDF), lida com todas as subpastas. Os RADs e notas inseridos pelo
+// painel também são gravados nela. Se ficar vazia, volta a valer a descoberta automática dentro da raiz.
+var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
+
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
 
@@ -137,6 +141,7 @@ function descobrir_(forcar) {
 
 function idsPastas_() {
   var d = descobrir_(false);
+  if (PASTA_FONTES) return { rads: PASTA_FONTES, notas: PASTA_FONTES, prefat: d.prefat, prefatXlsx: d.prefatXlsx, raiz: d.raiz };
   return { rads: d.rads || d.raiz, notas: d.notas || d.raiz, prefat: d.prefat, prefatXlsx: d.prefatXlsx, raiz: d.raiz };
 }
 
@@ -173,7 +178,7 @@ function getFontes(token) {
   }
 
   var pastaRads = abrirPasta_(ids.rads, 'RADs');
-  var pastaNotas = abrirPasta_(ids.notas, 'notas');
+  var pastaNotas = ids.notas === ids.rads ? null : abrirPasta_(ids.notas, 'notas'); // mesma pasta: lida uma vez só
   var rads = [], pdfs = [], vistos = {}, ignorados = [], consolidados = [];
   var cache = lerCache_();
 
@@ -204,7 +209,8 @@ function getFontes(token) {
   if (pastaRads) listarArquivos_(pastaRads, '', tratar);
   if (pastaNotas) listarArquivos_(pastaNotas, '', tratar);
 
-  var nomes = [pastaRads && 'RADs: “' + pastaRads.getName() + '”', pastaNotas && 'Notas: “' + pastaNotas.getName() + '”'].filter(String);
+  var nomes = pastaNotas ? [pastaRads && 'RADs: “' + pastaRads.getName() + '”', 'Notas: “' + pastaNotas.getName() + '”'].filter(String)
+                         : [pastaRads && 'RADs e notas: “' + pastaRads.getName() + '”'].filter(String);
   return {
     modo: 'drive', origem: nomes.join(' · '), atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados
   };

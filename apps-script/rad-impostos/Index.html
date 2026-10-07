@@ -1371,14 +1371,27 @@ function periodoPorData(data) {
 
 /** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. */
 function notasDosRads(rads) {
-  var notas = [], vistas = {}, avisos = [];
+  var notas = [], vistas = {}, avisos = [], conteudos = {};
+  // Ordem estável (pelo caminho/nome): entre arquivos duplicados fica sempre o mesmo.
+  rads = rads.slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR', { numeric: true }); });
   rads.forEach(function (r) {
     var rad;
     try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); } catch (e) { avisos.push(e.message); return; }
+    // Duplicidade pelo CONTEÚDO (não pelo nome): mesma Unidade, mesmo período e as mesmas ordens com os mesmos valores.
+    // O arquivo repetido é desconsiderado inteiro, mesmo que esteja em outra subpasta ou com outro nome.
+    var todas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade);
+    var assinatura = rad.unidade + '#' + (rad.periodo || '') + '#' + todas.map(function (n) {
+      return [n.os, n.nfPeca, n.nfServ, n.placa, n.aprovado, n.liquido].join('|');
+    }).sort().join(';');
+    if (todas.length && conteudos[assinatura]) {
+      avisos.push('“' + r.nome + '” tem o mesmo conteúdo de “' + conteudos[assinatura] + '” (RAD duplicado) e foi desconsiderado.');
+      return;
+    }
+    conteudos[assinatura] = r.nome;
     // Ordem repetida só é descartada dentro do mesmo RAD (mesma Unidade e período): assim um RAD enviado duas vezes não
     // duplica valores, mas uma OS que aparece em quinzenas diferentes continua contando em cada RAD.
     var identRad = rad.unidade + '|' + (rad.periodo || '');
-    var novas = linhasParaNotas(rad.cab, rad.linhas, rad.unidade).filter(function (n) {
+    var novas = todas.filter(function (n) {
       var k = [identRad, n.os, n.nfPeca, n.nfServ, n.placa].join('|');
       if (vistas[k]) return false;
       vistas[k] = 1; return true;
