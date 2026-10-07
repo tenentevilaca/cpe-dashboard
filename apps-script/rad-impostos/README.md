@@ -19,6 +19,9 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
 - Aba lateral **📘 Tutorial** (e botão **📘 Como usar** na tela do usuário): explica o painel para cada perfil.
 - Quadro **📂 Arquivos lidos da pasta** (aba Impostos): cada RAD encontrado, se foi computado ou desconsiderado (duplicado/erro),
   de onde veio o período (cabeçalho, nome da subpasta "RAD MMAAAA-Q" ou data de aprovação) e quantas ordens trouxe; PDFs por subpasta.
+- O quadro também traz a contagem **por subpasta** (RADs lidos, RADs em PDF, PDFs de notas, outros). Subpasta "RAD …" sem RAD lido
+  gera aviso no topo. Atalhos do Drive são seguidos; RAD em Excel de verdade (.xlsx/.xls binário) é convertido no servidor e,
+  se a conversão falhar, lido no navegador. RAD salvo em PDF não é lido (precisa do .xls exportado do sistema).
 - `VERSAO_CODIGO` (Code.gs) e `VERSAO_PAINEL` (Index.html) devem ser iguais: se o Code.gs publicado for antigo, o painel avisa.
 
 ## Regras fiscais

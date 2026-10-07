@@ -1460,6 +1460,19 @@ function carregar() {
   loading.textContent = 'Lendo os RADs e as notas…';
   statusTopo('⏳ Sincronizando dados com o Drive (RADs e notas fiscais)…');
   chamar('getFontes').then(function (res) {
+    // RADs em Excel que o servidor não conseguiu converter: o navegador lê o Excel (biblioteca SheetJS).
+    var bins = (res.rads || []).filter(function (r) { return r.bin; });
+    if (!bins.length) return res;
+    return carregarScript(LIB.xlsx, function () { return window.XLSX; }).then(function () {
+      bins.forEach(function (r) {
+        try { r.grade = gradeDoExcel(XLSX.read(r.bin, { type: 'base64', cellDates: true })); } catch (e) { r.grade = null; }
+        if (!r.grade) { res.ignorados = (res.ignorados || []).concat(r.nome + ' (Excel sem a tabela do RAD)'); r.descartar = true; }
+        delete r.bin;
+      });
+      res.rads = res.rads.filter(function (r) { return !r.descartar; });
+      return res;
+    });
+  }).then(function (res) {
     var notas, avisos = [];
     if (res.modo === 'drive') {
       var r = notasDosRads(res.rads);
@@ -1476,7 +1489,14 @@ function carregar() {
     }
     FONTE = { modo: res.modo, origem: res.origem, atualizadoEm: res.atualizadoEm, avisos: avisos,
               nRads: (res.rads || []).length, consolidados: res.consolidados || [],
-              relatorio: r ? r.relatorio : [], ignorados: res.ignorados || [], outros: res.outros || [], pastaRads: res.pastaRads };
+              relatorio: r ? r.relatorio : [], ignorados: res.ignorados || [], outros: res.outros || [], pastaRads: res.pastaRads,
+              inventario: res.inventario || [], radsPdf: res.radsPdf || [] };
+    // Subpasta de RAD ("RAD 052026-1") sem nenhum RAD legível: avisa o motivo provável.
+    (res.inventario || []).forEach(function (x) {
+      if (!/(^|[^a-z])rad([^a-z]|$)/i.test(x.pasta.split('/').pop()) || x.rads) return;
+      avisos.push('Subpasta “' + x.pasta + '”: nenhum RAD em .xls lido' + (x.radsPdf ? ' — há ' + x.radsPdf + ' RAD(s) em PDF, que não dá para ler; coloque o .xls exportado do sistema' :
+        x.outros ? ' — ' + x.outros + ' arquivo(s) não reconhecido(s) como RAD (veja “Arquivos lidos da pasta”)' : x.pdfs ? ' — só há PDFs (' + x.pdfs + ')' : ' — pasta vazia') + '.');
+    });
     exibir(notas);
   }).catch(erroCarga);
 }
@@ -1578,20 +1598,23 @@ function periodoPorData(data) {
   return p;
 }
 
-var VERSAO_PAINEL = '2026-10-07b'; // deve ser igual a VERSAO_CODIGO do Code.gs
+var VERSAO_PAINEL = '2026-10-07c'; // deve ser igual a VERSAO_CODIGO do Code.gs
 
 /** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
 function renderRelatorioArquivos() {
-  var box = document.getElementById('relArquivos'), rel = FONTE.relatorio || [];
-  box.hidden = !rel.length;
-  if (!rel.length) return;
+  var box = document.getElementById('relArquivos'), rel = FONTE.relatorio || [], invt = FONTE.inventario || [];
+  box.hidden = !rel.length && !invt.length;
+  if (box.hidden) return;
+  // Abre o quadro sozinho quando alguma subpasta de RAD não teve RAD lido.
+  if (invt.some(function (x) { return /(^|[^a-z])rad([^a-z]|$)/i.test(x.pasta.split('/').pop()) && !x.rads; })) box.open = true;
   var c = { lido: 0, duplicado: 0, erro: 0, vazio: 0 };
   rel.forEach(function (x) { c[x.status]++; });
   var pastas = {};
   PDFS.forEach(function (p) { var k = (p.caminho || '').replace(/\/$/, '') || '(pasta principal)'; pastas[k] = (pastas[k] || 0) + 1; });
   document.getElementById('relResumo').textContent = '📂 Arquivos lidos da pasta — ' + c.lido + ' RAD(s) computado(s)' +
     (c.duplicado ? ' · ' + c.duplicado + ' duplicado(s) desconsiderado(s)' : '') + (c.erro + c.vazio ? ' · ' + (c.erro + c.vazio) + ' com problema' : '') +
-    ' · ' + PDFS.length + ' PDF(s) de notas (clique para ver)';
+    ' · ' + PDFS.length + ' PDF(s) de notas' + ((FONTE.radsPdf || []).length ? ' · ' + FONTE.radsPdf.length + ' RAD(s) em PDF (não lidos)' : '') +
+    ((FONTE.ignorados || []).length + (FONTE.outros || []).length ? ' · ' + ((FONTE.ignorados || []).length + (FONTE.outros || []).length) + ' arquivo(s) não lido(s)' : '') + ' (clique para ver)';
   var pr = FONTE.pastaRads;
   document.getElementById('relPasta').innerHTML = pr ? 'Pasta lida (com todas as subpastas): <a href="' + esc(pr.url) + '" target="_blank" rel="noopener">' + esc(pr.nome) + '</a>' : '';
   var st = { lido: ['ok', '✓ Computado'], duplicado: ['warn', '≡ Duplicado'], erro: ['bad', '✕ Erro'], vazio: ['bad', '∅ Sem ordens'] };
@@ -1601,8 +1624,14 @@ function renderRelatorioArquivos() {
   }).join('');
   var outros = (FONTE.ignorados || []).map(function (x) { return 'não é RAD: ' + x; }).concat((FONTE.consolidados || []).map(function (x) { return '“UNIAO RAD” ignorada: ' + x; }))
     .concat((FONTE.outros || []).map(function (x) { return 'não lido: ' + x; }));
-  document.getElementById('relOutros').innerHTML =
-    (Object.keys(pastas).length ? '<b>PDFs por subpasta:</b> ' + Object.keys(pastas).sort().map(function (k) { return esc(k) + ' (' + pastas[k] + ')'; }).join(' · ') : '') +
+  var tabInv = invt.length ? '<b>Por subpasta:</b><div class="tbl-wrap" style="max-height:260px;margin:6px 0 10px"><table><thead><tr><th>Subpasta</th><th class="n">RADs (.xls) lidos</th>' +
+    '<th class="n">RADs em PDF</th><th class="n">PDFs de notas</th><th class="n">Outros</th></tr></thead><tbody>' + invt.map(function (x) {
+      return '<tr><td>' + esc(x.pasta) + '</td><td class="n">' + (x.rads ? x.rads : '<span class="tag bad">0</span>') + '</td><td class="n">' + (x.radsPdf || '') +
+        '</td><td class="n">' + (x.pdfs || '') + '</td><td class="n">' + (x.outros || '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '';
+  outros = (FONTE.radsPdf || []).map(function (x) { return 'RAD em PDF (precisa do .xls): ' + x; }).concat(outros);
+  document.getElementById('relOutros').innerHTML = tabInv +
+    (!invt.length && Object.keys(pastas).length ? '<b>PDFs por subpasta:</b> ' + Object.keys(pastas).sort().map(function (k) { return esc(k) + ' (' + pastas[k] + ')'; }).join(' · ') : '') +
     (outros.length ? '<br><b>Outros arquivos:</b> ' + outros.map(esc).join(' · ') : '');
 }
 
@@ -1780,7 +1809,13 @@ function lerArquivos(files) {
       passo = carregarScript(LIB.xlsx, function () { return window.XLSX; }).then(function () {
         return Promise.all(planilhas.map(function (p) {
           return lerComo(p.file, 'bin').then(function (buf) {
-            var t = tabelaDaPlanilha(XLSX.read(buf, { type: 'array', cellDates: true }));
+            var wb = XLSX.read(buf, { type: 'array', cellDates: true }), g = gradeDoExcel(wb);
+            if (g && g.slice(0, 40).some(function (l) { return l.some(function (v) { return /Per[ií]odo:|[ÓO]rg[ãa]o \/ Entidade/i.test(String(v)); }); })) {
+              var rr = notasDosRads([{ nome: p.file.name, grade: g }]);
+              notas = notas.concat(rr.notas); avisos = avisos.concat(rr.avisos); origem.push(p.file.name);
+              return;
+            }
+            var t = tabelaDaPlanilha(wb);
             if (!t) { avisos.push('“' + p.file.name + '” não tem a aba de dados (cabeçalho começando por "Placa").'); return; }
             notas = notas.concat(linhasParaNotas(t[0], t.slice(1), ''));
             origem.push(p.file.name);
@@ -1807,6 +1842,14 @@ function lerArquivos(files) {
       exibir(notas.map(function (n) { delete n._p; return n; }));
     });
   }).catch(function (e) { erroCarga(e); if (!NOTAS.length) document.getElementById('drop').hidden = false; });
+}
+/** RAD em Excel: a aba com o cabeçalho "Placa" na 1ª coluna, inteira (com o cabeçalho do relatório: Órgão, Período…). */
+function gradeDoExcel(wb) {
+  for (var i = 0; i < wb.SheetNames.length; i++) {
+    var t = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], { header: 1, raw: false, defval: '', dateNF: 'dd/mm/yyyy hh:mm' });
+    if (t.slice(0, 40).some(function (l) { return /^\s*placa\s*$/i.test(String(l[0] || '')); })) return t;
+  }
+  return null;
 }
 function tabelaDaPlanilha(wb) {
   var nomes = wb.SheetNames.slice().sort(function (a) { return a === ABA_DADOS ? -1 : 1; });

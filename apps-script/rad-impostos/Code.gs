@@ -26,7 +26,7 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
 // Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
-var VERSAO_CODIGO = '2026-10-07b';
+var VERSAO_CODIGO = '2026-10-07c';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
@@ -182,8 +182,14 @@ function getFontes(token) {
 
   var pastaRads = abrirPasta_(ids.rads, 'RADs');
   var pastaNotas = ids.notas === ids.rads ? null : abrirPasta_(ids.notas, 'notas'); // mesma pasta: lida uma vez só
-  var rads = [], pdfs = [], vistos = {}, ignorados = [], consolidados = [], outros = [];
+  var rads = [], pdfs = [], vistos = {}, ignorados = [], consolidados = [], outros = [], radsPdf = [], inventario = {};
   var cache = lerCache_();
+  // Contagem por subpasta (o painel mostra no quadro "Arquivos lidos da pasta").
+  var inv = function (caminho, tipo) {
+    var k = caminho.replace(/\/$/, '') || '(pasta principal)';
+    var x = inventario[k] = inventario[k] || { pasta: k, rads: 0, pdfs: 0, radsPdf: 0, outros: 0 };
+    x[tipo]++;
+  };
 
   var tratar = function (arq, caminho) {
     var id = arq.getId();
@@ -191,26 +197,47 @@ function getFontes(token) {
     vistos[id] = 1;
     var nome = arq.getName();
     var mime = arq.getMimeType();
+    // Atalho do Drive: segue para o arquivo/pasta de verdade.
+    if (mime === 'application/vnd.google-apps.shortcut') {
+      try {
+        var alvoId = arq.getTargetId(), alvoMime = arq.getTargetMimeType();
+        if (alvoMime === 'application/vnd.google-apps.folder') {
+          if (!vistos[alvoId]) { vistos[alvoId] = 1; listarArquivos_(DriveApp.getFolderById(alvoId), caminho + nome + '/', tratar); }
+          return;
+        }
+        arq = DriveApp.getFileById(alvoId); mime = arq.getMimeType(); id = alvoId;
+        if (vistos['f' + id]) return;
+        vistos['f' + id] = 1;
+      } catch (e) { outros.push(caminho + nome + ' (atalho sem acesso)'); inv(caminho, 'outros'); return; }
+    }
+    // RAD salvo em PDF: não é nota fiscal e não dá para ler os valores com segurança — precisa do .xls do sistema.
+    if ((mime === MimeType.PDF || /\.pdf$/i.test(nome)) && /relat[oó]rio.{0,20}(sint|despesa)|sint[eé]tico.{0,10}despesa|(^|[^a-z])rad([^a-z]|$)/i.test(nome)) {
+      radsPdf.push(caminho + nome); inv(caminho, 'radsPdf');
+      return;
+    }
     if (mime === MimeType.PDF || /\.pdf$/i.test(nome)) {
+      inv(caminho, 'pdfs');
       var c = cache[id];
       // "lido": já tem impressão no cache (o painel busca só os números que precisa com impressoesCache).
       pdfs.push({ id: id, nome: nome, caminho: caminho, lido: !!(c && c.atualizado === arq.getLastUpdated().getTime()) });
     } else if (IGNORAR_RADS.test(nome)) {
       consolidados.push(caminho + nome); // planilha consolidada: os dados já estão nos RADs das unidades
+      inv(caminho, 'outros');
     } else if (/fatur/i.test(nome)) {
-      outros.push(caminho + nome + ' (pré-faturamento)');
-    } else if (/rad|relat/i.test(caminho + nome) && !/fatur/i.test(nome) &&
-               (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
-                /\.(xlsx|xlsm|xls|html?)$/i.test(nome))) {
+      outros.push(caminho + nome + ' (pré-faturamento)'); inv(caminho, 'outros');
+    } else if (mime === MimeType.GOOGLE_SHEETS || mime === MimeType.MICROSOFT_EXCEL || mime === MimeType.MICROSOFT_EXCEL_LEGACY ||
+               /^text\/(html|plain)$|octet-stream|ms-excel|spreadsheet/i.test(mime) || /\.(xlsx|xlsm|xls|html?)$/i.test(nome) ||
+               (/rad|relat/i.test(caminho + nome) && !/^(image|video|audio)\/|google-apps\.(document|presentation|form|folder)/i.test(mime))) {
+      // Qualquer planilha/HTML (com ou sem extensão) é testada: só vira RAD se tiver a tabela do RAD (cabeçalho "Placa").
       try {
-        var rad = lerRadArquivo_(arq, mime);
-        if (rad) { rad.nome = caminho + nome; rads.push(rad); }
-        else ignorados.push(caminho + nome);
+        var rad = arq.getSize && arq.getSize() > 30 * 1024 * 1024 ? null : lerRadArquivo_(arq, mime);
+        if (rad) { rad.nome = caminho + nome; rads.push(rad); inv(caminho, 'rads'); }
+        else { ignorados.push(caminho + nome + ' (' + mime + ')'); inv(caminho, 'outros'); }
       } catch (e) {
-        ignorados.push(caminho + nome + ' (erro: ' + (e && e.message || e) + ')');
+        ignorados.push(caminho + nome + ' (erro: ' + (e && e.message || e) + ')'); inv(caminho, 'outros');
       }
     } else {
-      outros.push(caminho + nome + ' (' + mime + ')');
+      outros.push(caminho + nome + ' (' + mime + ')'); inv(caminho, 'outros');
     }
   };
   if (pastaRads) listarArquivos_(pastaRads, '', tratar);
@@ -220,7 +247,8 @@ function getFontes(token) {
                          : [pastaRads && 'RADs e notas: “' + pastaRads.getName() + '”'].filter(String);
   return {
     modo: 'drive', origem: nomes.join(' · '), atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados,
-    outros: outros, versao: VERSAO_CODIGO, pastaRads: pastaRads ? { id: pastaRads.getId(), nome: pastaRads.getName(), url: pastaRads.getUrl() } : null
+    outros: outros, radsPdf: radsPdf, versao: VERSAO_CODIGO,
+    inventario: Object.keys(inventario).sort().map(function (k) { return inventario[k]; }), pastaRads: pastaRads ? { id: pastaRads.getId(), nome: pastaRads.getName(), url: pastaRads.getUrl() } : null
   };
 }
 
@@ -238,9 +266,17 @@ function lerRadArquivo_(arq, mime) {
   var ehXlsBin = b.length > 1 && (b[0] & 0xFF) === 0xD0 && (b[1] & 0xFF) === 0xCF; // Excel 97-2003
   if (ehXlsx || ehXlsBin) {
     // Converte uma cópia temporária em Planilha Google só para ler, e apaga em seguida.
-    var tmp = Drive.Files.create({ name: '_tmp_rad_' + arq.getName(), mimeType: MimeType.GOOGLE_SHEETS }, blob, { fields: 'id' });
-    try { return gradeDaPlanilha_(SpreadsheetApp.openById(tmp.id)); }
-    finally { DriveApp.getFileById(tmp.id).setTrashed(true); }
+    // Se a conversão falhar (serviço "Drive API" desativado, cota etc.), o arquivo vai para o navegador, que lê o Excel.
+    try {
+      var tmp = Drive.Files.create({ name: '_tmp_rad_' + arq.getName(), mimeType: MimeType.GOOGLE_SHEETS }, blob, { fields: 'id' });
+      try { var g = gradeDaPlanilha_(SpreadsheetApp.openById(tmp.id)); if (g) return g; }
+      finally { DriveApp.getFileById(tmp.id).setTrashed(true); }
+    } catch (e) {
+      if (b.length <= 8 * 1024 * 1024) return { bin: Utilities.base64Encode(b), conv: String(e && e.message || e) };
+      throw e;
+    }
+    if (b.length <= 8 * 1024 * 1024) return { bin: Utilities.base64Encode(b), conv: 'tabela do RAD não encontrada na conversão' };
+    return null;
   }
   var html = blob.getDataAsString('UTF-8');
   if (/title-rad|Sint(&eacute;|é)tico da Despesa|<table/i.test(html) && /Placa/i.test(html)) return { grade: gradeDoHtml_(html) };
