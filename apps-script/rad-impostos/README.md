@@ -123,6 +123,14 @@ adm. e valor líquido — e o botão **A pagar** (ao clicar vira **✓ Pago**; o
 data e responsável do pagamento, opção de desfazer e exportação CSV. O registro fica na aba oculta `_rads_pagos`.
 O gestor também vê a aba SOFI.
 
+## Almoxarifado — pagamento dos RADs
+
+Perfil **Almoxarifado** (`ALMOX`): o usuário pede acesso na tela de login (aba "Solicitar acesso") e o gestor, em **Acessos**,
+escolhe o perfil **Almoxarifado** e aprova. Ao entrar com login e senha, ele vê **só a aba 📦 Almoxarifado**: a mesma tela da
+SOFI (RADs a pagar, Consultar RADs, CSV e o painel de Impostos sem os botões de inserir/pastas). O controle de pagamento é
+**próprio do Almoxarifado**, na aba oculta `_rads_pagos_almox`: marcar um RAD como pago no Almoxarifado não altera a SOFI, e vice-versa.
+Cada setor só lê e grava o próprio controle; o gestor vê as duas abas.
+
 ## Visual
 
 Identidade "Gestão à Vista CPE": menu lateral preto com o escudo padrão PMMG/CPE (imagem `escudo-pmmg-cpe.webp`, embutida

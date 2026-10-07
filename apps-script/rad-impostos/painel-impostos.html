@@ -334,6 +334,7 @@
   <div class="marca">Painel de Gestão</div>
   <button class="nav-btn" data-view="impostos" aria-current="page"><span class="ic">📊</span><span class="tx">Impostos RAD</span></button>
   <button class="nav-btn so-drive" data-view="sofi"><span class="ic">🏦</span><span class="tx">SOFI<small>pagamento dos RADs</small></span></button>
+  <button class="nav-btn so-drive" data-view="almox"><span class="ic">📦</span><span class="tx">Almoxarifado<small>pagamento dos RADs</small></span></button>
   <button class="nav-btn so-drive so-gestor" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento<small>gestão</small></span></button>
   <button class="nav-btn so-drive so-gestor" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
   <div class="nav-rodape so-drive">
@@ -441,7 +442,7 @@
 <div class="wrap" id="viewSofi" hidden>
   <header>
     <div>
-      <h1>SOFI — Pagamento dos RADs</h1>
+      <h1 id="sofiTitulo">SOFI — Pagamento dos RADs</h1>
       <div class="sub">Totais de cada RAD (Unidade × quinzena). Quando o RAD for pago, clique em <b>“A pagar”</b>: ele vira <b>“✓ Pago”</b> e sai da lista na próxima atualização (continua em “Consultar RADs”).</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1293,7 +1294,7 @@ function exibir(notas) {
   montarFiltros();
   render();
   buscarNotas();
-  if (VIEW === 'sofi') sofiCarregar();
+  if (VIEW === 'sofi' || VIEW === 'almox') sofiCarregar();
   statusTopo('✓ Dados atualizados' + (FONTE.atualizadoEm ? ' em ' + FONTE.atualizadoEm : '') + ' · ' + NOTAS.length + ' ordens');
 }
 function erroCarga(e) {
@@ -2048,7 +2049,10 @@ function statusTopo(msg, erro) {
 
 /* ---------------- SOFI: pagamento dos RADs ---------------- */
 var VIEW = '';
-var SOFI = { pagos: null, consulta: false, carregando: false, nestaSessao: {} };
+var SOFI = { pagos: null, consulta: false, carregando: false, nestaSessao: {}, setor: '' };
+// A mesma tela serve à SOFI e ao Almoxarifado; cada setor tem o seu controle de pagamento no servidor.
+var SETORES = { SOFI: 'SOFI', ALMOX: 'Almoxarifado' };
+function setorAtual() { return VIEW === 'almox' ? 'ALMOX' : 'SOFI'; }
 
 /** Totais de cada RAD (Unidade + período) a partir das ordens lidas. */
 function radsResumo() {
@@ -2074,10 +2078,12 @@ function sofiCarregar() {
   if (SOFI.carregando) return;
   SOFI.carregando = true;
   l.hidden = false;
-  chamar('listarPagamentos').then(function (p) {
+  var setor = setorAtual();
+  chamar('listarPagamentos', setor).then(function (p) {
+    if (setor !== setorAtual()) return; // trocou de aba enquanto carregava
     SOFI.pagos = p; l.hidden = true; document.getElementById('sofiApp').hidden = false; sofiRender();
   }).catch(function (e) { l.textContent = 'Erro: ' + (e && e.message || e); })
-    .then(function () { SOFI.carregando = false; });
+    .then(function () { SOFI.carregando = false; if (!SOFI.pagos && (VIEW === 'sofi' || VIEW === 'almox')) sofiCarregar(); });
 }
 
 function sofiRender() {
@@ -2146,7 +2152,7 @@ function sofiMarcar(b, chave, pago, semConfirmar) {
   if (!semConfirmar && !confirm(msg)) return;
   if (pago) SOFI.nestaSessao[chave] = 1;
   b.disabled = true; b.textContent = '⏳';
-  chamar('marcarPago', chave, { unidade: r.unidade, periodo: r.rotPeriodo, qtd: r.qtd, aprovado: r.aprovado, impostos: r.impostos, adm: r.adm, liquido: r.liquido }, pago)
+  chamar('marcarPago', chave, { unidade: r.unidade, periodo: r.rotPeriodo, qtd: r.qtd, aprovado: r.aprovado, impostos: r.impostos, adm: r.adm, liquido: r.liquido }, pago, setorAtual())
     .then(function (res) { SOFI.pagos[chave] = { pago: res.pago, em: res.em, por: res.por }; sofiRender(); })
     .catch(function (e) { alert('Não foi possível registrar: ' + (e && e.message || e)); sofiRender(); });
 }
@@ -2160,7 +2166,7 @@ function sofiCsv() {
             pg ? pagos[r.chave].em : '', pg ? pagos[r.chave].por : '', Object.keys(r.arquivos).join(', ')].map(cel).join(';');
   });
   var csv = '\ufeffUnidade;Período;Nº de OS;Valor aprovado;Impostos retidos;Taxa adm.;Valor líquido;Situação;Pago em;Por;Arquivo(s) RAD\n' + linhas.join('\n');
-  baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'rads_sofi.csv');
+  baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'rads_' + setorAtual().toLowerCase() + '.csv');
 }
 
 /* ---------------- Navegação lateral ---------------- */
@@ -2169,19 +2175,29 @@ function mostrarView(v) {
     if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   VIEW = v;
-  var titulos = { impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
+  var titulos = { impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', almox: 'Almoxarifado — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
                   acessos: 'Gestão de Acessos', usuario: 'Minhas notas — Pré-faturamento', login: 'Pré-faturamento — RAD' };
   document.getElementById('topoTitulo').textContent = titulos[v] || '';
   ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi'].forEach(function (k) {
-    document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = v !== k && !(v === 'sofi' && k === 'impostos');
+    var setorial = v === 'sofi' || v === 'almox';
+    document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = !(v === k || (setorial && (k === 'sofi' || k === 'impostos')));
   });
-  // Na aba SOFI: pagamento dos RADs + painel de Impostos completo, sem os botões de inserir RADs/notas e de pastas.
-  document.body.classList.toggle('modo-sofi', v === 'sofi');
+  // Nas abas SOFI e Almoxarifado: pagamento dos RADs + painel de Impostos completo, sem os botões de inserir RADs/notas e de pastas.
+  var setorial = v === 'sofi' || v === 'almox';
+  document.body.classList.toggle('modo-sofi', setorial);
   if (v === 'acessos') acCarregar();
-  if (v === 'sofi') { SOFI.nestaSessao = {}; if (SOFI.pagos) sofiRender(); sofiCarregar(); }
+  if (setorial) {
+    var setor = setorAtual();
+    document.getElementById('sofiTitulo').textContent = SETORES[setor] + ' — Pagamento dos RADs';
+    if (SOFI.setor !== setor) { SOFI.setor = setor; SOFI.pagos = null; SOFI.consulta = false; }
+    SOFI.nestaSessao = {};
+    if (SOFI.pagos) sofiRender();
+    else { document.getElementById('sofiApp').hidden = true; document.getElementById('sofiLoading').hidden = false; }
+    sofiCarregar();
+  }
   // A planilha de pré-faturamento só é carregada quando o painel é aberto (economiza dados).
   if (v === 'prefat' && !PF.dados && !PF.carregando) pfCarregar();
-  if ((v === 'impostos' || v === 'sofi') && NOTAS.length) render();
+  if ((v === 'impostos' || setorial) && NOTAS.length) render();
   if (v === 'login' || v === 'usuario') document.getElementById('lateral').hidden = true;
   window.scrollTo(0, 0);
 }
@@ -2356,13 +2372,19 @@ function iniciar() {
   if (window.TOKEN_INICIAL) { guardarToken(window.TOKEN_INICIAL); window.TOKEN_INICIAL = ''; } // aberto pelo menu da planilha
   chamar('getSessao').then(function (s) {
     SESSAO = s;
-    if (s && s.perfil === 'SOFI') {
+    if (s && (s.perfil === 'SOFI' || s.perfil === 'ALMOX')) {
+      // SOFI e Almoxarifado: só a própria aba (pagamento dos RADs + Impostos, sem inserir/pastas).
+      var propria = s.perfil === 'SOFI' ? 'sofi' : 'almox';
       document.getElementById('lateral').hidden = false;
       document.querySelectorAll('.so-gestor').forEach(function (el) { el.hidden = true; });
+      // SOFI continua vendo também a aba Impostos; o Almoxarifado vê só a própria aba.
+      document.querySelectorAll('#lateral .nav-btn[data-view]').forEach(function (b) {
+        if (b.dataset.view !== propria && !(propria === 'sofi' && b.dataset.view === 'impostos')) b.hidden = true;
+      });
       ['btnInserirRad', 'btnInserirNota', 'btnPasta'].forEach(function (id) { document.getElementById(id).hidden = true; });
-      document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · SOFI';
+      document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · ' + SETORES[s.perfil];
       document.getElementById('navSair').hidden = false; document.getElementById('navSenha').hidden = false;
-      mostrarView('sofi');
+      mostrarView(propria);
       carregar();
     } else if (s && s.perfil === 'GESTOR') {
       document.getElementById('lateral').hidden = false;
@@ -2593,7 +2615,7 @@ function acRender() {
     return '<tr class="acc" data-l="' + esc(u.login) + '"><td><span class="tag ' + (tag[u.status] || '') + '">' + esc(u.status) + '</span></td>' +
       '<td>' + esc(u.nome) + '</td><td>' + esc(u.login) + '</td>' +
       '<td><input data-f="unidade" value="' + esc(u.unidade) + '" list="dlUnidades"></td><td><input data-f="cia" value="' + esc(u.cia) + '" list="dlCias"></td>' +
-      '<td><select data-f="perfil">' + [['USUARIO', 'Usuário (Unidade)'], ['SOFI', 'SOFI'], ['GESTOR', 'Gestor']].map(function (o) {
+      '<td><select data-f="perfil">' + [['USUARIO', 'Usuário (Unidade)'], ['SOFI', 'SOFI'], ['ALMOX', 'Almoxarifado'], ['GESTOR', 'Gestor']].map(function (o) {
         return '<option value="' + o[0] + '"' + ((u.perfil || 'USUARIO') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td>' +
       '<td>' + esc(u.solicitado) + '</td><td>' + esc(u.acesso || '—') + '</td><td><div class="acoes">' + acoes + '</div></td></tr>';
   }).join('') : '<tr><td class="empty" colspan="9">Nenhum usuário nesta situação.</td></tr>';

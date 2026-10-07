@@ -760,12 +760,19 @@ function exigirGestor_(token) {
   throw new Error('Acesso restrito à gestão. Entre com um login de gestor.');
 }
 
-/** Leitura dos dados de impostos/notas: gestão e SOFI. */
+/** Leitura dos dados de impostos/notas: gestão, SOFI e Almoxarifado. */
 function exigirLeitura_(token) {
   if (gestorGoogle_()) return { perfil: 'GESTOR', nome: gestorGoogle_() };
   var s = sessao_(token);
-  if (s && (s.perfil === 'GESTOR' || s.perfil === 'SOFI')) return s;
-  throw new Error('Acesso restrito à gestão e à SOFI.');
+  if (s && (s.perfil === 'GESTOR' || s.perfil === 'SOFI' || s.perfil === 'ALMOX')) return s;
+  throw new Error('Acesso restrito à gestão, à SOFI e ao Almoxarifado.');
+}
+
+/** Controle de pagamento de um setor (SOFI ou ALMOX): o gestor acessa os dois; cada setor só o seu. */
+function exigirSetor_(token, setor) {
+  var s = exigirLeitura_(token);
+  if (s.perfil !== 'GESTOR' && s.perfil !== setor) throw new Error('Acesso restrito a este setor.');
+  return s;
 }
 
 function exigirUsuario_(token) {
@@ -877,7 +884,7 @@ function decidirUsuario(token, login, acao, dados) {
     dados = dados || {};
     if (dados.unidade != null) u.unidade = String(dados.unidade).trim();
     if (dados.cia != null) u.cia = String(dados.cia).trim();
-    if (['GESTOR', 'SOFI', 'USUARIO'].indexOf(dados.perfil) > -1) u.perfil = dados.perfil;
+    if (['GESTOR', 'SOFI', 'ALMOX', 'USUARIO'].indexOf(dados.perfil) > -1) u.perfil = dados.perfil;
     var resp = { ok: true };
     if (acao === 'APROVAR' || acao === 'REATIVAR') u.status = 'APROVADO';
     else if (acao === 'RECUSAR') u.status = 'RECUSADO';
@@ -1155,20 +1162,23 @@ function salvarNota(token, arq, destino) {
 }
 
 /* ------------------------------------------------------------------ */
-/* SOFI: controle de pagamento dos RADs                                */
+/* SOFI e Almoxarifado: controle de pagamento dos RADs                 */
 /* ------------------------------------------------------------------ */
 /*
  * Cada RAD = Unidade + período (ex.: "BPMRV|2026-09-16|2026-09-30"). Os totais são calculados no painel a partir
- * dos RADs lidos; aqui fica só o registro de pagamento, na aba oculta "_rads_pagos" da planilha do painel.
+ * dos RADs lidos; aqui fica só o registro de pagamento, na aba oculta "_rads_pagos" (SOFI) ou "_rads_pagos_almox"
+ * (Almoxarifado) da planilha do painel. Cada setor tem o seu controle, independente do outro.
  */
 var ABA_PAGOS = '_rads_pagos';
+var ABAS_PAGOS = { SOFI: ABA_PAGOS, ALMOX: '_rads_pagos_almox' };
+function setor_(setor) { return setor === 'ALMOX' ? 'ALMOX' : 'SOFI'; }
 var PAGOS_CAB = ['chave', 'unidade', 'periodo', 'qtd_os', 'valor_aprovado', 'impostos', 'taxa_adm', 'valor_liquido', 'pago', 'pago_em', 'pago_por'];
 
-function abaPagos_() {
-  var ss = painelSS_();
-  var aba = ss.getSheetByName(ABA_PAGOS);
+function abaPagos_(setor) {
+  var ss = painelSS_(), nome = ABAS_PAGOS[setor_(setor)];
+  var aba = ss.getSheetByName(nome);
   if (!aba) {
-    aba = ss.insertSheet(ABA_PAGOS);
+    aba = ss.insertSheet(nome);
     aba.getRange(1, 1, 1, PAGOS_CAB.length).setValues([PAGOS_CAB]);
     aba.hideSheet();
   }
@@ -1176,9 +1186,9 @@ function abaPagos_() {
 }
 
 /** Situação de pagamento de todos os RADs já marcados: { chave: {pago, em, por} }. */
-function listarPagamentos(token) {
-  exigirLeitura_(token);
-  var aba = abaPagos_(), n = aba.getLastRow(), out = {};
+function listarPagamentos(token, setor) {
+  exigirSetor_(token, setor_(setor));
+  var aba = abaPagos_(setor), n = aba.getLastRow(), out = {};
   if (n < 2) return out;
   aba.getRange(2, 1, n - 1, PAGOS_CAB.length).getDisplayValues().forEach(function (l) {
     out[l[0]] = { pago: l[8] === 'SIM', em: l[9], por: l[10] };
@@ -1186,13 +1196,13 @@ function listarPagamentos(token) {
   return out;
 }
 
-/** Marca (pago = true) ou desmarca um RAD como pago pela SOFI, guardando os totais do momento. */
-function marcarPago(token, chave, resumo, pago) {
-  var s = exigirLeitura_(token);
+/** Marca (pago = true) ou desmarca um RAD como pago pelo setor (SOFI/ALMOX), guardando os totais do momento. */
+function marcarPago(token, chave, resumo, pago, setor) {
+  var s = exigirSetor_(token, setor_(setor));
   var quem = s.nome_pm || s.nome || s.login || '';
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
-    var aba = abaPagos_(), n = aba.getLastRow();
+    var aba = abaPagos_(setor), n = aba.getLastRow();
     var chaves = n > 1 ? aba.getRange(2, 1, n - 1, 1).getValues().map(function (l) { return String(l[0]); }) : [];
     var r = resumo || {};
     var linha = [chave, r.unidade || '', r.periodo || '', r.qtd || 0, r.aprovado || 0, r.impostos || 0, r.adm || 0, r.liquido || 0,
