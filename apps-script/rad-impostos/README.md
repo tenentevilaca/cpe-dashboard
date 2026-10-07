@@ -14,6 +14,12 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
   **Tomador** (ISSQN retido e recolhido à prefeitura) e **Prestador**, com NFs, municípios e ISSQN de cada grupo; segue os filtros.
 - **Tabela final** com todas as ordens (ordenável, exporta CSV). Ela e a tabela de notas fiscais vêm classificadas por **município**.
 
+## Regras fiscais
+
+As orientações fiscais do CPE (peça × serviço, Simples, tomador/prestador do ISSQN) estão em
+[`REGRAS-FISCAIS.md`](REGRAS-FISCAIS.md). O painel confere cada ordem com elas (coluna **Regras fiscais** e filtros de
+Situação **Fora das regras fiscais** / **Regras: verificar**), e o filtro **Responsável ISSQN** só considera notas de serviço.
+
 ## Opção 1 — Google Drive + Apps Script (recomendado)
 
 1. **RADs e notas fiscais (PDF)** vêm de uma pasta fixa: `PASTA_FONTES` no `Code.gs`

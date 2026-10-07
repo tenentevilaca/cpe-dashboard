@@ -511,6 +511,8 @@
           <option value="com">Com retenção</option>
           <option value="sem">Sem retenção</option>
           <option value="div">Com diferença</option>
+          <option value="regra">Fora das regras fiscais</option>
+          <option value="regraAviso">Regras: verificar (avisos)</option>
         </select>
       </div>
       <div class="f">
@@ -730,7 +732,10 @@ function preparar(n) {
   if (n.periodo === undefined) n.periodo = periodoPorData(n.data);
   if (!n.radChave) n.radChave = n.unidade + '|' + (n.periodo ? n.periodo.ini + '|' + n.periodo.fim : 'sem-periodo');
   n.respIss = String(n.respIss || '').toUpperCase();
-  n.issRetido = n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0) ? n.iss : 0;
+  // Tomador/prestador é informação da NF de SERVIÇO: nota de peça não tem tomador (ver REGRAS_FISCAIS).
+  n.respIssRad = n.respIss;
+  if (!n.nfServ) n.respIss = '';
+  n.issRetido = n.nfServ && (n.respIss === 'TOMADOR' || (!n.respIss && n.iss > 0)) ? n.iss : 0;
   n.basePeca = r2(n.vPeca + n.icms + n.irPeca);
   n.baseServ = r2(n.vServ + n.irServ + n.issRetido);
   // ICMS desonerado vem como texto na alíquota: usa a alíquota implícita para não acusar diferença falsa.
@@ -748,10 +753,46 @@ function preparar(n) {
   n.dLiquido = r2(n.liquido - n.cLiquido);
   n.temDif = [n.dIcms, n.dIrPeca, n.dIss, n.dIrServ, n.dLiquido].some(function (d) { return Math.abs(d) > TOLERANCIA; });
   n.nNfs = (n.nfPeca ? 1 : 0) + (n.nfServ ? 1 : 0);
+  n.regras = conferirRegras(n);
+  n.regraErro = n.regras.some(function (r) { return r.nivel === 'erro'; });
+  n.regraTxt = n.regras.map(function (r) { return r.msg; }).join(' · ');
   n.perRot = n.periodo ? n.periodo.rotMes + ' · ' + n.periodo.q + 'ª' : '';
   n.busca = [n.periodo ? n.periodo.rot : '', n.placa, n.estab, n.cidade, n.nfPeca, n.nfServ, n.cnpj, n.os, n.modelo, n.resp].join(' ').toLowerCase();
   return n;
 }
+/*
+ * REGRAS FISCAIS (orientações do CPE) — toda conferência do painel segue estas regras:
+ *  NF de PEÇA:    IRRF de peça e desoneração de ICMS, só se a empresa NÃO for optante pelo Simples.
+ *                 Nota de peça NÃO tem tomador nem ISSQN.
+ *  NF de SERVIÇO: IRRF de serviço, só se a empresa NÃO for optante pelo Simples; ISSQN, cujo responsável
+ *                 (prestador ou tomador) depende da legislação do município e vem na NF de serviço.
+ *                 Se o responsável for o TOMADOR, pode haver ou não retenção.
+ * Novas orientações devem ser acrescentadas aqui (e em REGRAS-FISCAIS.md).
+ */
+var REGRAS_FISCAIS = [
+  { id: 'simples-icms', nivel: 'erro', aplica: function (n) { return n.simples === 'Sim' && n.icms > 0; },
+    msg: 'ICMS desonerado em empresa do Simples' },
+  { id: 'simples-irpeca', nivel: 'erro', aplica: function (n) { return n.simples === 'Sim' && n.irPeca > 0; },
+    msg: 'IRRF de peça em empresa do Simples' },
+  { id: 'simples-irserv', nivel: 'erro', aplica: function (n) { return n.simples === 'Sim' && n.irServ > 0; },
+    msg: 'IRRF de serviço em empresa do Simples' },
+  { id: 'peca-sem-iss', nivel: 'erro', aplica: function (n) { return !n.nfServ && (n.iss > 0 || !!n.respIssRad); },
+    msg: 'ISSQN/tomador informado sem NF de serviço (nota de peça não tem tomador)' },
+  { id: 'servico-sem-icms', nivel: 'erro', aplica: function (n) { return !n.nfPeca && (n.icms > 0 || n.irPeca > 0); },
+    msg: 'ICMS/IRRF de peça sem NF de peça' },
+  { id: 'nao-simples-irpeca', nivel: 'aviso', aplica: function (n) { return n.nfPeca && n.simples === 'Não' && n.vPeca > 0 && !(n.irPeca > 0); },
+    msg: 'Sem IRRF de peça (empresa fora do Simples)' },
+  { id: 'nao-simples-icms', nivel: 'aviso', aplica: function (n) { return n.nfPeca && n.simples === 'Não' && n.vPeca > 0 && !(n.icms > 0); },
+    msg: 'Sem desoneração de ICMS (empresa fora do Simples)' },
+  { id: 'nao-simples-irserv', nivel: 'aviso', aplica: function (n) { return n.nfServ && n.simples === 'Não' && n.vServ > 0 && !(n.irServ > 0); },
+    msg: 'Sem IRRF de serviço (empresa fora do Simples)' },
+  { id: 'resp-iss-vazio', nivel: 'aviso', aplica: function (n) { return n.nfServ && !n.respIss; },
+    msg: 'Responsável ISSQN não informado na NF de serviço' }
+];
+function conferirRegras(n) {
+  return REGRAS_FISCAIS.filter(function (r) { return r.aplica(n); }).map(function (r) { return { id: r.id, nivel: r.nivel, msg: r.msg }; });
+}
+
 function dif(n, t) { return n['d' + t.id.charAt(0).toUpperCase() + t.id.slice(1)]; }
 function aliqDe(n, t) { return t.id === 'icms' ? n.pIcmsEfetiva : n[t.aliq]; }
 function rotuloAliq(n, t) { return t.id === 'icms' && n.icmsObs ? 'Desonerado' : P(n[t.aliq]); }
@@ -799,7 +840,10 @@ function filtrar() {
     if (per && !periodoConfere(n, per)) return false;
     if (mun && n.cidade !== mun) return false;
     if (simp && n.simples !== simp) return false;
-    if (resp && (n.respIss || '(vazio)') !== resp) return false;
+    // Responsável ISSQN só existe na NF de serviço: ordens sem NF de serviço ficam fora desse filtro.
+    if (resp && (!n.nfServ || (n.respIss || '(não informado)') !== resp)) return false;
+    if (sit === 'regra' && !n.regraErro) return false;
+    if (sit === 'regraAviso' && !n.regras.length) return false;
     if (q && n.busca.indexOf(q) < 0) return false;
     if (aliq && state.imposto !== 'todos' && rotuloAliq(n, ativos[0]) !== aliq) return false;
     if (sit === 'com' && !ativos.some(function (t) { return n[t.valor] > 0; })) return false;
@@ -833,7 +877,7 @@ function montarFiltros() {
   preencher('fUnidade', unicos(NOTAS.map(function (n) { return n.unidade; })));
   montarPeriodos();
   preencher('fMunicipio', unicos(NOTAS.map(function (n) { return n.cidade; })));
-  preencher('fResp', unicos(NOTAS.map(function (n) { return n.respIss || '(vazio)'; })));
+  preencher('fResp', unicos(NOTAS.filter(function (n) { return n.nfServ; }).map(function (n) { return n.respIss || '(não informado)'; })));
   montarAliquotas();
 
   ['fSituacao', 'fAliquota', 'fPeriodo', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp'].forEach(function (id) {
@@ -1146,6 +1190,7 @@ var COLUNAS = [
   { k: 'aprovado', t: 'Valor Aprovado', m: 1 },
   { k: 'liquido', t: 'Valor Líquido', m: 1 },
   { k: 'difSel', t: 'Diferença', m: 1 },
+  { k: 'regraTxt', t: 'Regras fiscais' },
   { k: 'data', t: 'Aprovação' },
   { k: 'resp', t: 'Responsável' }
 ];
@@ -1181,6 +1226,9 @@ function renderTabela(d) {
       var v = n[c.k], h;
       if (c.f) h = esc(c.f(n));
       else if (c.k === 'difSel') h = Math.abs(v) > TOLERANCIA ? '<span class="tag bad">⚠ ' + R(v) + '</span>' : '<span class="tag ok">✓</span>';
+      else if (c.k === 'regraTxt') h = n.regras.length ? n.regras.map(function (r) {
+        return '<span class="tag ' + (r.nivel === 'erro' ? 'bad' : 'warn') + '" style="margin:1px 0">' + (r.nivel === 'erro' ? '✕ ' : '! ') + esc(r.msg) + '</span>';
+      }).join('<br>') : '<span class="tag ok">✓</span>';
       else if (c.k === 'simples') h = v === 'Sim' ? '<span class="tag warn">Simples</span>' : esc(v);
       else if (c.m) h = v ? R(v) : '<span class="muted">' + R(0) + '</span>';
       else if (c.p) h = v ? P(v) : '<span class="muted">0%</span>';
@@ -1562,7 +1610,7 @@ var NF_IMP = {
   icms:   { tipo: 'peca', rot: 'ICMS',                       valor: 'icms',   aplica: function (n) { return n.nfPeca && n.icms > 0; } },
   irPeca: { tipo: 'peca', rot: 'IRRF Peça',                  valor: 'irPeca', aplica: function (n) { return n.nfPeca && n.irPeca > 0; } },
   irServ: { tipo: 'serv', rot: 'IRRF Serviço',               valor: 'irServ', aplica: function (n) { return n.nfServ && n.irServ > 0; } },
-  iss:    { tipo: 'serv', rot: 'ISSQN retido pelo tomador',  valor: 'iss',    aplica: function (n) { return ehTomador(n); } }
+  iss:    { tipo: 'serv', rot: 'ISSQN — tomador',            valor: 'iss',    aplica: function (n) { return ehTomador(n); } }
 };
 var NF_ORDEM = ['icms', 'irPeca', 'irServ', 'iss'];
 function rotuloTipo(t) { return t === 'peca' ? 'Peça' : 'Serviço'; }
@@ -1570,6 +1618,8 @@ function rotuloTipo(t) { return t === 'peca' ? 'Peça' : 'Serviço'; }
 /** Notas fiscais (documentos) em que incide o imposto escolhido. */
 function documentos(notas, sel) {
   var ids = !sel || sel === 'todos' ? NF_ORDEM : [sel];
+  // Filtro de Responsável ISSQN (tomador/prestador) é da NF de serviço: notas de peça não entram.
+  if (document.getElementById('fResp').value) ids = ids.filter(function (id) { return NF_IMP[id].tipo === 'serv'; });
   var docs = [], porChave = {};
   notas.forEach(function (n) {
     ids.forEach(function (id) {
@@ -1850,14 +1900,16 @@ function renderNotasTomador() {
                                  : '<span class="muted">' + (x.pdf.fp ? 'PDF sem texto legível — só o nome do arquivo confere' : 'Ainda não lido') + '</span>') : '';
     var imps = x.d.imps.map(function (id) {
       return '<span class="cat"><i style="background:var(' + imp(id).cor + ')"></i>' + esc(id === 'iss' ? 'ISSQN' : NF_IMP[id].rot) + '</span>';
-    }).join('<br>') + (x.inferido ? '<div><span class="tag warn" title="Responsável ISSQN vazio no RAD, mas há ISSQN retido">Resp. vazio no RAD</span></div>' : '');
+    }).join('<br>') + (x.d.imps.indexOf('iss') > -1 ? '<div><span class="tag ' + (n.iss > 0 ? 'ok' : '') + '">' + (n.iss > 0 ? 'Tomador · com retenção' : 'Tomador · sem retenção') + '</span></div>' : '') + (x.inferido ? '<div><span class="tag warn" title="Responsável ISSQN vazio no RAD, mas há ISSQN retido">Resp. vazio no RAD</span></div>' : '');
     return '<tr><td class="fixa"><span class="tag ' + s.cls + '">' + s.ic + ' ' + s.rot + '</span></td>' +
       '<td>' + imps + '</td><td>' + rotuloTipo(x.d.tipo) + '</td>' +
       '<td>' + esc(n.unidade) + '</td><td title="' + esc(n.cnpj) + '">' + esc(n.estab) + '<div class="muted" style="font-size:11px">' + esc(n.cnpj) + '</div></td>' +
       '<td>' + esc(n.cidade) + '</td><td><b>' + esc(x.d.numero) + '</b></td><td>' + esc(n.os) + '</td><td>' + esc(n.placa) + '</td>' +
       '<td class="n">' + esc(aliquotaDoc(x.d)) + '</td><td class="n">' + R(valorDoc(x.d)) + '</td>' +
       '<td>' + arq + '</td><td class="checks">' + conf + '</td></tr>';
-  }).join('') : '<tr><td class="empty" colspan="13">Nenhuma nota fiscal de ' + esc(nomeImp) + ' nos filtros atuais.</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="13">' + (document.getElementById('fResp').value && sel !== 'todos' && NF_IMP[sel].tipo === 'peca'
+      ? 'O filtro “Responsável ISSQN” vale só para notas de serviço — nota de peça não tem tomador. Limpe esse filtro para ver as notas de ' + esc(nomeImp) + '.'
+      : 'Nenhuma nota fiscal de ' + esc(nomeImp) + ' nos filtros atuais.') + '</td></tr>';
   rolagemHorizontal('tblNf');
   document.querySelectorAll('#tblNf a[data-local]').forEach(function (a) {
     a.onclick = function (e) {
