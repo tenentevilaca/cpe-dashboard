@@ -14,6 +14,12 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
   **Tomador** (ISSQN retido e recolhido à prefeitura) e **Prestador**, com NFs, municípios e ISSQN de cada grupo; segue os filtros.
 - **Tabela final** com todas as ordens (ordenável, exporta CSV). Ela e a tabela de notas fiscais vêm classificadas por **município**.
 
+## Senhas
+
+- **Nova senha** (aba Acessos): gera uma senha temporária de 8 caracteres (maiúsculas e números, sem 0/O/1/I/L), mostrada uma vez
+  para copiar. Ao entrar com ela, o usuário é obrigado a criar a senha pessoal antes de usar o painel.
+- Os dados de login são gravados como texto na aba `_usuarios` (evita que a planilha transforme o hash da senha em fórmula).
+
 ## Tutorial e conferência da pasta
 
 - Aba lateral **📘 Tutorial** (e botão **📘 Como usar** na tela do usuário): explica o painel para cada perfil.

@@ -375,7 +375,7 @@
     <img class="escudo" id="escudoLogin" alt="">
     <h1>Pré-faturamento — RAD</h1>
     <p class="sub">Consulta das notas da sua Unidade e Cia.</p>
-    <div class="tabs" role="tablist">
+    <div class="tabs" role="tablist" id="loginTabs">
       <button class="chip" id="tabEntrar" aria-pressed="true">Entrar</button>
       <button class="chip" id="tabCadastro" aria-pressed="false">Solicitar acesso</button>
     </div>
@@ -383,6 +383,18 @@
       <div class="f"><label for="lgLogin">Login</label><input id="lgLogin" autocomplete="username" required></div>
       <div class="f"><label for="lgSenha">Senha</label><input id="lgSenha" type="password" autocomplete="current-password" required></div>
       <button class="btn primary" type="submit">Entrar</button>
+    </form>
+    <form id="formTroca" hidden autocomplete="off">
+      <h2 style="margin:6px 0 4px">🔑 Defina sua nova senha</h2>
+      <p class="hint" id="trocaHint"></p>
+      <div class="f" id="trocaAtualBox"><label for="trAtual">Senha atual</label><input id="trAtual" type="password" autocomplete="current-password"></div>
+      <div class="f"><label for="trNova">Nova senha (mínimo 6 caracteres)</label><input id="trNova" type="password" autocomplete="new-password" required minlength="6"></div>
+      <div class="f"><label for="trNova2">Confirmar a nova senha</label><input id="trNova2" type="password" autocomplete="new-password" required minlength="6"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" type="submit">Salvar nova senha</button>
+        <button class="btn" type="button" id="trCancelar" hidden>Cancelar</button>
+        <button class="btn" type="button" id="trSair" hidden>Sair</button>
+      </div>
     </form>
     <form id="formCadastro" hidden autocomplete="off">
       <p class="hint">Preencha seus dados. O gestor confere e libera o acesso só às notas da sua Unidade e Cia.</p>
@@ -552,7 +564,8 @@
   <section class="card tut" id="tut-acessos" data-perfis="GESTOR">
     <h2>9. Acessos (gestão)</h2>
     <p>Lista os pedidos de acesso. Escolha o <b>perfil</b> — <b>Usuário</b> (Unidade/Cia), <b>SOFI</b>, <b>Almoxarifado</b> ou <b>Gestor</b> —, confira Unidade e Cia
-      e clique em <b>Aprovar</b>. Também é possível bloquear, reativar e gerar senha temporária.</p>
+      e clique em <b>Aprovar</b>. Também é possível bloquear e reativar. <b>Nova senha</b> gera uma senha temporária (mostrada uma única vez,
+      para copiar e repassar); a senha antiga deixa de valer e, ao entrar com a temporária, o usuário é levado a criar a própria senha.</p>
   </section>
 
   <section class="card tut" id="tut-faq" data-perfis="GESTOR SOFI ALMOX USUARIO">
@@ -567,7 +580,8 @@
       <dt>Por que o filtro de tomador não mostra notas de peça?</dt>
       <dd>Porque tomador/prestador do ISSQN é informação da nota de serviço; nota de peça não tem tomador.</dd>
       <dt>Esqueci a senha.</dt>
-      <dd>Peça à gestão uma senha temporária (aba Acessos) e troque-a em 🔑 Trocar senha.</dd>
+      <dd>Peça à gestão uma <b>senha temporária</b> (aba Acessos › Nova senha). Entre com ela: o painel pede na hora para você criar a sua senha pessoal.
+        A senha temporária usa só letras maiúsculas e números, sem 0/O e 1/I/L.</dd>
     </dl>
   </section>
 </div>
@@ -1601,7 +1615,7 @@ function periodoPorData(data) {
   return p;
 }
 
-var VERSAO_PAINEL = '2026-10-08'; // deve ser igual a VERSAO_CODIGO do Code.gs
+var VERSAO_PAINEL = '2026-10-08b'; // deve ser igual a VERSAO_CODIGO do Code.gs
 
 /** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
 function renderRelatorioArquivos() {
@@ -2717,6 +2731,7 @@ function iniciar() {
   if (window.TOKEN_INICIAL) { guardarToken(window.TOKEN_INICIAL); window.TOKEN_INICIAL = ''; } // aberto pelo menu da planilha
   chamar('getSessao').then(function (s) {
     SESSAO = s;
+    if (s && s.trocarSenha) { mostrarTroca(true, ''); return; }
     if (s && (s.perfil === 'SOFI' || s.perfil === 'ALMOX')) {
       // SOFI e Almoxarifado: só a própria aba (pagamento dos RADs + Impostos, sem inserir/pastas).
       var propria = s.perfil === 'SOFI' ? 'sofi' : 'almox';
@@ -2797,10 +2812,13 @@ function configurarLogin() {
   document.getElementById('formEntrar').onsubmit = function (e) {
     e.preventDefault();
     var b = this.querySelector('button'); b.disabled = true; msgLogin('⏳ Entrando…', true);
-    chamar('entrar', document.getElementById('lgLogin').value, document.getElementById('lgSenha').value).then(function (r) {
+    var senhaDigitada = document.getElementById('lgSenha').value;
+    chamar('entrar', document.getElementById('lgLogin').value, senhaDigitada).then(function (r) {
       guardarToken(r.token);
       document.getElementById('lgSenha').value = '';
       msgLogin('');
+      // Entrou com a senha temporária gerada pelo gestor: vai direto para a troca de senha.
+      if (r.trocarSenha) { mostrarTroca(true, senhaDigitada); return; }
       iniciar();
     }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
   };
@@ -2819,6 +2837,31 @@ function configurarLogin() {
     }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
   };
 }
+/* ---------------- Troca de senha (obrigatória após senha temporária, ou voluntária) ---------------- */
+var TROCA = { atual: '', obrigatoria: false, voltar: '', lateral: false };
+function mostrarTroca(obrigatoria, atual) {
+  TROCA = { atual: atual || '', obrigatoria: obrigatoria, voltar: obrigatoria ? '' : VIEW, lateral: !document.getElementById('lateral').hidden };
+  mostrarView('login');
+  document.getElementById('topoTitulo').textContent = 'Trocar senha';
+  ['loginTabs', 'formEntrar', 'formCadastro'].forEach(function (id) { document.getElementById(id).hidden = true; });
+  document.getElementById('formTroca').hidden = false;
+  document.getElementById('formTroca').reset();
+  document.getElementById('trocaAtualBox').hidden = !!TROCA.atual;
+  document.getElementById('trAtual').required = !TROCA.atual;
+  document.getElementById('trCancelar').hidden = obrigatoria;
+  document.getElementById('trSair').hidden = !obrigatoria;
+  document.getElementById('trocaHint').textContent = obrigatoria
+    ? 'Você entrou com uma senha temporária. Para continuar, crie agora a sua senha pessoal.' + (TROCA.atual ? '' : ' Informe também a senha temporária.')
+    : 'Informe a senha atual e a nova senha.';
+  msgLogin('');
+  document.getElementById(TROCA.atual ? 'trNova' : 'trAtual').focus();
+}
+function fecharTroca() {
+  document.getElementById('formTroca').hidden = true;
+  document.getElementById('loginTabs').hidden = false;
+  abaLogin(false);
+}
+
 function sairSessao() {
   chamar('sair').catch(function () {}).then(function () { guardarToken(''); SESSAO = null; location.reload(); });
 }
@@ -2971,10 +3014,11 @@ function acRender() {
       if (acao === 'TESTAR') { acTestar(b); return; }
       if (acao === 'RECUSAR' && !confirm('Recusar o pedido de ' + b.dataset.l + '?')) return;
       if (acao === 'BLOQUEAR' && !confirm('Bloquear o acesso de ' + b.dataset.l + '?')) return;
+      if (acao === 'SENHA' && !confirm('Gerar uma senha temporária para ' + b.dataset.l + '?\nA senha atual dele deixa de funcionar e, ao entrar, ele terá de criar uma nova.')) return;
       if (acao === 'APROVAR' && (!g('unidade') || !g('cia')) && !confirm('Unidade ou Cia em branco. Aprovar mesmo assim?')) return;
       b.disabled = true; b.textContent = '⏳';
       chamar('decidirUsuario', b.dataset.l, acao, { unidade: g('unidade'), cia: g('cia'), perfil: g('perfil') }).then(function (r) {
-        if (r.senhaTemporaria) alert('Senha temporária de ' + b.dataset.l + ': ' + r.senhaTemporaria + '\nPasse ao usuário e peça para trocá-la em “Trocar senha”.');
+        if (r.senhaTemporaria) prompt('Senha temporária de ' + b.dataset.l + ' (copie e passe ao usuário).\nAo entrar com ela, o painel pede para ele criar a senha pessoal:', r.senhaTemporaria);
         acCarregar();
       }).catch(function (e) { alert('Erro: ' + (e && e.message || e)); acCarregar(); });
     };
@@ -3036,10 +3080,29 @@ document.addEventListener('DOMContentLoaded', function () {
   // Usuário da Unidade não tem barra lateral: abre o tutorial por um botão e volta para "Minhas notas".
   document.getElementById('uTutorial').onclick = function () { TUT_VOLTAR = 'usuario'; mostrarView('tutorial'); };
   document.getElementById('tutVoltar').onclick = function () { var v = TUT_VOLTAR; TUT_VOLTAR = ''; mostrarView(v || 'impostos'); };
-  document.getElementById('uSenha').onclick = function () {
-    var at = prompt('Senha atual:'); if (at == null) return;
-    var nv = prompt('Nova senha (mínimo 6 caracteres):'); if (nv == null) return;
-    chamar('trocarSenha', at, nv).then(function () { alert('Senha alterada.'); }).catch(function (e) { alert(e && e.message || e); });
+  document.getElementById('uSenha').onclick = function () { mostrarTroca(false, ''); };
+  document.getElementById('trCancelar').onclick = function () {
+    fecharTroca();
+    if (TROCA.lateral) document.getElementById('lateral').hidden = false;
+    mostrarView(TROCA.voltar || 'impostos');
+  };
+  document.getElementById('trSair').onclick = sairSessao;
+  document.getElementById('formTroca').onsubmit = function (e) {
+    e.preventDefault();
+    var atual = TROCA.atual || document.getElementById('trAtual').value;
+    var nova = document.getElementById('trNova').value, nova2 = document.getElementById('trNova2').value;
+    if (nova.length < 6) { msgLogin('A nova senha precisa ter pelo menos 6 caracteres.'); return; }
+    if (nova !== nova2) { msgLogin('A confirmação não confere com a nova senha.'); return; }
+    var b = this.querySelector('button[type=submit]'); b.disabled = true; msgLogin('⏳ Salvando…', true);
+    chamar('trocarSenha', atual, nova).then(function () {
+      var obrig = TROCA.obrigatoria;
+      fecharTroca();
+      msgLogin('✅ Senha alterada.', true);
+      if (obrig) { iniciar(); return; }
+      if (TROCA.lateral) document.getElementById('lateral').hidden = false;
+      mostrarView(TROCA.voltar || 'impostos');
+      alert('Senha alterada.');
+    }).catch(function (err) { msgLogin(err && err.message || String(err)); }).then(function () { b.disabled = false; });
   };
   iniciar();
 });

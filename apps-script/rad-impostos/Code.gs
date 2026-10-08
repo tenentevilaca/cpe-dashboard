@@ -26,7 +26,7 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
 // Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
-var VERSAO_CODIGO = '2026-10-08';
+var VERSAO_CODIGO = '2026-10-08b';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
@@ -719,7 +719,8 @@ var SESSAO_SEGUNDOS = 6 * 60 * 60;   // sessão de login vale 6 horas
 // e, depois disso, a senha pode ser trocada pelo próprio admin em "Trocar senha".
 var ADMIN_INICIAL = { login: 'frotacpe', nome_pm: 'Administrador — Frota CPE', cia: 'CPE', unidade: 'CPE',
                       sal: 'eHvZdKLsGHzi4gU-', hash: 'AZ2mTHuvhFl2yOoSmIc0wpbK/z8PNC4l20Fj8bGRCRg=' };
-var USU_CAB = ['login', 'nome_pm', 'cia', 'unidade', 'hash', 'sal', 'status', 'perfil', 'solicitado_em', 'decidido_em', 'decidido_por', 'ultimo_acesso'];
+var USU_CAB = ['login', 'nome_pm', 'cia', 'unidade', 'hash', 'sal', 'status', 'perfil', 'solicitado_em', 'decidido_em', 'decidido_por', 'ultimo_acesso',
+               'trocar_senha'];
 
 function agora_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'); }
 
@@ -730,6 +731,8 @@ function abaUsuarios_() {
     aba = ss.insertSheet(ABA_USUARIOS);
     aba.getRange(1, 1, 1, USU_CAB.length).setValues([USU_CAB]);
     aba.hideSheet();
+  } else if (String(aba.getRange(1, USU_CAB.length).getValue()) !== USU_CAB[USU_CAB.length - 1]) {
+    aba.getRange(1, 1, 1, USU_CAB.length).setValues([USU_CAB]); // coluna nova (trocar_senha) em planilha antiga
   }
   return aba;
 }
@@ -768,12 +771,20 @@ function garantirAdmin_(aba) {
   var u = { login: ADMIN_INICIAL.login, nome_pm: ADMIN_INICIAL.nome_pm, cia: ADMIN_INICIAL.cia, unidade: ADMIN_INICIAL.unidade,
             hash: ADMIN_INICIAL.hash, sal: ADMIN_INICIAL.sal, status: 'APROVADO', perfil: 'GESTOR',
             solicitado_em: agora_(), decidido_em: agora_(), decidido_por: 'configuração inicial' };
-  aba.appendRow(USU_CAB.map(function (c) { return u[c] == null ? '' : u[c]; }));
+  aba.appendRow(linhaUsuario_(u));
+}
+
+/*
+ * Tudo é gravado como TEXTO (apóstrofo na frente): sem isso a planilha pode transformar o hash/sal da senha que
+ * começa com "+", "-" ou "=" em fórmula (#ERROR!), ou um login "007" em número — e a senha deixa de conferir.
+ */
+function linhaUsuario_(u) {
+  return USU_CAB.map(function (c) { var v = u[c] == null ? '' : String(u[c]); return v === '' ? '' : "'" + v; });
 }
 
 function gravarUsuario_(u) {
   var aba = abaUsuarios_();
-  var linha = USU_CAB.map(function (c) { return u[c] == null ? '' : u[c]; });
+  var linha = linhaUsuario_(u);
   if (u.linha) aba.getRange(u.linha, 1, 1, USU_CAB.length).setValues([linha]);
   else aba.appendRow(linha);
 }
@@ -793,10 +804,13 @@ function novoToken_() {
     Utilities.getUuid() + Math.random() + Date.now(), Utilities.Charset.UTF_8)).replace(/=+$/, '');
 }
 
-function sessao_(token) {
+function sessao_(token, permitirTroca) {
   if (!token) return null;
   var v = CacheService.getScriptCache().get('sess_' + token);
-  return v ? JSON.parse(v) : null;
+  var s = v ? JSON.parse(v) : null;
+  // Entrou com senha temporária: só pode trocar a senha antes de usar o painel.
+  if (s && s.trocar && !permitirTroca) throw new Error('Defina sua nova senha para continuar.');
+  return s;
 }
 
 /** Gestor pela conta Google (menu da planilha / dono do App da Web) ou por login com perfil GESTOR. */
@@ -843,8 +857,8 @@ function getSessao(token) {
   lembrarPlanilha_();
   var g = gestorGoogle_();
   if (g) return { perfil: 'GESTOR', nome: g, google: true };
-  var s = sessao_(token);
-  return s ? { perfil: s.perfil, nome: s.nome_pm, unidade: s.unidade, cia: s.cia, google: !!s.planilha } : null;
+  var s = sessao_(token, true);
+  return s ? { perfil: s.perfil, nome: s.nome_pm, unidade: s.unidade, cia: s.cia, google: !!s.planilha, trocarSenha: !!s.trocar } : null;
 }
 
 /** Opções de Unidade e Cia para o formulário de cadastro (tiradas da planilha de pré-faturamento). */
@@ -883,7 +897,7 @@ function solicitarAcesso(dados) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     if (lerUsuarios_().some(function (u) { return u.login === login; })) throw new Error('Este login já existe. Escolha outro ou fale com o gestor.');
-    var sal = novoToken_().slice(0, 16);
+    var sal = novoSal_();
     gravarUsuario_({ login: login, nome_pm: nome, cia: cia, unidade: unidade, hash: hashSenha_(senha, sal), sal: sal,
                      status: 'PENDENTE', perfil: 'USUARIO', solicitado_em: agora_() });
   } finally { lock.releaseLock(); }
@@ -905,20 +919,37 @@ function entrar(login, senha) {
   if (u.status !== 'APROVADO') throw new Error('Acesso ' + u.status.toLowerCase() + '. Fale com o gestor.');
   var token = novoToken_();
   var sess = { login: u.login, nome_pm: u.nome_pm, cia: u.cia, unidade: u.unidade, perfil: u.perfil || 'USUARIO' };
+  if (u.trocar_senha === 'SIM') sess.trocar = true; // senha temporária: troca obrigatória antes de continuar
   cache.put('sess_' + token, JSON.stringify(sess), SESSAO_SEGUNDOS);
   u.ultimo_acesso = agora_(); gravarUsuario_(u);
-  return { token: token, perfil: sess.perfil, nome: u.nome_pm, unidade: u.unidade, cia: u.cia };
+  return { token: token, perfil: sess.perfil, nome: u.nome_pm, unidade: u.unidade, cia: u.cia, trocarSenha: !!sess.trocar };
 }
 
 function sair(token) { if (token) CacheService.getScriptCache().remove('sess_' + token); return true; }
 
 function trocarSenha(token, atual, nova) {
-  var s = exigirUsuario_(token);
-  if (String(nova || '').length < 6) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
+  var s = sessao_(token, true);
+  if (!s) throw new Error('Sessão expirada. Entre novamente.');
+  if (!s.login || s.planilha) throw new Error('Esta conta entra pelo Google; não há senha do painel para trocar.');
+  nova = String(nova || '');
+  if (nova.length < 6) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
+  if (nova === String(atual || '')) throw new Error('A nova senha precisa ser diferente da atual.');
   var u = lerUsuarios_().filter(function (x) { return x.login === s.login; })[0];
   if (!u || hashSenha_(String(atual || ''), u.sal) !== u.hash) throw new Error('Senha atual incorreta.');
-  u.sal = novoToken_().slice(0, 16); u.hash = hashSenha_(nova, u.sal); gravarUsuario_(u);
+  u.sal = novoSal_(); u.hash = hashSenha_(nova, u.sal); u.trocar_senha = ''; gravarUsuario_(u);
+  if (s.trocar) { delete s.trocar; CacheService.getScriptCache().put('sess_' + token, JSON.stringify(s), SESSAO_SEGUNDOS); }
   return { ok: true };
+}
+
+/** Sal só com letras e números (nada que a planilha possa confundir com fórmula). */
+function novoSal_() { return novoToken_().replace(/[^a-zA-Z0-9]/g, '').slice(0, 16); }
+
+/** Senha temporária fácil de ditar/digitar: sem 0/O, 1/I/L. */
+function senhaTemporaria_() {
+  var alfabeto = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    Utilities.getUuid() + Math.random() + Date.now(), Utilities.Charset.UTF_8), out = '';
+  for (var i = 0; i < 8; i++) out += alfabeto.charAt((bytes[i] & 255) % alfabeto.length);
+  return out;
 }
 
 /* ---- Gestão de acessos ---- */
@@ -947,8 +978,9 @@ function decidirUsuario(token, login, acao, dados) {
     else if (acao === 'RECUSAR') u.status = 'RECUSADO';
     else if (acao === 'BLOQUEAR') u.status = 'BLOQUEADO';
     else if (acao === 'SENHA') {
-      var temp = novoToken_().replace(/[^a-zA-Z0-9]/g, '').slice(0, 8);
-      u.sal = novoToken_().slice(0, 16); u.hash = hashSenha_(temp, u.sal); resp.senhaTemporaria = temp;
+      var temp = senhaTemporaria_();
+      u.sal = novoSal_(); u.hash = hashSenha_(temp, u.sal); u.trocar_senha = 'SIM'; resp.senhaTemporaria = temp;
+      CacheService.getScriptCache().remove('tent_' + u.login); // libera quem travou por excesso de tentativas
     }
     if (acao !== 'SALVAR' && acao !== 'SENHA') { u.decidido_em = agora_(); u.decidido_por = g.nome || g.nome_pm || g.login || ''; }
     gravarUsuario_(u);
