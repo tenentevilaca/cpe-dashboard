@@ -520,7 +520,7 @@
       <li><b>Indicadores e gráficos</b>: totais retidos, diferenças, distribuição por imposto, alíquota e Unidade.</li>
       <li><b>Notas fiscais</b>: o painel procura cada nota nos PDFs pelo <b>número da nota + número da OS</b>.
         <span class="tag ok">✓ Encontrada</span> = os dois conferem; <span class="tag warn">! Conferir</span> = conferem o nº e o CNPJ, mas não a OS;
-        <span class="tag bad">✕ Não encontrada</span> = o PDF não está na pasta. O botão <b>⬇ Baixar notas encontradas</b> gera um .zip com os PDFs e uma relação em CSV.</li>
+        <span class="tag bad">✕ Não encontrada</span> = o PDF não está na pasta. O botão <b>⬇ Baixar notas encontradas</b> gera um .zip com os PDFs e uma relação em CSV, baixado direto para o seu computador (nada é gravado no Drive).</li>
       <li><b>Card de responsáveis pelo ISSQN</b>: quantos CNPJs distintos têm o <b>tomador</b> (prefeituras) ou o <b>prestador</b> como responsável.</li>
       <li><b>Tabela final</b>: todas as ordens, ordenadas por município (clique no título de uma coluna para mudar a ordem) e <b>⬇ CSV</b> para exportar.</li>
     </ol>
@@ -1615,7 +1615,7 @@ function periodoPorData(data) {
   return p;
 }
 
-var VERSAO_PAINEL = '2026-10-08b'; // deve ser igual a VERSAO_CODIGO do Code.gs
+var VERSAO_PAINEL = '2026-10-08c'; // deve ser igual a VERSAO_CODIGO do Code.gs
 
 /** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
 function renderRelatorioArquivos() {
@@ -2152,12 +2152,11 @@ function renderNotasTomador() {
   bz.disabled = NF.buscando || NF.zipando || !baixaveis;
   bz.classList.toggle('busy', !!(NF.buscando || NF.zipando));
   bz.textContent = NF.buscando ? '⏳ Localizando notas… ' + (NF.lidos || 0) + ' de ' + (NF.total || 0) + ' PDFs'
-                 : NF.zipando ? '⏳ Gerando .zip…'
+                 : NF.zipando ? '⏳ Gerando .zip… ' + (NF.zipProgresso || '')
                  : '⬇ Baixar ' + baixaveis + ' nota(s) encontrada(s) (.zip)';
 
   var st = document.getElementById('nfStatus');
   if (NF.buscando) st.innerHTML = '<span class="ampulheta">⏳</span> Localizando as notas nos PDFs. O download é liberado ao final. (Na primeira vez cada PDF leva alguns segundos; depois fica guardado.)';
-  else if (NF.zipLink) st.innerHTML = '✅ <a href="' + esc(NF.zipLink.url) + '" target="_blank" rel="noopener">Clique aqui se o download do arquivo ' + esc(NF.zipLink.nome) + ' não começar</a>';
   else if ((NF.erros || []).length) st.textContent = '⚠ ' + NF.erros.length + ' PDF(s) não puderam ser lidos. Primeiro erro: ' + NF.erros[0];
   else if (!PDFS.length) st.textContent = MODO === 'offline' ? 'Abra também os PDFs das notas (botão “Abrir arquivos…”).' : 'Nenhum PDF encontrado na pasta de notas.';
   else if (cont.nao) st.textContent = cont.nao + ' nota(s) não encontrada(s) em nenhum dos ' + PDFS.length + ' PDFs — o PDF dela pode não estar na pasta de notas.';
@@ -2217,7 +2216,7 @@ function baixarBlob(blob, nome) {
 function baixarZip() {
   var itens = NF.lista.filter(function (x) { return x.pdf; });
   if (!itens.length || NF.buscando) return;
-  NF.zipando = true; NF.zipLink = null;
+  NF.zipando = true;
   renderNotasTomador();
   var fim = function () { NF.zipando = false; renderNotasTomador(); };
   var nome = nomeZip();
@@ -2237,27 +2236,42 @@ function baixarZip() {
   var csv = '\ufeff' + cab.join(';') + '\n' + linhasCsv.join('\n') + '\n' +
             ['TOTAL', '', '', '', '', '', '', '', itens.length + ' nota(s)', '', '', '', '', '', '', '', '', '', brNum(total)].map(cel).join(';');
 
-  if (MODO === 'appsscript') {
-    // O .zip é montado e gravado no Drive; o navegador baixa direto de lá (sem trafegar pelo painel).
-    chamar('gerarZip', itens.map(function (x) { return { id: x.pdf.id, nome: nomeNoZip(x) }; }), nome, csv).then(function (res) {
-      NF.zipLink = res;
-      var a = document.createElement('a');
-      a.href = res.url; a.target = '_blank'; a.rel = 'noopener';
-      document.body.appendChild(a); a.click(); a.remove();
-    }).catch(function (e) { NF.erros = ['Erro ao gerar o .zip: ' + (e && e.message || e)]; }).then(fim);
-  } else {
-    carregarScript(LIB.zip, function () { return window.JSZip; }).then(function () {
-      var zip = new JSZip(), usados = {};
-      itens.forEach(function (x) {
-        var nm = nomeNoZip(x);
-        if (usados[nm]) nm = nm.replace(/\.pdf$/, '_' + (++usados[nm]) + '.pdf'); else usados[nm] = 1;
-        zip.file(nm, x.pdf.file);
+  // O .zip é montado aqui no navegador e baixado direto para o computador — nada é gravado no Drive.
+  var usados = {}, nomeUnico = function (x) {
+    var nm = nomeNoZip(x);
+    if (usados[nm]) nm = nm.replace(/\.pdf$/, '_' + (++usados[nm]) + '.pdf'); else usados[nm] = 1;
+    return nm;
+  };
+  carregarScript(LIB.zip, function () { return window.JSZip; }).then(function () {
+    var zip = new JSZip();
+    zip.file('relacao_notas.csv', csv);
+    if (MODO !== 'appsscript') {
+      itens.forEach(function (x) { zip.file(nomeUnico(x), x.pdf.file); });
+      return zip;
+    }
+    // Apps Script: busca os PDFs no servidor em lotes (até ~15 MB cada), mostrando o progresso.
+    var porId = {}, pendentes = [];
+    itens.forEach(function (x) { if (!porId[x.pdf.id]) { porId[x.pdf.id] = []; pendentes.push(x.pdf.id); } porId[x.pdf.id].push(x); });
+    var feitos = 0;
+    var lote = function () {
+      if (!pendentes.length) return zip;
+      NF.zipProgresso = feitos + ' de ' + (feitos + pendentes.length) + ' PDF(s)'; renderNotasTomador();
+      return chamar('lerPdfsZip', pendentes.slice(0, 40)).then(function (res) {
+        if (!res.length) throw new Error('o servidor não devolveu os PDFs');
+        res.forEach(function (r) {
+          porId[r.id].forEach(function (x) { zip.file(nomeUnico(x), r.base64, { base64: true }); });
+          pendentes.splice(pendentes.indexOf(r.id), 1); feitos++;
+        });
+        return lote();
       });
-      zip.file('relacao_notas.csv', csv);
-      return zip.generateAsync({ type: 'blob' });
-    }).then(function (blob) { baixarBlob(blob, nome); })
-      .catch(function (e) { NF.erros = ['Erro ao gerar o .zip: ' + (e && e.message || e)]; }).then(fim);
-  }
+    };
+    return lote();
+  }).then(function (zip) {
+    NF.zipProgresso = 'compactando…'; renderNotasTomador();
+    return zip.generateAsync({ type: 'blob' });
+  }).then(function (blob) { baixarBlob(blob, nome); })
+    .catch(function (e) { NF.erros = ['Erro ao gerar o .zip: ' + (e && e.message || e)]; })
+    .then(function () { NF.zipProgresso = ''; fim(); });
 }
 
 /* ---------------- Inserir RADs no Drive ---------------- */

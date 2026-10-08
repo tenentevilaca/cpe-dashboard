@@ -71,8 +71,9 @@ Localização das notas (automática, ao abrir o painel):
 Enquanto localiza, o botão de download mostra ⏳ e fica bloqueado; é liberado ao final.
 
 **Economia de dados:** o RAD é convertido em tabela no servidor (≈ 4× menor que o .xls); dos PDFs o painel
-recebe só os números procurados (dezenas de bytes por PDF, nunca o texto); o .zip é gravado na subpasta
-`Notas tomador (painel)` e baixado direto do Drive (o .zip anterior vai para a lixeira); sem fontes externas.
+recebe só os números procurados (dezenas de bytes por PDF, nunca o texto); o .zip é montado no
+navegador (os PDFs vêm do servidor em lotes de até ~15 MB) e baixado direto para o computador — nada é gravado no Drive.
+A antiga subpasta `Notas tomador (painel)` não é mais usada e pode ser apagada.
 
 Sem pasta configurada, o painel usa a aba `BADE SE DADOS` da planilha (formato consolidado antigo).
 

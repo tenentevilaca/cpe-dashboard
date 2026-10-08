@@ -26,14 +26,14 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
 // Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
-var VERSAO_CODIGO = '2026-10-08b';
+var VERSAO_CODIGO = '2026-10-08c';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
 
 var ABA_DADOS = 'BADE SE DADOS';
 var ABA_CACHE = '_cache_pdf_v2';
-var PASTA_ZIP = 'Notas tomador (painel)';
+var PASTA_ZIP = 'Notas tomador (painel)'; // pasta antiga dos .zip (não é mais criada; só é pulada na leitura)
 var LIMITE_SEGUNDOS = 240; // cada chamada de leitura de PDFs para antes de 4 min (o Apps Script corta em 6)
 
 function onOpen() {
@@ -243,6 +243,10 @@ function getFontes(token) {
   if (pastaRads) listarArquivos_(pastaRads, '', tratar);
   if (pastaNotas) listarArquivos_(pastaNotas, '', tratar);
 
+  try {
+    var ok = {}; pdfs.forEach(function (p) { ok[p.id] = 1; });
+    CacheService.getScriptCache().put('pdfs_permitidos', JSON.stringify(ok), 6 * 3600);
+  } catch (e) {} // lista grande demais para o cache: lerPdfsZip confere pelas pastas-mãe
   var nomes = pastaNotas ? [pastaRads && 'RADs: “' + pastaRads.getName() + '”', 'Notas: “' + pastaNotas.getName() + '”'].filter(String)
                          : [pastaRads && 'RADs e notas: “' + pastaRads.getName() + '”'].filter(String);
   return {
@@ -478,33 +482,44 @@ function gravarCache_(linhas, cache) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Junta os PDFs (e a relação em CSV) num .zip gravado na subpasta PASTA_ZIP da pasta de notas.
- * O navegador baixa o arquivo direto do Drive, sem passar pelo painel (menos dados trafegados).
- * Os .zip gerados antes são enviados para a lixeira.
+ * Entrega ao painel o conteúdo (base64) de um lote de PDFs para o .zip, que é montado e baixado NO NAVEGADOR —
+ * nada é gravado no Drive. Só PDFs da pasta de notas (a lista lida em getFontes, ou conferindo as pastas-mãe).
+ * Lotes de até ~15 MB por chamada; o painel pede o próximo lote até terminar.
  */
-function gerarZip(token, itens, nomeZip, csv) {
+var LIMITE_LOTE_ZIP = 15 * 1024 * 1024;
+function lerPdfsZip(token, ids) {
   exigirLeitura_(token);
-  var usados = {};
-  var blobs = itens.map(function (it) {
-    var blob = DriveApp.getFileById(it.id).getBlob();
-    var nome = (it.nome || blob.getName()).replace(/[\\/:*?"<>|]/g, '_');
-    if (usados[nome]) nome = nome.replace(/(\.pdf)?$/i, '_' + (++usados[nome]) + '.pdf'); else usados[nome] = 1;
-    return blob.setName(nome);
-  });
-  if (csv) blobs.push(Utilities.newBlob(csv, 'text/csv', 'relacao_notas.csv'));
-  var zip = Utilities.zip(blobs, nomeZip);
-
-  var pasta = abrirPasta_(idsPastas_().notas, 'notas');
-  var destinos = pasta.getFoldersByName(PASTA_ZIP);
-  var destino = destinos.hasNext() ? destinos.next() : pasta.createFolder(PASTA_ZIP);
-  // Limpa só .zip com mais de 1 hora: não apaga o de outra pessoa que acabou de gerar e ainda vai baixar.
-  var antigos = destino.getFiles(), limite = Date.now() - 3600 * 1000;
-  while (antigos.hasNext()) {
-    var a = antigos.next();
-    if (/\.zip$/i.test(a.getName()) && a.getDateCreated().getTime() < limite) a.setTrashed(true);
+  var permitidos = null;
+  try { permitidos = JSON.parse(CacheService.getScriptCache().get('pdfs_permitidos') || 'null'); } catch (e) {}
+  var raiz = idsPastas_().notas, out = [], total = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var arq = DriveApp.getFileById(ids[i]);
+    if (!(permitidos && permitidos[ids[i]]) && !dentroDaPasta_(arq, raiz)) throw new Error('Arquivo fora da pasta de notas: ' + arq.getName());
+    if (arq.getMimeType() !== MimeType.PDF && !/\.pdf$/i.test(arq.getName())) throw new Error('Não é PDF: ' + arq.getName());
+    var tam = arq.getSize();
+    if (out.length && total + tam > LIMITE_LOTE_ZIP) break; // o resto vai no próximo lote
+    out.push({ id: ids[i], base64: Utilities.base64Encode(arq.getBlob().getBytes()) });
+    total += tam;
   }
-  var arq = destino.createFile(zip);
-  return { nome: nomeZip, url: 'https://drive.google.com/uc?export=download&id=' + arq.getId(), tamanho: arq.getSize() };
+  return out;
+}
+
+/** O arquivo está dentro da pasta (em qualquer nível de subpasta)? */
+function dentroDaPasta_(arq, pastaId) {
+  var nivel = [], vistos = {};
+  var ps = arq.getParents(); while (ps.hasNext()) nivel.push(ps.next());
+  for (var prof = 0; prof < 10 && nivel.length; prof++) {
+    var prox = [];
+    for (var k = 0; k < nivel.length; k++) {
+      var id = nivel[k].getId();
+      if (id === pastaId) return true;
+      if (vistos[id]) continue;
+      vistos[id] = 1;
+      var pp = nivel[k].getParents(); while (pp.hasNext()) prox.push(pp.next());
+    }
+    nivel = prox;
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------------ */
