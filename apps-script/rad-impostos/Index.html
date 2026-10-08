@@ -1561,14 +1561,17 @@ function lerRadHtml(html, nomeArquivo) {
 
 /** RAD que virou Planilha Google (grade de células). */
 function lerRadGrade(grade, nomeArquivo) {
-  var orgao = '', periodo = '', cab = null, linhas = [];
+  var orgao = '', periodo = '', cab = null, linhas = [], c0 = 0;
   grade.forEach(function (l) {
     l = l.map(function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); });
+    // Planilha convertida pode ter colunas vazias antes da tabela: alinha pela coluna do cabeçalho "Placa".
+    if (!cab) { var ip = l.findIndex(function (v) { return normCab(v) === 'placa'; }); if (ip > 0) c0 = ip; }
     l.forEach(function (v, i) {
       if (!orgao && /^(Nome|Código) Órgão \/ Entidade:?$/i.test(v)) orgao = l.slice(i + 1).filter(String)[0] || '';
       var m = !periodo && /Per[ií]odo:\s*(.+)$/i.exec(v); if (m) periodo = m[1];
       if (!periodo && /^Per[ií]odo:?$/i.test(v)) periodo = l.slice(i + 1).filter(String).join(' ');
     });
+    if (c0) l = l.slice(c0);
     if (normCab(l[0]) === 'placa') { cab = l; return; }
     // Linhas de dados: ao menos 8 células preenchidas (descarta cabeçalhos de página e a linha de totais).
     if (cab && l[0] && !/^qtd de os/i.test(l[0]) && l.filter(String).length >= 8) linhas.push(l);
@@ -1598,7 +1601,7 @@ function periodoPorData(data) {
   return p;
 }
 
-var VERSAO_PAINEL = '2026-10-07c'; // deve ser igual a VERSAO_CODIGO do Code.gs
+var VERSAO_PAINEL = '2026-10-08'; // deve ser igual a VERSAO_CODIGO do Code.gs
 
 /** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
 function renderRelatorioArquivos() {
@@ -1847,7 +1850,7 @@ function lerArquivos(files) {
 function gradeDoExcel(wb) {
   for (var i = 0; i < wb.SheetNames.length; i++) {
     var t = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], { header: 1, raw: false, defval: '', dateNF: 'dd/mm/yyyy hh:mm' });
-    if (t.slice(0, 40).some(function (l) { return /^\s*placa\s*$/i.test(String(l[0] || '')); })) return t;
+    if (t.slice(0, 80).some(function (l) { return l.some(function (v) { return /^\s*placa\s*$/i.test(String(v || '')); }); })) return t;
   }
   return null;
 }

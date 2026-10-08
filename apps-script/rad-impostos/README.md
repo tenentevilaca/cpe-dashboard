@@ -22,6 +22,10 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
 - O quadro também traz a contagem **por subpasta** (RADs lidos, RADs em PDF, PDFs de notas, outros). Subpasta "RAD …" sem RAD lido
   gera aviso no topo. Atalhos do Drive são seguidos; RAD em Excel de verdade (.xlsx/.xls binário) é convertido no servidor e,
   se a conversão falhar, lido no navegador. RAD salvo em PDF não é lido (precisa do .xls exportado do sistema).
+- RAD convertido em Planilha Google (upload com conversão) é lido mesmo com colunas deslocadas; percentuais guardados como
+  fração (0,18) viram 18%.
+- **Diagnóstico sem o painel**: no editor do Apps Script, escolha a função `diagnosticoPasta` › Executar e veja o
+  Registro de execução — lista cada arquivo da pasta, o tipo e se é lido como RAD.
 - `VERSAO_CODIGO` (Code.gs) e `VERSAO_PAINEL` (Index.html) devem ser iguais: se o Code.gs publicado for antigo, o painel avisa.
 
 ## Regras fiscais

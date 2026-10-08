@@ -26,7 +26,7 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
 // Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
-var VERSAO_CODIGO = '2026-10-07c';
+var VERSAO_CODIGO = '2026-10-08';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
@@ -310,13 +310,20 @@ function gradeDaPlanilha_(ss) {
   var tz = Session.getScriptTimeZone();
   var abas = ss.getSheets().slice().sort(function (a) { return a.getName() === ABA_DADOS ? -1 : 1; });
   for (var i = 0; i < abas.length; i++) {
-    var v = abas[i].getDataRange().getValues();
-    var temCab = v.slice(0, 30).some(function (l) { return /^placa$/i.test(String(l[0]).trim()); });
+    var faixa = abas[i].getDataRange(), v = faixa.getValues();
+    // RAD convertido em Planilha Google: o cabeçalho "Placa" pode não estar na coluna A (colunas vazias do HTML).
+    var temCab = v.slice(0, 80).some(function (l) { return l.some(function (x) { return /^placa$/i.test(String(x).trim()); }); });
     if (!temCab) continue;
+    var formatos = faixa.getNumberFormats();
     return {
       aba: abas[i].getName(),
-      grade: v.map(function (l) {
-        return l.map(function (x) { return x instanceof Date ? Utilities.formatDate(x, tz, 'dd/MM/yyyy HH:mm') : x; });
+      grade: v.map(function (l, r) {
+        return l.map(function (x, c) {
+          if (x instanceof Date) return Utilities.formatDate(x, tz, 'dd/MM/yyyy HH:mm');
+          // Percentual guardado como fração (0,18 = 18%): o painel trabalha com 18.
+          if (typeof x === 'number' && /%/.test(formatos[r][c] || '')) return Math.round(x * 1e6) / 1e4;
+          return x;
+        });
       })
     };
   }
@@ -1262,4 +1269,31 @@ function marcarPago(token, chave, resumo, pago, setor) {
     else aba.appendRow(linha);
     return { ok: true, pago: !!pago, em: linha[9], por: linha[10] };
   } finally { lock.releaseLock(); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Diagnóstico da pasta (rodar no editor do Apps Script)               */
+/* ------------------------------------------------------------------ */
+/**
+ * No editor: escolha "diagnosticoPasta" no menu de funções › Executar › veja o "Registro de execução".
+ * Lista cada subpasta e cada arquivo da pasta de RADs/notas com o tipo e o que o painel faz com ele.
+ * Só funciona para o dono do script (conta Google), não pelo App da Web.
+ */
+function diagnosticoPasta() {
+  if (!gestorGoogle_()) throw new Error('Rode esta função pelo editor do Apps Script, com a conta dona do script.');
+  var ids = idsPastas_(), pasta = abrirPasta_(ids.rads, 'RADs'), linhas = [];
+  linhas.push('Pasta: ' + pasta.getName() + ' (' + pasta.getId() + ') · versão ' + VERSAO_CODIGO);
+  listarArquivos_(pasta, '', function (arq, caminho) {
+    var nome = arq.getName(), mime = arq.getMimeType(), destino;
+    if (mime === 'application/vnd.google-apps.shortcut') destino = 'ATALHO → seguido';
+    else if (/pdf/i.test(mime) || /\.pdf$/i.test(nome)) destino = 'PDF';
+    else if (IGNORAR_RADS.test(nome)) destino = 'UNIAO RAD (ignorada)';
+    else {
+      try { var r = lerRadArquivo_(arq, mime); destino = r ? (r.bin ? 'RAD em Excel (lido no navegador: ' + r.conv + ')' : 'RAD OK') : 'NÃO é RAD (sem a tabela "Placa")'; }
+      catch (e) { destino = 'ERRO: ' + (e && e.message || e); }
+    }
+    linhas.push((caminho || './') + nome + '  [' + mime + ', ' + arq.getSize() + ' bytes]  → ' + destino);
+  });
+  Logger.log(linhas.join('\n'));
+  return linhas.join('\n');
 }
