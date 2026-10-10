@@ -26,7 +26,7 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
 // Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
-var VERSAO_CODIGO = '2026-10-08c';
+var VERSAO_CODIGO = '2026-10-10';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
@@ -854,12 +854,7 @@ function exigirLeitura_(token) {
   throw new Error('Acesso restrito à gestão, à SOFI e ao Almoxarifado.');
 }
 
-/** Controle de pagamento de um setor (SOFI ou ALMOX): o gestor acessa os dois; cada setor só o seu. */
-function exigirSetor_(token, setor) {
-  var s = exigirLeitura_(token);
-  if (s.perfil !== 'GESTOR' && s.perfil !== setor) throw new Error('Acesso restrito a este setor.');
-  return s;
-}
+
 
 function exigirUsuario_(token) {
   var s = sessao_(token);
@@ -1276,7 +1271,9 @@ function salvarNota(token, arq, destino) {
 var ABA_PAGOS = '_rads_pagos';
 var ABAS_PAGOS = { SOFI: ABA_PAGOS, ALMOX: '_rads_pagos_almox' };
 function setor_(setor) { return setor === 'ALMOX' ? 'ALMOX' : 'SOFI'; }
-var PAGOS_CAB = ['chave', 'unidade', 'periodo', 'qtd_os', 'valor_aprovado', 'impostos', 'taxa_adm', 'valor_liquido', 'pago', 'pago_em', 'pago_por'];
+var PAGOS_CAB = ['chave', 'unidade', 'periodo', 'qtd_os', 'valor_aprovado', 'impostos', 'taxa_adm', 'valor_liquido', 'pago', 'pago_em', 'pago_por',
+                 'data_pagamento', 'etapa', 'etapa_em', 'etapa_por', 'titulo', 'nf_ticket', 'dados_em', 'dados_por'];
+var ETAPAS = ['FROTA/P4', 'ALMOXARIFADO', 'SOFI'];
 
 function abaPagos_(setor) {
   var ss = painelSS_(), nome = ABAS_PAGOS[setor_(setor)];
@@ -1285,37 +1282,125 @@ function abaPagos_(setor) {
     aba = ss.insertSheet(nome);
     aba.getRange(1, 1, 1, PAGOS_CAB.length).setValues([PAGOS_CAB]);
     aba.hideSheet();
+  } else if (String(aba.getRange(1, PAGOS_CAB.length).getValue()) !== PAGOS_CAB[PAGOS_CAB.length - 1]) {
+    aba.getRange(1, 1, 1, PAGOS_CAB.length).setValues([PAGOS_CAB]); // colunas novas em planilha antiga
   }
   return aba;
 }
 
-/** Situação de pagamento de todos os RADs já marcados: { chave: {pago, em, por} }. */
-function listarPagamentos(token, setor) {
-  exigirSetor_(token, setor_(setor));
-  var aba = abaPagos_(setor), n = aba.getLastRow(), out = {};
+/*
+ * Permissões:
+ *  - ler: o controle da SOFI é lido pela gestão (Frota/P4), SOFI e Almoxarifado; o do Almoxarifado, pela gestão e Almoxarifado;
+ *  - Status de Pagamento: só o próprio setor altera (SOFI no da SOFI) — a Frota/P4 consulta, mas não altera;
+ *  - Etapa de tramitação: Frota/P4, Almoxarifado e SOFI;  - Nº do título e NF Ticket Log: SOFI e Frota/P4.
+ */
+function exigirLeituraPagtos_(token, setor) {
+  var s = exigirLeitura_(token);
+  if (s.perfil === 'GESTOR' || s.perfil === setor || (setor === 'SOFI' && s.perfil === 'ALMOX')) return s;
+  throw new Error('Acesso restrito a este setor.');
+}
+function exigirSetor_(token, setor) {
+  var s = exigirLeitura_(token);
+  if (s.perfil !== setor) throw new Error('Somente ' + (setor === 'SOFI' ? 'a SOFI' : 'o Almoxarifado') + ' pode alterar o Status de Pagamento.');
+  return s;
+}
+/** Número exibido pela planilha em qualquer formato ("98.725,95", "98,725.95", "R$ 98725,95"). */
+function numPlanilha_(v) {
+  var t = String(v == null ? '' : v).replace(/[^\d,.\-]/g, '');
+  var ultV = t.lastIndexOf(','), ultP = t.lastIndexOf('.');
+  if (ultV > ultP) t = t.replace(/\./g, '').replace(',', '.'); else t = t.replace(/,/g, '');
+  return Number(t) || 0;
+}
+function quem_(s) { return s.nome_pm || s.nome || s.login || ''; }
+
+/** Linha gravada como texto (apóstrofo) nos campos de texto, para a planilha não converter datas/códigos. */
+function linhaPagto_(o) {
+  return PAGOS_CAB.map(function (c) {
+    var v = o[c];
+    if (v == null || v === '') return '';
+    if (typeof v === 'number') return v;
+    return "'" + String(v);
+  });
+}
+function lerPagtos_(aba) {
+  var n = aba.getLastRow(), out = {};
   if (n < 2) return out;
-  aba.getRange(2, 1, n - 1, PAGOS_CAB.length).getDisplayValues().forEach(function (l) {
-    out[l[0]] = { pago: l[8] === 'SIM', em: l[9], por: l[10] };
+  aba.getRange(2, 1, n - 1, PAGOS_CAB.length).getDisplayValues().forEach(function (l, i) {
+    var o = { linha: i + 2 };
+    PAGOS_CAB.forEach(function (c, k) { o[c] = l[k]; });
+    if (o.chave) out[o.chave] = o;
   });
   return out;
 }
-
-/** Marca (pago = true) ou desmarca um RAD como pago pelo setor (SOFI/ALMOX), guardando os totais do momento. */
-function marcarPago(token, chave, resumo, pago, setor) {
-  var s = exigirSetor_(token, setor_(setor));
-  var quem = s.nome_pm || s.nome || s.login || '';
+function pagtoParaPainel_(o) {
+  return { pago: o.pago === 'SIM', em: o.pago_em, por: o.pago_por, dataPag: o.data_pagamento, etapa: o.etapa, etapaEm: o.etapa_em,
+           etapaPor: o.etapa_por, titulo: o.titulo, nfTicket: o.nf_ticket, dadosEm: o.dados_em, dadosPor: o.dados_por };
+}
+/** Lê/cria a linha do RAD, aplica a alteração e grava (com trava, para duas pessoas não se sobreporem). */
+function alterarPagto_(setor, chave, resumo, alterar) {
+  if (!chave || !/\|/.test(chave)) throw new Error('RAD inválido.');
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
-    var aba = abaPagos_(setor), n = aba.getLastRow();
-    var chaves = n > 1 ? aba.getRange(2, 1, n - 1, 1).getValues().map(function (l) { return String(l[0]); }) : [];
+    var aba = abaPagos_(setor), todos = lerPagtos_(aba);
+    var o = todos[chave] || { chave: chave, pago: 'NÃO' };
     var r = resumo || {};
-    var linha = [chave, r.unidade || '', r.periodo || '', r.qtd || 0, r.aprovado || 0, r.impostos || 0, r.adm || 0, r.liquido || 0,
-                 pago ? 'SIM' : 'NÃO', pago ? agora_() : '', pago ? quem : ''];
-    var i = chaves.indexOf(chave);
-    if (i > -1) aba.getRange(i + 2, 1, 1, PAGOS_CAB.length).setValues([linha]);
+    // Totais do RAD no momento da alteração (para consulta histórica).
+    if (r.unidade != null) { o.unidade = r.unidade; o.periodo = r.periodo || ''; o.qtd_os = Number(r.qtd) || 0; o.valor_aprovado = Number(r.aprovado) || 0;
+      o.impostos = Number(r.impostos) || 0; o.taxa_adm = Number(r.adm) || 0; o.valor_liquido = Number(r.liquido) || 0; }
+    ['qtd_os', 'valor_aprovado', 'impostos', 'taxa_adm', 'valor_liquido'].forEach(function (c) { if (typeof o[c] === 'string') o[c] = numPlanilha_(o[c]); });
+    alterar(o);
+    var linha = linhaPagto_(o);
+    if (o.linha) aba.getRange(o.linha, 1, 1, PAGOS_CAB.length).setValues([linha]);
     else aba.appendRow(linha);
-    return { ok: true, pago: !!pago, em: linha[9], por: linha[10] };
+    return pagtoParaPainel_(o);
   } finally { lock.releaseLock(); }
+}
+
+/** Situação de pagamento de todos os RADs registrados: { chave: {pago, em, por, dataPag, etapa, …} }. */
+function listarPagamentos(token, setor) {
+  setor = setor_(setor);
+  exigirLeituraPagtos_(token, setor);
+  var todos = lerPagtos_(abaPagos_(setor)), out = {};
+  Object.keys(todos).forEach(function (k) { out[k] = pagtoParaPainel_(todos[k]); });
+  return out;
+}
+
+/**
+ * Status de Pagamento (pago = true → PAGO; false → A PAGAR), só pelo próprio setor.
+ * dataPagamento (dd/mm/aaaa) = data efetiva do pagamento; "em/por" = quando e quem atualizou.
+ */
+function marcarPago(token, chave, resumo, pago, setor, dataPagamento) {
+  setor = setor_(setor);
+  var s = exigirSetor_(token, setor);
+  var data = String(dataPagamento || '').trim();
+  if (pago) {
+    if (!data) data = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(data);
+    if (!m || +m[1] < 1 || +m[1] > 31 || +m[2] < 1 || +m[2] > 12) throw new Error('Data do pagamento inválida (use dd/mm/aaaa).');
+  }
+  return alterarPagto_(setor, chave, resumo, function (o) {
+    o.pago = pago ? 'SIM' : 'NÃO';
+    o.data_pagamento = pago ? data : '';
+    o.pago_em = agora_(); o.pago_por = quem_(s);
+  });
+}
+
+/** Etapa de tramitação (Frota/P4, Almoxarifado, SOFI) e/ou Nº do título e NF Ticket Log de um RAD (controle da SOFI). */
+function salvarInfoRad(token, chave, resumo, campos) {
+  var s = exigirLeitura_(token), c = campos || {};
+  var podeEtapa = ['GESTOR', 'SOFI', 'ALMOX'].indexOf(s.perfil) > -1, podeDados = ['GESTOR', 'SOFI'].indexOf(s.perfil) > -1;
+  if (c.etapa != null && !podeEtapa) throw new Error('Sem permissão para alterar a etapa.');
+  if ((c.titulo != null || c.nfTicket != null) && !podeDados) throw new Error('Somente a SOFI e a Frota/P4 informam o título e a NF da Ticket Log.');
+  if (c.etapa != null && c.etapa !== '' && ETAPAS.indexOf(c.etapa) < 0) throw new Error('Etapa inválida.');
+  var limpa = function (v) { return String(v == null ? '' : v).trim().slice(0, 60); };
+  return alterarPagto_('SOFI', chave, resumo, function (o) {
+    if (c.etapa != null) { o.etapa = c.etapa; o.etapa_em = agora_(); o.etapa_por = quem_(s); }
+    if (c.titulo != null || c.nfTicket != null) {
+      if (c.titulo != null) o.titulo = limpa(c.titulo);
+      if (c.nfTicket != null) o.nf_ticket = limpa(c.nfTicket);
+      o.dados_em = agora_(); o.dados_por = quem_(s);
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ */

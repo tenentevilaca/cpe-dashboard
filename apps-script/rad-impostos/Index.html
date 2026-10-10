@@ -158,6 +158,43 @@
   .drop h2 { color: var(--text); font-size: 17px; margin-bottom: 6px; }
   .drop p { margin: 0 0 16px; }
   .rel-arq { margin-bottom: 16px; }
+  /* Pendências, cliques e Status de Pagamento */
+  .clicavel { cursor: pointer; }
+  tr.clicavel:hover td, td.clicavel:hover { background: var(--hl); }
+  .kpi.clicavel:hover { border-color: var(--gold, var(--accent)); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .kpi.sel { outline: 2px solid var(--gold, var(--accent)); }
+  tr.pend-erro td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+  tr.pend-aviso td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+  .st-pago { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #1f8a4c; color: #fff; font-weight: 700; font-size: 12px; white-space: nowrap; }
+  .st-apagar { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #f0a020; color: #3a2400; font-weight: 700; font-size: 12px; white-space: nowrap; }
+  select.st-sel { font-weight: 700; border-radius: 999px; padding: 3px 8px; border: 1px solid transparent; }
+  select.st-sel.pago { background: #1f8a4c; color: #fff; }
+  select.st-sel.apagar { background: #f0a020; color: #3a2400; }
+  input.inf-rad, input.dt-pag { width: 130px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+  .kpis-pagto { margin-bottom: 10px; }
+  #kpis, #kpisPagto { grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); }
+  #kpis .kpi .v, #kpisPagto .kpi .v { white-space: nowrap; }
+  .kpis-titulo { grid-column: 1 / -1; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi.kpi-pago::before { background: #1f8a4c !important; }
+  .kpi.kpi-apagar::before { background: #f0a020 !important; }
+  .rad-atual { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .rad-card { text-align: left; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--gold, var(--accent)); border-radius: 10px;
+              padding: 10px 14px; cursor: pointer; color: var(--text); font: inherit; line-height: 1.6; }
+  .rad-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+  .rad-num { font-size: 15px; }
+  /* Janela de detalhamento */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: 4vh 12px; overflow: auto; }
+  .modal[hidden] { display: none !important; }
+  .modal-box { background: var(--surface); color: var(--text); border-radius: 12px; width: min(1280px, 100%); padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+  .modal-cab { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+  .modal-rod { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  body.com-modal { overflow: hidden; }
+  .rad-status { padding: 12px 14px; border-radius: 10px; font-size: 16px; margin-bottom: 12px; }
+  .rad-status.pago { background: #1f8a4c; color: #fff; }
+  .rad-status.apagar { background: #f0a020; color: #3a2400; }
+  table.ficha { width: 100%; }
+  table.ficha th { font-weight: 600; color: var(--text-2); padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  table.ficha td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
   .tut { line-height: 1.55; font-size: 14px; }
   .tut h2 { font: 700 18px Georgia, serif; margin-bottom: 8px; }
   .tut h3 { font-size: 14px; margin: 0 0 4px; }
@@ -348,6 +385,7 @@
   <div class="marca">Painel de Gestão</div>
   <button class="nav-btn" data-view="impostos" aria-current="page"><span class="ic">📊</span><span class="tx">Impostos RAD</span></button>
   <button class="nav-btn so-drive" data-view="sofi"><span class="ic">🏦</span><span class="tx">SOFI<small>pagamento dos RADs</small></span></button>
+  <button class="nav-btn so-drive" data-view="pagamentos"><span class="ic">💳</span><span class="tx">Pagamentos dos RADs<small>consulta por status</small></span></button>
   <button class="nav-btn so-drive" data-view="almox"><span class="ic">📦</span><span class="tx">Almoxarifado<small>pagamento dos RADs</small></span></button>
   <button class="nav-btn so-drive so-gestor" data-view="prefat"><span class="ic">🧾</span><span class="tx">Pré-faturamento<small>gestão</small></span></button>
   <button class="nav-btn so-drive so-gestor" data-view="acessos"><span class="ic">👥</span><span class="tx">Acessos<small id="navPend"></small></span></button>
@@ -486,6 +524,7 @@
         desconsiderado, qualquer que seja o nome. Arquivos “UNIAO RAD” (junção dos demais) são ignorados.</li>
       <li>No topo da aba Impostos, o quadro <b>📂 Arquivos lidos da pasta</b> mostra cada arquivo encontrado: se foi computado, se era
         duplicado, de onde veio o período e quantas ordens trouxe. Se um RAD não aparecer no painel, confira primeiro esse quadro.</li>
+      <li><b>Rodapé do RAD</b>: a soma das ordens lidas de cada arquivo é conferida com os totais do rodapé (Ticket Log). Se não bater, vira pendência.</li>
     </ul>
   </section>
 
@@ -517,12 +556,17 @@
           <li><b>Responsável ISSQN</b> (tomador/prestador): vale só para notas de serviço;</li>
           <li><b>Buscar</b>: placa, estabelecimento, nº da NF, cidade ou CNPJ.</li>
         </ul></li>
-      <li><b>Indicadores e gráficos</b>: totais retidos, diferenças, distribuição por imposto, alíquota e Unidade.</li>
+      <li><b>Indicadores</b>: valor movimentado, ICMS desonerado (não é retenção), IRRF Peça, IRRF Serviço, ISSQN retido, retenções efetivas,
+        NFs distintas, líquido e <b>Pendências</b>. Clique nos cards de tributo ou de pendências para ver as notas.</li>
+      <li><b>Pendências por RAD</b>: cada RAD com diferenças (RAD × recalculado), alertas de regras e conferência do rodapé. Clique na linha:
+        aparecem NF, OS, unidade, tipo, tributo, valor no RAD (Ticket Log), valor recalculado, diferença e motivo.</li>
+      <li><b>Gráficos</b>: “Total por tributo” mostra o valor e o nº de NFs distintas (clique na barra para ver as notas); “Valor por alíquota”
+        soma só as notas com valor (a soma confere com o total); com <b>Todos os períodos</b> aparecem as linhas de evolução da movimentação e das retenções.</li>
       <li><b>Notas fiscais</b>: o painel procura cada nota nos PDFs pelo <b>número da nota + número da OS</b>.
         <span class="tag ok">✓ Encontrada</span> = os dois conferem; <span class="tag warn">! Conferir</span> = conferem o nº e o CNPJ, mas não a OS;
         <span class="tag bad">✕ Não encontrada</span> = o PDF não está na pasta. O botão <b>⬇ Baixar notas encontradas</b> gera um .zip com os PDFs e uma relação em CSV, baixado direto para o seu computador (nada é gravado no Drive).</li>
       <li><b>Card de responsáveis pelo ISSQN</b>: quantos CNPJs distintos têm o <b>tomador</b> (prefeituras) ou o <b>prestador</b> como responsável.</li>
-      <li><b>Tabela final</b>: todas as ordens, ordenadas por município (clique no título de uma coluna para mudar a ordem) e <b>⬇ CSV</b> para exportar.</li>
+      <li><b>Quadro final</b>: abas <b>NF-e — Peças</b>, <b>NFS-e — Serviços</b> e <b>Ordens</b>, com totais (iguais ao rodapé do RAD), link do PDF e <b>⬇ CSV</b>.</li>
     </ol>
   </section>
 
@@ -539,10 +583,12 @@
   <section class="card tut" id="tut-pagamento" data-perfis="GESTOR SOFI ALMOX">
     <h2>6. SOFI e Almoxarifado — pagamento dos RADs</h2>
     <ol>
-      <li>A tabela <b>RADs a pagar</b> mostra cada RAD (Unidade × quinzena) com nº de OS, valor aprovado, impostos, taxa adm. e valor líquido.</li>
-      <li>Quando o RAD for pago, clique em <b>A pagar</b> e confirme: o botão vira <b>✓ Pago</b>. Na próxima atualização ele sai da lista.</li>
-      <li><b>📋 Consultar RADs</b> mostra todos (pagos e a pagar), com data e responsável. Clicar em <b>✓ Pago</b> desfaz o pagamento. Exporta em CSV.</li>
-      <li>SOFI e Almoxarifado têm <b>controles independentes</b>: o que um marca não altera o outro. Abaixo da tabela fica o painel de Impostos completo.</li>
+      <li><b>SOFI</b>: na tabela <b>RADs a pagar</b>, mude o <b>Status de Pagamento</b> de <span class="st-apagar">A PAGAR</span> para <span class="st-pago">PAGO</span>
+        e confira a <b>data efetiva do pagamento</b>. Só a SOFI altera o status; o simples envio à SOFI não é pagamento.</li>
+      <li>Na mesma linha: <b>Nº do título</b>, <b>NF Ticket Log</b> e <b>Etapa de tramitação</b> (Frota/P4, Almoxarifado ou SOFI).</li>
+      <li>O status aparece sozinho para a Frota/P4 e o Almoxarifado: nos indicadores de pagamento do painel, na ficha de cada RAD e na
+        aba <b>💳 Pagamentos dos RADs</b> (filtros por status, nº do RAD, unidade, competência e quinzena; ordenação; Excel).</li>
+      <li>Almoxarifado: além de consultar o status da SOFI, tem um controle interno próprio (Pendente / Concluído).</li>
     </ol>
   </section>
 
@@ -600,12 +646,43 @@
   </section>
 </div>
 
+<!-- ================= Consulta de RADs por Status de Pagamento ================= -->
+<div class="wrap" id="viewPagamentos" hidden>
+  <header>
+    <div>
+      <h1>Consulta de RADs por Status de Pagamento</h1>
+      <div class="sub">Todos os RADs de todas as competências, com o Status de Pagamento registrado pela SOFI. Clique em um RAD para ver a ficha.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="pgExcel">⬇ Exportar para Excel</button>
+      <button class="btn" id="pgAtualizar">↻ Atualizar</button>
+    </div>
+  </header>
+  <div id="pagLoading" class="pf-loading"><span class="ampulheta">⏳</span> Carregando os RADs e o Status de Pagamento…</div>
+  <main id="pagApp" hidden>
+    <section class="kpis" id="pgKpis"></section>
+    <section class="filters" aria-label="Filtros da consulta">
+      <div class="f"><label for="pgStatus">Status de Pagamento</label>
+        <select id="pgStatus"><option value="">TODOS</option><option value="apagar">A PAGAR</option><option value="pago">PAGO</option></select></div>
+      <div class="f search"><label for="pgBusca">Nº do RAD</label><input id="pgBusca" type="search" placeholder="Ex.: 09/2026-2, unidade, título…"></div>
+      <div class="f"><label for="pgUnidade">Unidade</label><select id="pgUnidade"></select></div>
+      <div class="f"><label for="pgMes">Competência</label><select id="pgMes"></select></div>
+      <div class="f"><label for="pgQ">Quinzena</label><select id="pgQ"><option value="">Todas</option><option value="1">1ª quinzena</option><option value="2">2ª quinzena</option></select></div>
+      <button class="btn" id="pgLimpar">Limpar filtros</button>
+    </section>
+    <section class="card">
+      <div class="hint" id="pgCont"></div>
+      <div class="tbl-wrap big-table"><table id="pgTabela"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    </section>
+  </main>
+</div>
+
 <!-- ================= SOFI: pagamento dos RADs ================= -->
 <div class="wrap" id="viewSofi" hidden>
   <header>
     <div>
       <h1 id="sofiTitulo">SOFI — Pagamento dos RADs</h1>
-      <div class="sub">Totais de cada RAD (Unidade × quinzena). Quando o RAD for pago, clique em <b>“A pagar”</b>: ele vira <b>“✓ Pago”</b> e sai da lista na próxima atualização (continua em “Consultar RADs”).</div>
+      <div class="sub">Totais de cada RAD (Unidade × quinzena), Status de Pagamento, data do pagamento, Nº do título, NF da Ticket Log e etapa de tramitação.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="sofiConsultar">📋 Consultar RADs</button>
@@ -617,13 +694,14 @@
     <section class="kpis" id="sofiKpis"></section>
     <section class="card">
       <div class="table-tools">
-        <div><h2>RADs a pagar</h2><div class="hint" style="margin:0" id="sofiCont"></div></div>
+        <div><h2 id="sofiTitTabela">RADs a pagar</h2><div class="hint" style="margin:0" id="sofiCont"></div></div>
       </div>
+      <p class="hint" id="sofiAviso"></p>
       <div class="tbl-wrap"><table id="sofiTabela"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
     </section>
     <section class="card" id="sofiConsulta" hidden>
       <div class="table-tools">
-        <div><h2>Todos os RADs</h2><div class="hint" style="margin:0">Pagos e a pagar. Clique em “A pagar” para registrar o pagamento ou em “✓ Pago” para desfazer um registro feito por engano.</div></div>
+        <div><h2>Todos os RADs</h2><div class="hint" style="margin:0">Pagos e a pagar, de todas as competências. Para filtros, ordenação e Excel, use a aba <b>💳 Pagamentos dos RADs</b>.</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="sofiFiltro" class="pf-sel"><option value="">Todos</option><option value="apagar">A pagar</option><option value="pago">Pagos</option></select>
           <button class="btn primary" id="sofiCsv">⬇ Exportar CSV</button>
@@ -666,7 +744,7 @@
     <summary id="relResumo">Arquivos lidos da pasta</summary>
     <div class="hint" id="relPasta"></div>
     <div class="tbl-wrap" style="max-height:420px"><table id="tblRel"><thead><tr>
-      <th>Situação</th><th>Arquivo (subpasta/nome)</th><th>Unidade</th><th>Período</th><th>Período lido de</th><th class="n">Ordens</th><th>Observação</th>
+      <th>Situação</th><th>Arquivo (subpasta/nome)</th><th>Unidade</th><th>Período</th><th>Período lido de</th><th class="n">Ordens</th><th>Rodapé do RAD</th><th>Observação</th>
     </tr></thead><tbody></tbody></table></div>
     <div class="hint" id="relOutros"></div>
   </details>
@@ -718,13 +796,18 @@
       <button class="btn" id="btnLimpar">Limpar filtros</button>
     </section>
 
-    <!-- KPIs -->
+    <!-- RAD(s) da quinzena escolhida, com o Status de Pagamento (SOFI) -->
+    <section class="rad-atual" id="radAtual" hidden></section>
+    <!-- Indicadores de pagamento (Status informado pela SOFI) -->
+    <section class="kpis kpis-pagto" id="kpisPagto" hidden></section>
+    <!-- Indicadores fiscais -->
     <section class="kpis" id="kpis"></section>
 
     <!-- Diferenças por categoria -->
     <section class="card">
-      <h2>Diferenças de imposto por categoria</h2>
-      <p class="hint">Valor informado na planilha × valor recalculado (base × alíquota). Base da peça = Valor a Pagar Peça + ICMS + IRRF; base do serviço = Valor Serviço + IRRF + ISSQN (quando o tomador retém).</p>
+      <h2>Diferenças por tributo — RAD (Ticket Log) × recalculado</h2>
+      <p class="hint">Valor informado no RAD (base Ticket Log) × valor recalculado no Dashboard (base × alíquota). Base da peça = Valor a Pagar Peça + ICMS desonerado + IRRF; base do serviço = Valor Serviço + IRRF + ISSQN retido pelo tomador.
+        <b>Clique na diferença ou na quantidade de notas com diferença</b> para ver as notas fiscais envolvidas.</p>
       <div class="tbl-wrap">
         <table id="tblCategorias">
           <thead><tr>
@@ -733,8 +816,8 @@
             <th class="n">Notas sem retenção</th>
             <th>Alíquotas encontradas</th>
             <th class="n">Base de cálculo</th>
-            <th class="n">Valor informado</th>
-            <th class="n">Valor recalculado</th>
+            <th class="n">Valor no RAD (Ticket Log)</th>
+            <th class="n">Valor recalculado (Dashboard)</th>
             <th class="n">Diferença</th>
             <th class="n">Notas com diferença</th>
             <th class="n">Alíquota efetiva</th>
@@ -748,11 +831,21 @@
       </div>
     </section>
 
+    <!-- Pendências por RAD -->
+    <section class="card">
+      <h2>Pendências por RAD</h2>
+      <p class="hint" id="pendResumo"></p>
+      <div class="tbl-wrap" style="max-height:340px"><table id="tblPendRad"><thead><tr>
+        <th>RAD (competência)</th><th>Unidade</th><th class="n">OS</th><th class="n">Diferenças de valor</th><th class="n">Soma das diferenças</th>
+        <th class="n">Regras (erro)</th><th class="n">Regras (verificar)</th><th>Rodapé do RAD (Ticket Log)</th><th>Conferência</th><th>Status de Pagamento</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+
     <!-- Gráficos -->
     <div class="grid2">
       <section class="card">
-        <h2>Total retido por imposto</h2>
-        <p class="hint">Soma dos valores informados nas notas filtradas.</p>
+        <h2>Total por tributo</h2>
+        <p class="hint">Valor (R$) no fim de cada barra e nº de notas fiscais distintas dentro dela. ICMS desonerado não é retenção na fonte. <b>Clique na barra</b> para ver as notas.</p>
         <div class="chart-box" style="height:240px"><canvas id="chImposto"></canvas></div>
       </section>
       <section class="card">
@@ -764,8 +857,8 @@
     </div>
     <div class="grid2">
       <section class="card">
-        <h2>Notas por alíquota</h2>
-        <p class="hint">Quantidade de notas em cada alíquota do imposto escolhido.</p>
+        <h2>Valor por alíquota</h2>
+        <p class="hint" id="hintAliq"></p>
         <div class="tabs" id="tabsAliq"></div>
         <div class="chart-box" style="height:250px"><canvas id="chAliquota"></canvas></div>
       </section>
@@ -775,6 +868,24 @@
         <div class="chart-box" style="height:282px"><canvas id="chEstab"></canvas></div>
       </section>
     </div>
+
+    <!-- Evolução dos RADs (todos os períodos) -->
+    <section id="secEvolucao">
+      <div class="grid2">
+        <section class="card">
+          <h2>Movimentação financeira por RAD</h2>
+          <p class="hint" id="hintEvolucao"></p>
+          <div class="legend" id="lgMovimento"></div>
+          <div class="chart-box" style="height:260px"><canvas id="chMovimento"></canvas></div>
+        </section>
+        <section class="card">
+          <h2>Evolução das retenções</h2>
+          <p class="hint">IRRF Peça, IRRF Serviço, ISSQN retido e o total das retenções efetivas por competência/quinzena. O ICMS desonerado aparece tracejado e não entra no total.</p>
+          <div class="legend" id="lgRetencoes"></div>
+          <div class="chart-box" style="height:260px"><canvas id="chRetencoes"></canvas></div>
+        </section>
+      </div>
+    </section>
 
     <section class="card">
       <h2>Alíquota × unidade</h2>
@@ -808,10 +919,15 @@
     <section class="card">
       <div class="table-tools">
         <div>
-          <h2>Notas</h2>
+          <h2>Quadro final — documentos fiscais</h2>
           <div class="hint" style="margin:0" id="contTabela"></div>
         </div>
         <button class="btn primary" id="btnCsv">⬇ Exportar CSV</button>
+      </div>
+      <div class="tabs" id="tabsFinal" role="tablist" style="margin:8px 0 10px">
+        <button class="chip" data-tab="peca" aria-pressed="true">🔩 NF-e — Peças</button>
+        <button class="chip" data-tab="serv" aria-pressed="false">🛠 NFS-e — Serviços</button>
+        <button class="chip" data-tab="ordem" aria-pressed="false">📋 Ordens (visão completa)</button>
       </div>
       <div class="tbl-wrap big-table">
         <table id="tblNotas"><thead></thead><tbody></tbody><tfoot></tfoot></table>
@@ -868,14 +984,14 @@
 <script>
 /* ---------------- Configuração ---------------- */
 var IMPOSTOS = [
-  { id: 'icms',   nome: 'ICMS',          cor: '--icms',   valor: 'icms',   aliq: 'pIcms',   base: 'basePeca', calc: 'cIcms' },
+  { id: 'icms',   nome: 'ICMS desonerado', cor: '--icms',   valor: 'icms',   aliq: 'pIcms',   base: 'basePeca', calc: 'cIcms' },
   { id: 'irPeca', nome: 'IRRF Peça',     cor: '--irpeca', valor: 'irPeca', aliq: 'pIrPeca', base: 'basePeca', calc: 'cIrPeca' },
   { id: 'irServ', nome: 'IRRF Serviço',  cor: '--irserv', valor: 'irServ', aliq: 'pIrServ', base: 'baseServ', calc: 'cIrServ' },
-  { id: 'iss',    nome: 'ISSQN',         cor: '--iss',    valor: 'iss',    aliq: 'pIss',    base: 'baseServ', calc: 'cIss' }
+  { id: 'iss',    nome: 'ISSQN retido',  cor: '--iss',    valor: 'iss',    aliq: 'pIss',    base: 'baseServ', calc: 'cIss' }
 ];
 var TOLERANCIA = 0.05; // R$ — diferenças de arredondamento abaixo disso são ignoradas
 
-var state = { imposto: 'todos', aliqTab: 'iss', sort: { key: 'cidade', dir: 1 } };
+var state = { imposto: 'todos', aliqTab: 'iss', sort: { key: 'cidade', dir: 1 }, tabFinal: 'peca' };
 var NOTAS = [];
 var charts = {};
 
@@ -926,7 +1042,14 @@ function preparar(n) {
   n.regras = conferirRegras(n);
   n.regraErro = n.regras.some(function (r) { return r.nivel === 'erro'; });
   n.regraTxt = n.regras.map(function (r) { return r.msg; }).join(' · ');
-  n.perRot = n.periodo ? n.periodo.rotMes + ' · ' + n.periodo.q + 'ª' : '';
+  // Competência do RAD: "09/2026-2" (mês/ano-quinzena), como nas pastas do Drive.
+  n.radNum = n.periodo ? n.periodo.mes.slice(5) + '/' + n.periodo.mes.slice(0, 4) + '-' + n.periodo.q : 'sem período';
+  n.perRot = n.periodo ? n.radNum + ' (' + n.periodo.q + 'ª quinzena)' : '';
+  n.perOrd = n.periodo ? n.periodo.ini : '0000';
+  // Só para exibição por documento (não altera nenhum cálculo validado).
+  n.difPeca = r2(n.dIcms + n.dIrPeca);
+  n.difServ = r2(n.dIss + n.dIrServ);
+  n.retEfetivas = r2(n.irPeca + n.irServ + n.iss);
   n.busca = [n.periodo ? n.periodo.rot : '', n.placa, n.estab, n.cidade, n.nfPeca, n.nfServ, n.cnpj, n.os, n.modelo, n.resp].join(' ').toLowerCase();
   return n;
 }
@@ -957,10 +1080,15 @@ var REGRAS_FISCAIS = [
   { id: 'nao-simples-irserv', nivel: 'aviso', aplica: function (n) { return n.nfServ && n.simples === 'Não' && n.vServ > 0 && !(n.irServ > 0); },
     msg: 'Sem IRRF de serviço (empresa fora do Simples)' },
   { id: 'resp-iss-vazio', nivel: 'aviso', aplica: function (n) { return n.nfServ && !n.respIss; },
-    msg: 'Responsável ISSQN não informado na NF de serviço' }
+    msg: 'Responsável ISSQN não informado na NF de serviço' },
+  { id: 'prestador-com-iss', nivel: 'aviso', aplica: function (n) { return n.respIss === 'PRESTADOR' && n.iss > 0; },
+    msg: 'ISSQN informado como retido, mas o responsável é o Prestador' }
 ];
+// Documento fiscal a que cada regra se refere (para os quadros de NF-e de peças e NFS-e de serviços).
+var REGRA_TIPO = { 'simples-icms': 'peca', 'simples-irpeca': 'peca', 'servico-sem-icms': 'peca', 'nao-simples-irpeca': 'peca', 'nao-simples-icms': 'peca',
+  'simples-irserv': 'serv', 'peca-sem-iss': 'serv', 'nao-simples-irserv': 'serv', 'resp-iss-vazio': 'serv', 'prestador-com-iss': 'serv' };
 function conferirRegras(n) {
-  return REGRAS_FISCAIS.filter(function (r) { return r.aplica(n); }).map(function (r) { return { id: r.id, nivel: r.nivel, msg: r.msg }; });
+  return REGRAS_FISCAIS.filter(function (r) { return r.aplica(n); }).map(function (r) { return { id: r.id, nivel: r.nivel, msg: r.msg, tipo: REGRA_TIPO[r.id] }; });
 }
 
 function dif(n, t) { return n['d' + t.id.charAt(0).toUpperCase() + t.id.slice(1)]; }
@@ -1054,15 +1182,16 @@ function montarFiltros() {
     document.getElementById(id).onchange = render;
   });
   document.getElementById('fBusca').oninput = render;
-  document.getElementById('btnLimpar').onclick = function () {
-    ['fSituacao', 'fAliquota', 'fPeriodo', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
-      var el = document.getElementById(id); el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
-    });
-    state.imposto = 'todos';
-    chips.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.imp === 'todos'); });
-    montarAliquotas();
-    render();
-  };
+  document.getElementById('btnLimpar').onclick = function () { limparFiltros(); };
+}
+function limparFiltros(semRender) {
+  ['fSituacao', 'fAliquota', 'fPeriodo', 'fUnidade', 'fMunicipio', 'fSimples', 'fResp', 'fBusca'].forEach(function (id) {
+    var el = document.getElementById(id); el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
+  });
+  state.imposto = 'todos';
+  document.querySelectorAll('#chipsImposto .chip').forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.imp === 'todos'); });
+  montarAliquotas();
+  if (!semRender) render();
 }
 function unicos(arr) { return arr.filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
 function preencher(id, valores) {
@@ -1088,8 +1217,11 @@ function montarAliquotas() {
 /* ---------------- Render ---------------- */
 function render() {
   var dados = filtrar();
+  renderRadAtual();
+  renderKpisPagto();
   renderKpis(dados);
   renderCategorias(dados);
+  renderPendRad(dados);
   renderGraficos(dados);
   renderMatriz(dados);
   renderTabela(dados);
@@ -1097,26 +1229,6 @@ function render() {
 }
 
 function soma(arr, k) { return r2(arr.reduce(function (s, n) { return s + (typeof k === 'function' ? k(n) : n[k]); }, 0)); }
-
-function renderKpis(d) {
-  var ativos = impostosAtivos();
-  var totImp = soma(d, function (n) { return ativos.reduce(function (s, t) { return s + n[t.valor]; }, 0); });
-  var nDif = d.filter(function (n) { return n.temDif; }).length;
-  var difTot = soma(d, function (n) { return ativos.reduce(function (s, t) { return s + dif(n, t); }, 0); });
-  var aprov = soma(d, 'aprovado');
-  var k = [
-    { l: 'Ordens filtradas', v: int.format(d.length), d: 'de ' + int.format(NOTAS.length) + ' na base' },
-    { l: 'Notas fiscais', v: int.format(soma(d, 'nNfs')), d: int.format(d.filter(function (n) { return n.nfPeca; }).length) + ' de peça · ' + int.format(d.filter(function (n) { return n.nfServ; }).length) + ' de serviço' },
-    { l: 'Valor aprovado', v: Rk(aprov), d: R(aprov) },
-    { l: state.imposto === 'todos' ? 'Impostos informados' : imp(state.imposto).nome + ' informado', v: Rk(totImp), d: aprov ? P(totImp / aprov * 100) + ' do aprovado' : '—' },
-    { l: 'Valor líquido', v: Rk(soma(d, 'liquido')), d: R(soma(d, 'liquido')) },
-    // Sem ordem com diferença acima da tolerância, centavos de arredondamento não são mostrados como diferença.
-    { l: 'Diferença (informado − recalculado)', v: R(nDif ? difTot : 0), d: nDif ? nDif + ' ordem(ns) com diferença' : 'Nenhuma diferença encontrada', cls: nDif ? 'neg' : '' }
-  ];
-  document.getElementById('kpis').innerHTML = k.map(function (x) {
-    return '<div class="kpi"><div class="l">' + esc(x.l) + '</div><div class="v ' + (x.cls || '') + '">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>';
-  }).join('');
-}
 
 function renderCategorias(d) {
   var totalGeral = soma(d, function (n) { return n.icms + n.irPeca + n.irServ + n.iss; });
@@ -1146,11 +1258,14 @@ function renderCategorias(d) {
       '<td class="n">' + x.com + '</td><td class="n">' + x.sem + '</td>' +
       '<td class="wrap">' + (x.aliqs.length ? esc(x.aliqs.join(' · ')) : '<span class="muted">—</span>') + '</td>' +
       '<td class="n">' + R(x.base) + '</td><td class="n"><b>' + R(x.inf) + '</b></td><td class="n">' + R(x.calc) + '</td>' +
-      '<td class="n">' + tagDif(x.dif) + '</td>' +
-      '<td class="n">' + (x.nd ? '<span class="neg">' + x.nd + '</span>' : '0') + '</td>' +
+      '<td class="n' + (x.nd ? ' clicavel" data-pend-imp="' + x.t.id : '') + '">' + tagDif(x.dif) + '</td>' +
+      '<td class="n' + (x.nd ? ' clicavel" data-pend-imp="' + x.t.id : '') + '">' + (x.nd ? '<span class="neg">' + x.nd + ' ›</span>' : '0') + '</td>' +
       '<td class="n">' + P(x.efetiva) + '</td><td class="n">' + R(x.sim) + '</td><td class="n">' + R(x.nao) + '</td>' +
       '<td class="n">' + P(x.pct) + '</td></tr>';
   }).join('');
+  tb.querySelectorAll('[data-pend-imp]').forEach(function (td) {
+    td.onclick = function () { var t = imp(td.dataset.pendImp); detalharPendencias('Diferenças de ' + t.nome + ' — filtros atuais', pendencias(d, t.id)); };
+  });
   var tInf = soma(linhas, 'inf'), tCalc = soma(linhas, 'calc');
   document.querySelector('#tblCategorias tfoot').innerHTML = '<tr><td>Total</td><td></td><td></td><td></td><td></td>' +
     '<td class="n">' + R(tInf) + '</td><td class="n">' + R(tCalc) + '</td><td class="n">' + tagDif(r2(tInf - tCalc)) + '</td>' +
@@ -1198,95 +1313,6 @@ function desenhar(id, cfg) {
   charts[id] = new Chart(document.getElementById(id), cfg);
 }
 
-function renderGraficos(d) {
-  Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-  Chart.defaults.font.size = 12;
-  var ativos = impostosAtivos();
-
-  // 1) Total por imposto
-  desenhar('chImposto', {
-    type: 'bar',
-    data: {
-      labels: IMPOSTOS.map(function (t) { return t.nome; }),
-      datasets: [{
-        label: 'Informado',
-        data: IMPOSTOS.map(function (t) { return soma(d, t.valor); }),
-        backgroundColor: IMPOSTOS.map(function (t) {
-          var c = css(t.cor);
-          return state.imposto === 'todos' || state.imposto === t.id ? c : c + '40';
-        })
-      }]
-    },
-    options: opcoesBase(Rk, R, true),
-    plugins: [rotulosFim(R)]
-  });
-
-  // 2) Por unidade (barras agrupadas)
-  var unidades = unicos(d.map(function (n) { return n.unidade; }));
-  document.getElementById('lgUnidade').innerHTML = ativos.map(function (t) {
-    return '<span><i style="background:var(' + t.cor + ')"></i>' + esc(t.nome) + '</span>';
-  }).join('');
-  var o2 = opcoesBase(Rk, R, false);
-  o2.datasets.bar.borderWidth = { left: 1, right: 1 };
-  desenhar('chUnidade', {
-    type: 'bar',
-    data: {
-      labels: unidades,
-      datasets: ativos.map(function (t) {
-        return {
-          label: t.nome, backgroundColor: css(t.cor),
-          data: unidades.map(function (u) { return soma(d.filter(function (n) { return n.unidade === u; }), t.valor); })
-        };
-      })
-    },
-    options: o2
-  });
-
-  // 3) Notas por alíquota
-  var tabs = document.getElementById('tabsAliq');
-  tabs.innerHTML = IMPOSTOS.map(function (t) {
-    return '<button class="chip" data-t="' + t.id + '" aria-pressed="' + (state.aliqTab === t.id) + '"><i class="dot" style="background:var(' + t.cor + ')"></i>' + esc(t.nome) + '</button>';
-  }).join('');
-  tabs.querySelectorAll('.chip').forEach(function (b) { b.onclick = function () { state.aliqTab = b.dataset.t; renderGraficos(filtrar()); }; });
-  var ta = imp(state.aliqTab);
-  var grupos = agruparAliq(d, ta);
-  desenhar('chAliquota', {
-    type: 'bar',
-    data: {
-      labels: grupos.map(function (g) { return g.rot; }),
-      datasets: [{ label: 'Notas', backgroundColor: css(ta.cor), data: grupos.map(function (g) { return g.qtd; }), valores: grupos.map(function (g) { return g.valor; }) }]
-    },
-    options: (function () {
-      var o = opcoesBase(function (v) { return Number.isInteger(v) ? v : ''; }, function (v) { return int.format(v) + ' nota(s)'; }, false);
-      o.plugins.tooltip.external = function (ctx) {
-        tooltipExterno(function (v) { return int.format(v) + ' nota(s)'; })(ctx);
-        var p = ctx.tooltip.dataPoints && ctx.tooltip.dataPoints[0];
-        if (p && ctx.tooltip.opacity) tipEl.innerHTML += '<div class="muted">Valor retido: ' + R(grupos[p.dataIndex].valor) + '</div>';
-      };
-      return o;
-    })(),
-    plugins: [rotulosFim(function (v) { return int.format(v); })]
-  });
-
-  // 4) Top estabelecimentos
-  var porEst = {};
-  d.forEach(function (n) {
-    var v = ativos.reduce(function (s, t) { return s + n[t.valor]; }, 0);
-    porEst[n.estab] = (porEst[n.estab] || 0) + v;
-  });
-  var top = Object.keys(porEst).map(function (k) { return { k: k, v: r2(porEst[k]) }; })
-    .filter(function (x) { return x.v > 0; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 10);
-  document.getElementById('hintEstab').textContent = 'Top 10 pelo total de ' + (state.imposto === 'todos' ? 'impostos' : imp(state.imposto).nome) + ' informado.';
-  desenhar('chEstab', {
-    type: 'bar',
-    data: {
-      labels: top.map(function (x) { return x.k.length > 28 ? x.k.slice(0, 27) + '…' : x.k; }),
-      datasets: [{ label: '', backgroundColor: state.imposto === 'todos' ? css('--accent') : css(imp(state.imposto).cor), data: top.map(function (x) { return x.v; }) }]
-    },
-    options: opcoesBase(Rk, R, true),
-    plugins: [rotulosFim(R)]
-  });
-}
 function agruparAliq(d, t) {
   var g = {};
   d.forEach(function (n) {
@@ -1339,24 +1365,24 @@ function renderMatriz(d) {
 var COLUNAS = [
   { k: 'placa', t: 'Placa' },
   { k: 'unidade', t: 'Unidade' },
-  { k: 'perRot', t: 'Período (RAD)' },
+  { k: 'perRot', t: 'Competência (RAD)' },
   { k: 'estab', t: 'Estabelecimento' },
   { k: 'cidade', t: 'Cidade' },
   { k: 'simples', t: 'Simples' },
   { k: 'nfPeca', t: 'NF Peça' },
   { k: 'basePeca', t: 'Base Peça', m: 1 },
   { k: 'pIcms', t: '% ICMS', p: 1, imp: 'icms', f: function (n) { return n.icmsObs ? 'Deson. (' + P(n.pIcmsEfetiva) + ')' : P(n.pIcms); } },
-  { k: 'icms', t: 'ICMS', m: 1, imp: 'icms' },
+  { k: 'icms', t: 'ICMS desonerado', m: 1, imp: 'icms' },
   { k: 'pIrPeca', t: '% IRRF Peça', p: 1, imp: 'irPeca' },
   { k: 'irPeca', t: 'IRRF Peça', m: 1, imp: 'irPeca' },
   { k: 'nfServ', t: 'NF Serviço' },
   { k: 'baseServ', t: 'Base Serviço', m: 1 },
   { k: 'pIss', t: '% ISSQN', p: 1, imp: 'iss' },
-  { k: 'iss', t: 'ISSQN', m: 1, imp: 'iss' },
+  { k: 'iss', t: 'ISSQN retido', m: 1, imp: 'iss' },
   { k: 'respIss', t: 'Resp. ISSQN', imp: 'iss' },
   { k: 'pIrServ', t: '% IRRF Serv.', p: 1, imp: 'irServ' },
   { k: 'irServ', t: 'IRRF Serviço', m: 1, imp: 'irServ' },
-  { k: 'totalImp', t: 'Total retido', m: 1 },
+  { k: 'totalImp', t: 'Deduções (ICMS deson. + retenções)', m: 1 },
   { k: 'aprovado', t: 'Valor Aprovado', m: 1 },
   { k: 'liquido', t: 'Valor Líquido', m: 1 },
   { k: 'difSel', t: 'Diferença', m: 1 },
@@ -1364,6 +1390,53 @@ var COLUNAS = [
   { k: 'data', t: 'Aprovação' },
   { k: 'resp', t: 'Responsável' }
 ];
+// Quadro final separado por natureza do documento: NF-e de peças e NFS-e de serviços (item 2).
+var COL_BASE = [
+  { k: 'perRot', t: 'Competência (RAD)' }, { k: 'unidade', t: 'Unidade' }, { k: 'os', t: 'OS' }, { k: 'placa', t: 'Placa' },
+  { k: 'estab', t: 'Estabelecimento' }, { k: 'cnpj', t: 'CNPJ' }, { k: 'cidade', t: 'Município' }, { k: 'simples', t: 'Simples' }
+];
+var COL_PECA = COL_BASE.concat([
+  { k: 'nfPeca', t: 'Nº NF-e (peça)' },
+  { k: 'vPeca', t: 'Valor a pagar peça', m: 1 },
+  { k: 'basePeca', t: 'Base peça', m: 1 },
+  { k: 'pIcms', t: '% ICMS', p: 1, imp: 'icms', f: function (n) { return n.icmsObs ? 'Deson. (' + P(n.pIcmsEfetiva) + ')' : P(n.pIcms); } },
+  { k: 'icms', t: 'ICMS desonerado', m: 1, imp: 'icms' },
+  { k: 'pIrPeca', t: '% IRRF', p: 1, imp: 'irPeca' },
+  { k: 'irPeca', t: 'IRRF Peça', m: 1, imp: 'irPeca' },
+  { k: 'difPeca', t: 'Diferença', m: 1 },
+  { k: 'regrasDoc', t: 'Regras fiscais' },
+  { k: 'pdfDoc', t: 'PDF' }
+]);
+var COL_SERV = COL_BASE.concat([
+  { k: 'nfServ', t: 'Nº NFS-e (serviço)' },
+  { k: 'vServ', t: 'Valor a pagar serviço', m: 1 },
+  { k: 'baseServ', t: 'Base serviço', m: 1 },
+  { k: 'pIss', t: '% ISSQN', p: 1, imp: 'iss' },
+  { k: 'iss', t: 'ISSQN retido', m: 1, imp: 'iss' },
+  { k: 'respIss', t: 'Resp. ISSQN', imp: 'iss' },
+  { k: 'pIrServ', t: '% IRRF', p: 1, imp: 'irServ' },
+  { k: 'irServ', t: 'IRRF Serviço', m: 1, imp: 'irServ' },
+  { k: 'difServ', t: 'Diferença', m: 1 },
+  { k: 'regrasDoc', t: 'Regras fiscais' },
+  { k: 'pdfDoc', t: 'PDF' }
+]);
+// Ordem com NF de peça / de serviço (inclui documento sem número, mas com valor, para os totais fecharem com o RAD).
+function temPeca(n) { return !!(n.nfPeca || n.vPeca || n.icms || n.irPeca); }
+function temServ(n) { return !!(n.nfServ || n.vServ || n.iss || n.irServ); }
+function colunasAtuais() { return state.tabFinal === 'peca' ? COL_PECA : state.tabFinal === 'serv' ? COL_SERV : COLUNAS; }
+/** PDF encontrado de cada documento (OS + tipo), para abrir a nota direto do quadro. */
+function pdfsPorDoc(d) {
+  var m = {};
+  try { casarNotas(d, 'todos').forEach(function (x) { if (x.pdf) m[x.n.os + '|' + x.d.tipo + '|' + x.d.numero] = x.pdf; }); } catch (e) {}
+  return m;
+}
+function linkPdf(pdf) {
+  if (!pdf) return '<span class="muted">—</span>';
+  var u = urlPdf(pdf);
+  return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc(pdf.nome) + '">📄 abrir</a>'
+           : '<a href="#" data-local="' + esc(pdf.id) + '" title="' + esc(pdf.nome) + '">📄 abrir</a>';
+}
+
 function difSel(n) {
   var ativos = impostosAtivos();
   var v = ativos.reduce(function (s, t) { return s + dif(n, t); }, 0);
@@ -1372,30 +1445,46 @@ function difSel(n) {
 }
 function renderTabela(d) {
   d.forEach(function (n) { n.difSel = difSel(n); });
+  var tab = state.tabFinal || 'peca', COLS = colunasAtuais();
+  document.querySelectorAll('#tabsFinal .chip').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.tab === tab); });
+  var pdfs = tab === 'ordem' ? {} : pdfsPorDoc(d);
+  if (tab === 'peca') d = d.filter(temPeca);
+  if (tab === 'serv') d = d.filter(temServ);
   var s = state.sort;
+  if (!COLS.some(function (c) { return c.k === s.key; })) s = state.sort = { key: 'cidade', dir: 1 };
   d = d.slice().sort(function (a, b) {
     var x = a[s.key], y = b[s.key];
     if (s.key === 'data') { x = dataOrd(x); y = dataOrd(y); }
+    if (s.key === 'perRot') { x = a.perOrd; y = b.perOrd; }
     if (typeof x === 'number' && typeof y === 'number') return (x - y) * s.dir;
     return (String(x).localeCompare(String(y), 'pt-BR', { numeric: true }) * s.dir) || ordemMunicipio(a, b);
   });
   var hl = function (c) { return c.imp && state.imposto === c.imp ? ' hl' : ''; };
-  document.querySelector('#tblNotas thead').innerHTML = '<tr>' + COLUNAS.map(function (c) {
+  document.querySelector('#tblNotas thead').innerHTML = '<tr>' + COLS.map(function (c) {
     return '<th class="sort' + (c.m || c.p ? ' n' : '') + hl(c) + '" data-k="' + c.k + '">' + esc(c.t) +
       '<span class="arr">' + (s.key === c.k ? (s.dir > 0 ? '▲' : '▼') : '') + '</span></th>';
   }).join('') + '</tr>';
   document.querySelectorAll('#tblNotas th.sort').forEach(function (th) {
     th.onclick = function () {
       var k = th.dataset.k;
+      if (k === 'regrasDoc' || k === 'pdfDoc') return;
       state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (typeof NOTAS[0][k] === 'number' ? -1 : 1) };
       renderTabela(filtrar());
     };
   });
   document.querySelector('#tblNotas tbody').innerHTML = d.length ? d.map(function (n) {
-    return '<tr>' + COLUNAS.map(function (c) {
+    return '<tr>' + COLS.map(function (c) {
       var v = n[c.k], h;
       if (c.f) h = esc(c.f(n));
-      else if (c.k === 'difSel') h = Math.abs(v) > TOLERANCIA ? '<span class="tag bad">⚠ ' + R(v) + '</span>' : '<span class="tag ok">✓</span>';
+      else if (c.k === 'pdfDoc') h = linkPdf(pdfs[n.os + '|' + tab + '|' + (tab === 'peca' ? n.nfPeca : n.nfServ)]);
+      else if (c.k === 'regrasDoc') {
+        var rs = n.regras.filter(function (r) { return r.tipo === tab; });
+        h = rs.length ? rs.map(function (r) {
+          return '<span class="tag ' + (r.nivel === 'erro' ? 'bad' : 'warn') + '" style="margin:1px 0">' + (r.nivel === 'erro' ? '✕ ' : '! ') + esc(r.msg) + '</span>';
+        }).join('<br>') : '<span class="tag ok">✓</span>';
+      }
+      else if ((c.k === 'nfPeca' || c.k === 'nfServ') && !v) h = '<span class="tag warn">não informada</span>';
+      else if (c.k === 'difSel' || c.k === 'difPeca' || c.k === 'difServ') h = Math.abs(v) > TOLERANCIA ? '<span class="tag bad">⚠ ' + R(v) + '</span>' : '<span class="tag ok">✓</span>';
       else if (c.k === 'regraTxt') h = n.regras.length ? n.regras.map(function (r) {
         return '<span class="tag ' + (r.nivel === 'erro' ? 'bad' : 'warn') + '" style="margin:1px 0">' + (r.nivel === 'erro' ? '✕ ' : '! ') + esc(r.msg) + '</span>';
       }).join('<br>') : '<span class="tag ok">✓</span>';
@@ -1405,22 +1494,30 @@ function renderTabela(d) {
       else h = esc(v);
       return '<td class="' + (c.m || c.p ? 'n' : '') + hl(c) + '"' + (c.k === 'estab' ? ' title="' + esc(n.cnpj) + '"' : '') + '>' + h + '</td>';
     }).join('') + '</tr>';
-  }).join('') : '<tr><td class="empty" colspan="' + COLUNAS.length + '">Nenhuma nota nos filtros atuais.</td></tr>';
-  document.querySelector('#tblNotas tfoot').innerHTML = d.length ? '<tr>' + COLUNAS.map(function (c, i) {
+  }).join('') : '<tr><td class="empty" colspan="' + COLS.length + '">Nenhum documento nos filtros atuais.</td></tr>';
+  document.querySelector('#tblNotas tfoot').innerHTML = d.length ? '<tr>' + COLS.map(function (c, i) {
     if (i === 0) return '<td>Total</td>';
-    if (c.m) { var t = soma(d, c.k); return '<td class="n' + hl(c) + '">' + (c.k === 'difSel' ? tagDif(t) : R(t)) + '</td>'; }
+    if (c.m) { var t = soma(d, c.k); return '<td class="n' + hl(c) + '">' + (/^dif/.test(c.k) ? tagDif(t) : R(t)) + '</td>'; }
     return '<td class="' + hl(c).trim() + '"></td>';
   }).join('') + '</tr>' : '';
-  document.getElementById('contTabela').textContent = d.length + ' ordem(ns) · ' + soma(d, 'nNfs') + ' nota(s) fiscal(is). Clique no cabeçalho para ordenar.';
+  var nDocs = tab === 'peca' ? docsDistintos(d, 'peca') : tab === 'serv' ? docsDistintos(d, 'serv') : 0;
+  document.getElementById('contTabela').textContent = tab === 'ordem'
+    ? d.length + ' ordem(ns) · ' + soma(d, 'nNfs') + ' nota(s) fiscal(is). Clique no cabeçalho para ordenar.'
+    : d.length + ' linha(s) (uma por OS) · ' + nDocs + ' ' + (tab === 'peca' ? 'NF-e de peças' : 'NFS-e de serviços') + ' distinta(s). Clique no cabeçalho para ordenar.';
   window._tabelaAtual = d;
   rolagemHorizontal('tblNotas');
+  document.querySelectorAll('#tblNotas a[data-local]').forEach(function (a) {
+    a.onclick = function (e) { e.preventDefault(); var p = PDFS.filter(function (q) { return q.id === a.dataset.local; })[0]; if (p) window.open(URL.createObjectURL(p.file), '_blank'); };
+  });
 }
 function dataOrd(s) { var m = /(\d{2})\/(\d{2})\/(\d{4})\s*(\d{2})?:?(\d{2})?/.exec(s || ''); return m ? m[3] + m[2] + m[1] + (m[4] || '00') + (m[5] || '00') : ''; }
 
 function exportarCsv() {
-  var d = window._tabelaAtual || [];
-  var linhas = [COLUNAS.map(function (c) { return c.t; })].concat(d.map(function (n) {
-    return COLUNAS.map(function (c) {
+  var d = window._tabelaAtual || [], tab = state.tabFinal || 'peca';
+  var COLS = colunasAtuais().filter(function (c) { return c.k !== 'pdfDoc'; });
+  var linhas = [COLS.map(function (c) { return c.t; })].concat(d.map(function (n) {
+    return COLS.map(function (c) {
+      if (c.k === 'regrasDoc') return n.regras.filter(function (r) { return r.tipo === tab; }).map(function (r) { return r.msg; }).join(' · ');
       var v = c.f ? c.f(n) : n[c.k];
       return typeof v === 'number' ? String(v).replace('.', ',') : v;
     });
@@ -1430,8 +1527,427 @@ function exportarCsv() {
   }).join('\n');
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'notas_impostos' + (state.imposto === 'todos' ? '' : '_' + state.imposto) + '.csv';
+  a.download = (tab === 'peca' ? 'nfe_pecas' : tab === 'serv' ? 'nfse_servicos' : 'ordens') + (state.imposto === 'todos' ? '' : '_' + state.imposto) + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ================= Documentos fiscais, pendências e detalhamento (Frota/P4) ================= */
+/*
+ * Uma NF é identificada por CNPJ do estabelecimento + tipo (peça/serviço) + número. A mesma NF em mais de uma OS conta
+ * uma vez só ("NFs distintas"); os valores de cada OS continuam somados normalmente (como no RAD).
+ */
+var TRIB_TIPO = { icms: 'peca', irPeca: 'peca', irServ: 'serv', iss: 'serv' };
+function chaveNf(n, tipo) {
+  var num = tipo === 'peca' ? n.nfPeca : n.nfServ;
+  var nn = semZeros(num) || String(num || '').trim();
+  return (digitos(n.cnpj) || n.estab) + '|' + tipo + '|' + (nn || 'sem-numero-OS' + n.os);
+}
+function docsDistintos(d, tipo) {
+  var k = {};
+  d.forEach(function (n) {
+    if ((!tipo || tipo === 'peca') && temPeca(n)) k[chaveNf(n, 'peca')] = 1;
+    if ((!tipo || tipo === 'serv') && temServ(n)) k[chaveNf(n, 'serv')] = 1;
+  });
+  return Object.keys(k).length;
+}
+/** Linhas (uma por OS) em que o tributo tem valor, e quantas NFs distintas elas formam. */
+function docsDoTributo(d, id) {
+  var tipo = TRIB_TIPO[id], t = imp(id), linhas = d.filter(function (n) { return n[t.valor] > 0; }), k = {};
+  linhas.forEach(function (n) { k[chaveNf(n, tipo)] = 1; });
+  return { linhas: linhas, nfs: Object.keys(k).length, valor: soma(linhas, t.valor), tipo: tipo };
+}
+
+/* ---- Janela de detalhamento ---- */
+function abrirModal(titulo, sub, corpo, botoes) {
+  document.getElementById('mdTitulo').textContent = titulo;
+  document.getElementById('mdSub').innerHTML = sub || '';
+  document.getElementById('mdCorpo').innerHTML = corpo;
+  var rod = document.getElementById('mdRodape');
+  rod.innerHTML = '';
+  (botoes || []).forEach(function (b) {
+    var el = document.createElement('button'); el.className = 'btn' + (b.primary ? ' primary' : ''); el.textContent = b.rot; el.onclick = b.fn; rod.appendChild(el);
+  });
+  document.getElementById('modal').hidden = false;
+  document.body.classList.add('com-modal');
+  document.querySelectorAll('#mdCorpo a[data-local]').forEach(function (a) {
+    a.onclick = function (e) { e.preventDefault(); var p = PDFS.filter(function (q) { return q.id === a.dataset.local; })[0]; if (p) window.open(URL.createObjectURL(p.file), '_blank'); };
+  });
+  document.querySelectorAll('#mdCorpo [data-rad]').forEach(function (el) { el.onclick = function () { abrirRad(el.dataset.rad); }; });
+  rolagemHorizontal('mdTabela');
+}
+function fecharModal() { document.getElementById('modal').hidden = true; document.body.classList.remove('com-modal'); }
+function baixarCsvLinhas(cab, linhas, nome) {
+  var csv = '﻿' + [cab].concat(linhas).map(function (l) {
+    return l.map(function (v) { return celCsv(typeof v === 'number' ? brNum(v) : v); }).join(';');
+  }).join('\n');
+  baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), nome);
+}
+
+/** Notas fiscais que compõem o valor de um tributo (clique na barra do gráfico ou no card). */
+function detalharTributo(id, d) {
+  d = d || filtrar();
+  var t = imp(id), x = docsDoTributo(d, id), pdfs = pdfsPorDoc(x.linhas);
+  var linhas = x.linhas.slice().sort(function (a, b) { return a.perOrd.localeCompare(b.perOrd) || ordemMunicipio(a, b); });
+  var tipoRot = x.tipo === 'peca' ? 'NF-e (peça)' : 'NFS-e (serviço)';
+  var num = function (n) { return x.tipo === 'peca' ? n.nfPeca : n.nfServ; };
+  var corpo = '<div class="tbl-wrap" style="max-height:60vh"><table id="mdTabela"><thead><tr><th>Competência</th><th>Unidade</th><th>OS</th><th>Tipo</th><th>Nº NF</th>' +
+    '<th>Estabelecimento</th><th>Município</th><th class="n">Alíquota</th><th class="n">Base</th><th class="n">' + esc(t.nome) + '</th><th>PDF</th></tr></thead><tbody>' +
+    linhas.map(function (n) {
+      return '<tr><td><a href="#" data-rad="' + esc(n.radChave) + '">' + esc(n.radNum) + '</a></td><td>' + esc(n.unidade) + '</td><td>' + esc(n.os) + '</td><td>' + tipoRot +
+        '</td><td><b>' + esc(num(n) || '—') + '</b></td><td>' + esc(n.estab) + '<div class="muted" style="font-size:11px">' + esc(n.cnpj) + '</div></td><td>' + esc(n.cidade) +
+        '</td><td class="n">' + esc(rotuloAliq(n, t)) + '</td><td class="n">' + R(n[t.base]) + '</td><td class="n"><b>' + R(n[t.valor]) + '</b></td><td>' +
+        linkPdf(pdfs[n.os + '|' + x.tipo + '|' + num(n)]) + '</td></tr>';
+    }).join('') + '</tbody><tfoot><tr><td>Total</td><td></td><td>' + linhas.length + ' OS</td><td></td><td>' + x.nfs + ' NF(s)</td><td></td><td></td><td></td><td class="n">' +
+    R(soma(linhas, t.base)) + '</td><td class="n">' + R(x.valor) + '</td><td></td></tr></tfoot></table></div>';
+  abrirModal(t.nome + ' — notas fiscais', x.nfs + ' nota(s) fiscal(is) distinta(s) · ' + linhas.length + ' OS · total ' + R(x.valor) + ' · filtros atuais', corpo, [
+    { rot: '⬇ CSV', fn: function () {
+      baixarCsvLinhas(['Competência', 'Unidade', 'OS', 'Placa', 'Tipo', 'Nº NF', 'Estabelecimento', 'CNPJ', 'Município', 'Alíquota', 'Base', t.nome],
+        linhas.map(function (n) { return [n.radNum, n.unidade, n.os, n.placa, tipoRot, num(n), n.estab, n.cnpj, n.cidade, rotuloAliq(n, t), n[t.base], n[t.valor]]; }),
+        'notas_' + id + '.csv');
+    } },
+    { rot: 'Fechar', fn: fecharModal, primary: true }
+  ]);
+}
+
+/* ---- Pendências: diferenças entre o RAD (Ticket Log) e o recalculado, e regras fiscais (item 3) ---- */
+function motivoDif(n, t) {
+  var inf = n[t.valor], calc = n[t.calc], aliq = aliqDe(n, t);
+  if (!aliq && inf > 0) return 'Valor informado no RAD sem alíquota correspondente';
+  if (aliq > 0 && !inf) return 'Alíquota de ' + P(aliq) + ' no RAD, mas sem valor retido';
+  return 'Valor do RAD ≠ base × alíquota (' + R(n[t.base]) + ' × ' + P(aliq) + ' = ' + R(calc) + ')';
+}
+/** Lista de pendências das ordens: uma linha por tributo com diferença, diferença no líquido ou regra fiscal. */
+function pendencias(d, filtroId) {
+  var out = [];
+  d.forEach(function (n) {
+    IMPOSTOS.forEach(function (t) {
+      if (filtroId && filtroId !== t.id) return;
+      var df = dif(n, t);
+      if (Math.abs(df) <= TOLERANCIA) return;
+      var tipo = TRIB_TIPO[t.id];
+      out.push({ n: n, tipo: tipo, numero: tipo === 'peca' ? n.nfPeca : n.nfServ, tributo: t.nome, aliq: rotuloAliq(n, t), base: n[t.base],
+                 rad: n[t.valor], painel: n[t.calc], dif: df, motivo: motivoDif(n, t), origem: 'Cálculo', nivel: 'erro' });
+    });
+    if (!filtroId && Math.abs(n.dLiquido) > TOLERANCIA) {
+      out.push({ n: n, tipo: '', numero: [n.nfPeca, n.nfServ].filter(String).join(' / '), tributo: 'Valor líquido', aliq: '', base: n.aprovado,
+                 rad: n.liquido, painel: n.cLiquido, dif: n.dLiquido, motivo: 'Líquido do RAD ≠ aprovado − (ICMS desonerado + IRRF + ISSQN retido)', origem: 'Cálculo', nivel: 'erro' });
+    }
+    if (!filtroId || filtroId === 'regras') n.regras.forEach(function (r) {
+      out.push({ n: n, tipo: r.tipo, numero: r.tipo === 'peca' ? n.nfPeca : r.tipo === 'serv' ? n.nfServ : '', tributo: 'Regra fiscal', aliq: '', base: null,
+                 rad: null, painel: null, dif: null, motivo: r.msg, origem: 'Regras fiscais', nivel: r.nivel });
+    });
+  });
+  // Totais do rodapé do RAD (Ticket Log) × soma das ordens lidas do arquivo.
+  if (!filtroId) {
+    var arqs = {}; d.forEach(function (n) { if (n.radArquivo) arqs[n.radArquivo] = 1; });
+    Object.keys(arqs).forEach(function (a) {
+      var c = conferirRodape(a); if (!c || c.ok) return;
+      c.difs.forEach(function (x) {
+        out.push({ n: c.n[0], tipo: '', numero: '', tributo: 'Rodapé do RAD — ' + RODAPE_ROT[x.campo], aliq: '', base: null, rad: x.rodape, painel: x.soma, dif: r2(x.rodape - x.soma),
+                   motivo: 'Soma das ordens lidas do arquivo ≠ total do rodapé do RAD (arquivo incompleto ou linha não lida): ' + a, origem: 'Rodapé Ticket Log', nivel: 'erro' });
+      });
+    });
+  }
+  return out.sort(function (a, b) { return a.n.perOrd.localeCompare(b.n.perOrd) || String(a.n.unidade).localeCompare(String(b.n.unidade)) || String(a.n.os).localeCompare(String(b.n.os)); });
+}
+function detalharPendencias(titulo, lista) {
+  var pdfs = pdfsPorDoc(lista.map(function (p) { return p.n; }));
+  var tipoRot = function (t) { return t === 'peca' ? 'NF-e (peça)' : t === 'serv' ? 'NFS-e (serviço)' : 'Ordem'; };
+  var vazio = '<span class="muted">—</span>';
+  var corpo = lista.length ? '<div class="tbl-wrap" style="max-height:60vh"><table id="mdTabela"><thead><tr><th>Competência</th><th>Unidade</th><th>OS</th><th>Tipo</th><th>Nº NF</th>' +
+    '<th>Estabelecimento</th><th>Tributo</th><th class="n">Alíquota</th><th class="n">Valor no RAD (Ticket Log)</th><th class="n">Valor recalculado (Dashboard)</th>' +
+    '<th class="n">Diferença</th><th>Motivo</th><th>PDF</th></tr></thead><tbody>' + lista.map(function (p) {
+      var n = p.n;
+      return '<tr class="' + (p.nivel === 'erro' ? 'pend-erro' : 'pend-aviso') + '"><td><a href="#" data-rad="' + esc(n.radChave) + '">' + esc(n.radNum) + '</a></td><td>' + esc(n.unidade) +
+        '</td><td>' + esc(n.os) + '</td><td>' + tipoRot(p.tipo) + '</td><td><b>' + esc(p.numero || '—') + '</b></td><td>' + esc(n.estab) + '</td><td>' + esc(p.tributo) +
+        '</td><td class="n">' + esc(p.aliq || '') + '</td><td class="n">' + (p.rad == null ? vazio : R(p.rad)) + '</td><td class="n">' + (p.painel == null ? vazio : R(p.painel)) +
+        '</td><td class="n">' + (p.dif == null ? vazio : '<span class="tag bad">' + R(p.dif) + '</span>') + '</td><td class="wrap" style="max-width:320px"><span class="tag ' +
+        (p.nivel === 'erro' ? 'bad' : 'warn') + '">' + (p.nivel === 'erro' ? '✕' : '!') + '</span> ' + esc(p.motivo) + '<div class="muted" style="font-size:11px">' + esc(p.origem) + '</div></td><td>' +
+        (p.tipo ? linkPdf(pdfs[n.os + '|' + p.tipo + '|' + p.numero]) : vazio) + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '<p class="hint">Nenhuma pendência nestes filtros. ✓</p>';
+  var difs = lista.filter(function (p) { return p.dif != null; });
+  abrirModal(titulo, lista.length + ' pendência(s) · ' + difs.length + ' diferença(s) de valor (soma ' + R(difs.reduce(function (s, p) { return s + p.dif; }, 0)) + ') · ' +
+    (lista.length - difs.length) + ' alerta(s) de regra fiscal', corpo, [
+    { rot: '⬇ CSV', fn: function () {
+      baixarCsvLinhas(['Competência', 'Unidade', 'OS', 'Placa', 'Tipo', 'Nº NF', 'Estabelecimento', 'CNPJ', 'Tributo', 'Alíquota', 'Valor no RAD (Ticket Log)', 'Valor recalculado (Dashboard)', 'Diferença', 'Motivo', 'Origem'],
+        lista.map(function (p) { var n = p.n; return [n.radNum, n.unidade, n.os, n.placa, tipoRot(p.tipo), p.numero, n.estab, n.cnpj, p.tributo, p.aliq, p.rad == null ? '' : p.rad, p.painel == null ? '' : p.painel, p.dif == null ? '' : p.dif, p.motivo, p.origem]; }),
+        'pendencias.csv');
+    } },
+    { rot: 'Fechar', fn: fecharModal, primary: true }
+  ]);
+}
+
+function tagRodape(notas) {
+  var arqs = {}; notas.forEach(function (n) { if (n.radArquivo) arqs[n.radArquivo] = 1; });
+  var cs = Object.keys(arqs).map(conferirRodape).filter(Boolean);
+  if (!cs.length) return '<span class="muted">sem rodapé</span>';
+  return cs.every(function (c) { return c.ok; }) ? '<span class="tag ok">✓ confere</span>' : '<span class="tag bad">✕ difere</span>';
+}
+/** Quadro "Pendências por RAD": cada RAD (Unidade × quinzena) com as diferenças e alertas — clique para ver as notas. */
+function renderPendRad(d) {
+  var g = {};
+  d.forEach(function (n) {
+    var x = g[n.radChave] = g[n.radChave] || { chave: n.radChave, rad: n.radNum, unidade: n.unidade, ord: n.perOrd, notas: [] };
+    x.notas.push(n);
+  });
+  var linhas = Object.keys(g).map(function (k) {
+    var x = g[k], p = pendencias(x.notas);
+    x.pend = p; x.nDif = p.filter(function (q) { return q.dif != null; }).length;
+    x.vDif = r2(p.filter(function (q) { return q.dif != null; }).reduce(function (s, q) { return s + q.dif; }, 0));
+    x.nErro = p.filter(function (q) { return q.dif == null && q.nivel === 'erro'; }).length;
+    x.nAviso = p.filter(function (q) { return q.nivel === 'aviso'; }).length;
+    return x;
+  }).sort(function (a, b) { return a.ord.localeCompare(b.ord) || a.unidade.localeCompare(b.unidade); });
+  var com = linhas.filter(function (x) { return x.pend.length; });
+  document.getElementById('pendResumo').textContent = com.length
+    ? com.length + ' de ' + linhas.length + ' RAD(s) com pendência — clique na linha para ver as notas fiscais envolvidas.'
+    : 'Nenhuma pendência nos ' + linhas.length + ' RAD(s) filtrado(s). ✓';
+  document.querySelector('#tblPendRad tbody').innerHTML = linhas.length ? linhas.map(function (x) {
+    var st = statusPag(x.chave);
+    return '<tr class="clicavel' + (x.nDif || x.nErro ? ' pend-erro' : x.nAviso ? ' pend-aviso' : '') + '" data-pend="' + esc(x.chave) + '"><td><b>' + esc(x.rad) + '</b></td><td>' + esc(x.unidade) +
+      '</td><td class="n">' + x.notas.length + '</td><td class="n">' + (x.nDif ? '<span class="tag bad">' + x.nDif + '</span>' : '0') + '</td><td class="n">' + (x.nDif ? R(x.vDif) : '—') +
+      '</td><td class="n">' + (x.nErro ? '<span class="tag bad">' + x.nErro + '</span>' : '0') + '</td><td class="n">' + (x.nAviso ? '<span class="tag warn">' + x.nAviso + '</span>' : '0') +
+      '</td><td>' + tagRodape(x.notas) + '</td><td>' + (x.pend.length ? '<span class="tag bad">Pendente</span>' : '<span class="tag ok">✓ Conferido</span>') + '</td><td>' + tagStatusPag(st) + '</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="10">Nenhum RAD nos filtros atuais.</td></tr>';
+  document.querySelectorAll('#tblPendRad tr[data-pend]').forEach(function (tr) {
+    tr.onclick = function () { var x = g[tr.dataset.pend]; detalharPendencias('Pendências do RAD ' + x.rad + ' · ' + x.unidade, x.pend); };
+  });
+}
+
+/* ================= Indicadores e gráficos (itens 4, 5 e 6) ================= */
+function renderKpis(d) {
+  var aprov = soma(d, 'aprovado');
+  var tr = {};
+  IMPOSTOS.forEach(function (t) { tr[t.id] = docsDoTributo(d, t.id); });
+  var retEf = r2(tr.irPeca.valor + tr.irServ.valor + tr.iss.valor);
+  var nPeca = docsDistintos(d, 'peca'), nServ = docsDistintos(d, 'serv');
+  var pend = pendencias(d), pendDif = pend.filter(function (p) { return p.dif != null; });
+  var nOrdDif = d.filter(function (n) { return n.temDif; }).length;
+  var difTot = soma(d, function (n) { return impostosAtivos().reduce(function (s, t) { return s + dif(n, t); }, 0); });
+  var sel = function (id) { return state.imposto === id ? ' sel' : ''; };
+  var k = [
+    { l: 'Valor total movimentado', v: Rk(aprov), d: R(aprov) + ' · ' + int.format(d.length) + ' OS', c: 'gold' },
+    { l: 'ICMS desonerado', v: Rk(tr.icms.valor), d: R(tr.icms.valor) + ' · ' + tr.icms.nfs + ' NF-e · não é retenção', a: 'icms', cls2: sel('icms') },
+    { l: 'IRRF Peça', v: Rk(tr.irPeca.valor), d: R(tr.irPeca.valor) + ' · ' + tr.irPeca.nfs + ' NF-e', a: 'irPeca', cls2: sel('irPeca') },
+    { l: 'IRRF Serviço', v: Rk(tr.irServ.valor), d: R(tr.irServ.valor) + ' · ' + tr.irServ.nfs + ' NFS-e', a: 'irServ', cls2: sel('irServ') },
+    { l: 'ISSQN retido', v: Rk(tr.iss.valor), d: R(tr.iss.valor) + ' · ' + tr.iss.nfs + ' NFS-e', a: 'iss', cls2: sel('iss') },
+    { l: 'Retenções efetivas (IRRF + ISSQN)', v: Rk(retEf), d: R(retEf) + (aprov ? ' · ' + P(retEf / aprov * 100) + ' do movimentado' : ''), c: 'gold' },
+    { l: 'Notas fiscais distintas', v: int.format(nPeca + nServ), d: nPeca + ' NF-e de peças · ' + nServ + ' NFS-e de serviços' },
+    { l: 'Valor líquido', v: Rk(soma(d, 'liquido')), d: R(soma(d, 'liquido')) },
+    { l: 'Pendências', v: int.format(pend.length), d: pend.length ? pendDif.length + ' diferença(s) · ' + (pend.length - pendDif.length) + ' alerta(s) — clique' : 'Nenhuma pendência',
+      cls: pend.length ? 'neg' : '', p: 1 },
+    { l: 'Diferença (RAD − recalculado)', v: R(nOrdDif ? difTot : 0), d: nOrdDif ? nOrdDif + ' ordem(ns) com diferença — clique' : 'Nenhuma diferença encontrada', cls: nOrdDif ? 'neg' : '', p: 1 }
+  ];
+  document.getElementById('kpis').innerHTML = k.map(function (x, i) {
+    return '<div class="kpi' + (x.c ? ' ' + x.c : '') + (x.cls2 || '') + (x.a || x.p ? ' clicavel' : '') + '" data-i="' + i + '"><div class="l">' + esc(x.l) + '</div><div class="v ' + (x.cls || '') + '">' +
+      esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>';
+  }).join('');
+  document.querySelectorAll('#kpis .kpi.clicavel').forEach(function (el) {
+    var x = k[+el.dataset.i];
+    el.onclick = function () { if (x.a) detalharTributo(x.a, d); else detalharPendencias('Pendências — filtros atuais', pend); };
+  });
+}
+
+// Barra horizontal com valor (R$) e nº de NFs: a quantidade fica DENTRO da barra (texto claro) quando cabe;
+// se a barra for curta, vai junto do valor, no fim ("R$ 629,82 · 8 NFs"). Nunca deixa de aparecer.
+function rotulosValorNfs(fmt, textos) {
+  return {
+    id: 'rotulosValorNfs',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx;
+      ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      chart.getDatasetMeta(0).data.forEach(function (bar, i) {
+        var v = chart.data.datasets[0].data[i], txt = textos[i] || '';
+        if (!v && !txt) return;
+        ctx.font = '600 11px system-ui, sans-serif';
+        var cabe = txt && (bar.x - bar.base) > ctx.measureText(txt).width + 14;
+        if (cabe) { ctx.fillStyle = '#fff'; ctx.fillText(txt, bar.base + 7, bar.y); }
+        ctx.font = '500 11px system-ui, sans-serif'; ctx.fillStyle = css('--text-2');
+        ctx.fillText(fmt(v) + (!cabe && txt ? ' · ' + txt : ''), bar.x + 6, bar.y);
+      });
+      ctx.restore();
+    }
+  };
+}
+
+function renderGraficos(d) {
+  Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  Chart.defaults.font.size = 12;
+  var ativos = impostosAtivos();
+
+  // 1) Total por tributo: valor (R$, no fim da barra) e nº de NFs distintas (dentro da barra). Clique abre as notas.
+  var tr = IMPOSTOS.map(function (t) { return docsDoTributo(d, t.id); });
+  var o1 = opcoesBase(Rk, R, true);
+  o1.layout.padding.right = 150; o1.scales.x.ticks.maxTicksLimit = 4; o1.scales.x.ticks.maxRotation = 0;
+  o1.onClick = function (e, els) { if (els && els.length) detalharTributo(IMPOSTOS[els[0].index].id, d); };
+  o1.onHover = function (e, els) { e.native.target.style.cursor = els && els.length ? 'pointer' : 'default'; };
+  o1.plugins.tooltip.external = function (ctx) {
+    tooltipExterno(R)(ctx);
+    var p = ctx.tooltip.dataPoints && ctx.tooltip.dataPoints[0];
+    if (p && ctx.tooltip.opacity) tipEl.innerHTML += '<div class="muted">' + tr[p.dataIndex].nfs + ' nota(s) fiscal(is) distinta(s) · clique para ver</div>';
+  };
+  desenhar('chImposto', {
+    type: 'bar',
+    data: {
+      labels: IMPOSTOS.map(function (t) { return t.nome; }),
+      datasets: [{
+        label: 'Valor', data: tr.map(function (x) { return x.valor; }),
+        backgroundColor: IMPOSTOS.map(function (t) { var c = css(t.cor); return state.imposto === 'todos' || state.imposto === t.id ? c : c + '40'; })
+      }]
+    },
+    options: o1,
+    plugins: [rotulosValorNfs(R, tr.map(function (x) { return x.nfs + ' NF' + (x.nfs === 1 ? '' : 's'); }))]
+  });
+
+  // 2) Por unidade (barras agrupadas)
+  var unidades = unicos(d.map(function (n) { return n.unidade; }));
+  document.getElementById('lgUnidade').innerHTML = ativos.map(function (t) {
+    return '<span><i style="background:var(' + t.cor + ')"></i>' + esc(t.nome) + '</span>';
+  }).join('');
+  var o2 = opcoesBase(Rk, R, false);
+  o2.datasets.bar.borderWidth = { left: 1, right: 1 };
+  desenhar('chUnidade', {
+    type: 'bar',
+    data: {
+      labels: unidades,
+      datasets: ativos.map(function (t) {
+        return { label: t.nome, backgroundColor: css(t.cor), data: unidades.map(function (u) { return soma(d.filter(function (n) { return n.unidade === u; }), t.valor); }) };
+      })
+    },
+    options: o2
+  });
+
+  // 3) Valor retido por alíquota (R$) — só notas com valor do tributo (> 0); soma = total do tributo no gráfico 1.
+  var tabs = document.getElementById('tabsAliq');
+  tabs.innerHTML = IMPOSTOS.map(function (t) {
+    return '<button class="chip" data-t="' + t.id + '" aria-pressed="' + (state.aliqTab === t.id) + '"><i class="dot" style="background:var(' + t.cor + ')"></i>' + esc(t.nome) + '</button>';
+  }).join('');
+  tabs.querySelectorAll('.chip').forEach(function (b) { b.onclick = function () { state.aliqTab = b.dataset.t; renderGraficos(filtrar()); }; });
+  var ta = imp(state.aliqTab), tipoA = TRIB_TIPO[ta.id];
+  var grupos = agruparAliqValor(d, ta);
+  var totA = docsDoTributo(d, ta.id);
+  var somaG = r2(grupos.reduce(function (s, g) { return s + g.valor; }, 0));
+  document.getElementById('hintAliq').innerHTML = 'Somatório de <b>' + esc(ta.nome) + '</b> por alíquota, só das notas com valor (as sem retenção ficam fora, mas continuam na tabela). ' +
+    (Math.abs(somaG - totA.valor) <= 0.005 ? '<span class="tag ok">✓ soma ' + R(somaG) + ' = total do tributo</span>' : '<span class="tag bad">soma ' + R(somaG) + ' ≠ total ' + R(totA.valor) + '</span>');
+  var oA = opcoesBase(Rk, R, true);
+  oA.layout.padding.right = 150; oA.scales.x.ticks.maxTicksLimit = 4; oA.scales.x.ticks.maxRotation = 0;
+  oA.onClick = function (e, els) {
+    if (!els || !els.length) return;
+    var g = grupos[els[0].index];
+    detalharTributo(ta.id, d.filter(function (n) { return rotuloAliq(n, ta) === g.rot; }));
+  };
+  oA.onHover = o1.onHover;
+  oA.plugins.tooltip.external = function (ctx) {
+    tooltipExterno(R)(ctx);
+    var p = ctx.tooltip.dataPoints && ctx.tooltip.dataPoints[0];
+    if (p && ctx.tooltip.opacity) tipEl.innerHTML += '<div class="muted">' + grupos[p.dataIndex].nfs + ' ' + (tipoA === 'peca' ? 'NF-e' : 'NFS-e') + ' distinta(s) · clique para ver</div>';
+  };
+  desenhar('chAliquota', {
+    type: 'bar',
+    data: { labels: grupos.map(function (g) { return g.rot; }), datasets: [{ label: ta.nome, backgroundColor: css(ta.cor), data: grupos.map(function (g) { return g.valor; }) }] },
+    options: oA,
+    plugins: [rotulosValorNfs(R, grupos.map(function (g) { return g.nfs + ' NF' + (g.nfs === 1 ? '' : 's'); }))]
+  });
+
+  // 4) Top estabelecimentos
+  var porEst = {};
+  d.forEach(function (n) {
+    var v = ativos.reduce(function (s, t) { return s + n[t.valor]; }, 0);
+    porEst[n.estab] = (porEst[n.estab] || 0) + v;
+  });
+  var top = Object.keys(porEst).map(function (k) { return { k: k, v: r2(porEst[k]) }; })
+    .filter(function (x) { return x.v > 0; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 10);
+  document.getElementById('hintEstab').textContent = 'Top 10 pelo total de ' + (state.imposto === 'todos' ? 'ICMS desonerado + retenções' : imp(state.imposto).nome) + ' informado no RAD.';
+  desenhar('chEstab', {
+    type: 'bar',
+    data: {
+      labels: top.map(function (x) { return x.k.length > 28 ? x.k.slice(0, 27) + '…' : x.k; }),
+      datasets: [{ label: '', backgroundColor: state.imposto === 'todos' ? css('--accent') : css(imp(state.imposto).cor), data: top.map(function (x) { return x.v; }) }]
+    },
+    options: opcoesBase(Rk, R, true),
+    plugins: [rotulosFim(R)]
+  });
+  renderEvolucao(d);
+}
+/** Grupos de alíquota com valor do tributo > 0: valor somado e nº de NFs distintas. */
+function agruparAliqValor(d, t) {
+  var g = {}, tipo = TRIB_TIPO[t.id];
+  d.forEach(function (n) {
+    if (!(n[t.valor] > 0)) return;
+    var k = rotuloAliq(n, t);
+    if (!g[k]) g[k] = { rot: k, ord: t.id === 'icms' && n.icmsObs ? 999 : n[t.aliq], valor: 0, chaves: {} };
+    g[k].valor += n[t.valor]; g[k].chaves[chaveNf(n, tipo)] = 1;
+  });
+  return Object.keys(g).map(function (k) { var x = g[k]; x.valor = r2(x.valor); x.nfs = Object.keys(x.chaves).length; return x; })
+    .sort(function (a, b) { return a.ord - b.ord; });
+}
+
+/* ---- Evolução dos RADs (item 6): movimentação e retenções por competência/quinzena ---- */
+function porPeriodo(d) {
+  var g = {};
+  d.forEach(function (n) {
+    if (!n.periodo) return;
+    var k = n.periodo.ini;
+    var x = g[k] = g[k] || { ord: k, rot: n.radNum, aprovado: 0, liquido: 0, icms: 0, irPeca: 0, irServ: 0, iss: 0, unidades: {} };
+    x.aprovado += n.aprovado; x.liquido += n.liquido; x.icms += n.icms; x.irPeca += n.irPeca; x.irServ += n.irServ; x.iss += n.iss;
+    x.unidades[n.unidade] = (x.unidades[n.unidade] || 0) + n.aprovado;
+  });
+  var acum = 0;
+  return Object.keys(g).sort().map(function (k) {
+    var x = g[k];
+    ['aprovado', 'liquido', 'icms', 'irPeca', 'irServ', 'iss'].forEach(function (c) { x[c] = r2(x[c]); });
+    x.ret = r2(x.irPeca + x.irServ + x.iss);
+    acum = r2(acum + x.aprovado); x.acum = acum;
+    return x;
+  });
+}
+function renderEvolucao(d) {
+  var sec = document.getElementById('secEvolucao'), per = document.getElementById('fPeriodo').value;
+  // Visão histórica: todos os períodos (ou um mês inteiro). Numa quinzena só há um ponto.
+  sec.hidden = !!per && !/^m:/.test(per);
+  if (sec.hidden) return;
+  var pts = porPeriodo(d), semPer = d.filter(function (n) { return !n.periodo; }).length;
+  var tot = pts.length ? pts[pts.length - 1].acum : 0;
+  document.getElementById('hintEvolucao').textContent = pts.length + ' competência(s)/quinzena(s) em ordem cronológica · total movimentado no intervalo: ' + R(tot) +
+    (semPer ? ' · ' + semPer + ' ordem(ns) sem período ficam fora do gráfico' : '') + '. Passe o cursor nos pontos para ver os valores.';
+  var labels = pts.map(function (x) { return x.rot; });
+  var linha = function (rot, cor, dados, extra) {
+    return Object.assign({ label: rot, data: dados, borderColor: cor, backgroundColor: cor, pointRadius: 4, pointHoverRadius: 6, tension: 0.2, borderWidth: 2, fill: false }, extra || {});
+  };
+  var oM = opcoesBase(Rk, R, false);
+  oM.scales.y2 = { position: 'right', grid: { display: false }, border: { display: false }, beginAtZero: true, ticks: { color: css('--text-2'), callback: function (v) { return Rk(v); }, maxTicksLimit: 6 } };
+  oM.plugins.tooltip.external = function (ctx) {
+    tooltipExterno(R)(ctx);
+    var p = ctx.tooltip.dataPoints && ctx.tooltip.dataPoints[0];
+    if (p && ctx.tooltip.opacity) {
+      var u = pts[p.dataIndex].unidades;
+      tipEl.innerHTML += '<div class="muted" style="margin-top:4px">' + Object.keys(u).sort().map(function (k) { return esc(k) + ': ' + R(u[k]); }).join('<br>') + '</div>';
+    }
+  };
+  desenhar('chMovimento', {
+    type: 'line',
+    data: { labels: labels, datasets: [
+      linha('Valor movimentado (aprovado)', css('--accent'), pts.map(function (x) { return x.aprovado; })),
+      linha('Valor líquido', css('--irserv'), pts.map(function (x) { return x.liquido; })),
+      linha('Acumulado no intervalo (eixo direito)', css('--muted'), pts.map(function (x) { return x.acum; }), { borderDash: [6, 4], yAxisID: 'y2', pointRadius: 2 })
+    ] },
+    options: oM
+  });
+  document.getElementById('lgMovimento').innerHTML = [['--accent', 'Valor movimentado (aprovado)'], ['--irserv', 'Valor líquido'], ['--muted', 'Acumulado (eixo direito, tracejado)']]
+    .map(function (x) { return '<span><i style="background:var(' + x[0] + ')"></i>' + x[1] + '</span>'; }).join('');
+  desenhar('chRetencoes', {
+    type: 'line',
+    data: { labels: labels, datasets: [
+      linha('IRRF Peça', css('--irpeca'), pts.map(function (x) { return x.irPeca; })),
+      linha('IRRF Serviço', css('--irserv'), pts.map(function (x) { return x.irServ; })),
+      linha('ISSQN retido', css('--iss'), pts.map(function (x) { return x.iss; })),
+      linha('Total das retenções efetivas', css('--text'), pts.map(function (x) { return x.ret; }), { borderWidth: 3 }),
+      linha('ICMS desonerado (não é retenção)', css('--icms'), pts.map(function (x) { return x.icms; }), { borderDash: [6, 4] })
+    ] },
+    options: opcoesBase(Rk, R, false)
+  });
+  document.getElementById('lgRetencoes').innerHTML = [['--irpeca', 'IRRF Peça'], ['--irserv', 'IRRF Serviço'], ['--iss', 'ISSQN retido'], ['--text', 'Total das retenções efetivas'],
+    ['--icms', 'ICMS desonerado (tracejado, fora do total)']].map(function (x) { return '<span><i style="background:var(' + x[0] + ')"></i>' + x[1] + '</span>'; }).join('');
 }
 
 /* ---------------- Carga de dados ---------------- */
@@ -1537,6 +2053,8 @@ function exibir(notas) {
   render();
   buscarNotas();
   if (VIEW === 'sofi' || VIEW === 'almox') sofiCarregar();
+  carregarPagamentos();                 // Status de Pagamento (SOFI) para os indicadores, a ficha do RAD e a consulta
+  if (VIEW === 'pagamentos') pagRender();
   statusTopo('✓ Dados atualizados' + (FONTE.atualizadoEm ? ' em ' + FONTE.atualizadoEm : '') + ' · ' + NOTAS.length + ' ordens');
 }
 function erroCarga(e) {
@@ -1560,22 +2078,23 @@ function lerRadHtml(html, nomeArquivo) {
     if (!orgao && /^Código Órgão \/ Entidade:?$/i.test(t) && tds[i + 1]) orgao = tds[i + 1].textContent.replace(/\s+/g, ' ').trim();
     if (!periodo) { var m = /Período:\s*(.+)$/i.exec(t); if (m) periodo = m[1]; }
   }
-  var cab = null, linhas = [];
+  var cab = null, linhas = [], rodape = null;
   doc.querySelectorAll('tr').forEach(function (tr) {
     var cels = Array.prototype.map.call(tr.children, function (td) { return td.textContent.replace(/\s+/g, ' ').trim(); });
     if (tr.classList.contains('tb-cabecalho') || normCab(cels[0]) === 'placa') { cab = cels; return; }
+    if (cab && /^qtd de os/i.test(cels[0] || '')) { rodape = lerRodape(cab, cels) || rodape; return; }
     if (!cab || tr.classList.contains('rad-totais') || cels.length !== cab.length) return;
     linhas.push(cels);
   });
   if (!cab) throw new Error('“' + nomeArquivo + '” não parece um RAD (tabela com "Placa" não encontrada).');
   // "25A BPMAMB" -> "BPMAMB"
   var sigla = orgao.replace(/^\d+\s*[ºª°A-Z]?\s+/i, '').trim() || orgao;
-  return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo };
+  return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo, rodape: rodape };
 }
 
 /** RAD que virou Planilha Google (grade de células). */
 function lerRadGrade(grade, nomeArquivo) {
-  var orgao = '', periodo = '', cab = null, linhas = [], c0 = 0;
+  var orgao = '', periodo = '', cab = null, linhas = [], c0 = 0, rodape = null;
   grade.forEach(function (l) {
     l = l.map(function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); });
     // Planilha convertida pode ter colunas vazias antes da tabela: alinha pela coluna do cabeçalho "Placa".
@@ -1587,12 +2106,13 @@ function lerRadGrade(grade, nomeArquivo) {
     });
     if (c0) l = l.slice(c0);
     if (normCab(l[0]) === 'placa') { cab = l; return; }
+    if (cab && /^qtd de os/i.test(l[0] || '')) { rodape = lerRodape(cab, l) || rodape; return; }
     // Linhas de dados: ao menos 8 células preenchidas (descarta cabeçalhos de página e a linha de totais).
     if (cab && l[0] && !/^qtd de os/i.test(l[0]) && l.filter(String).length >= 8) linhas.push(l);
   });
   if (!cab) throw new Error('“' + nomeArquivo + '” não parece um RAD (cabeçalho "Placa" não encontrado).');
   var sigla = orgao.replace(/^\d+\s*[ºª°A-Z]?\s+/i, '').trim() || orgao;
-  return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo };
+  return { orgao: orgao, unidade: sigla, periodo: periodo, cab: cab, linhas: linhas, arquivo: nomeArquivo, rodape: rodape };
 }
 
 /* ---------------- Período do RAD (quinzena) ---------------- */
@@ -1615,7 +2135,7 @@ function periodoPorData(data) {
   return p;
 }
 
-var VERSAO_PAINEL = '2026-10-08c'; // deve ser igual a VERSAO_CODIGO do Code.gs
+var VERSAO_PAINEL = '2026-10-10'; // deve ser igual a VERSAO_CODIGO do Code.gs
 
 /** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
 function renderRelatorioArquivos() {
@@ -1637,7 +2157,8 @@ function renderRelatorioArquivos() {
   var st = { lido: ['ok', '✓ Computado'], duplicado: ['warn', '≡ Duplicado'], erro: ['bad', '✕ Erro'], vazio: ['bad', '∅ Sem ordens'] };
   document.querySelector('#tblRel tbody').innerHTML = rel.map(function (x) {
     return '<tr><td><span class="tag ' + st[x.status][0] + '">' + st[x.status][1] + '</span></td><td>' + esc(x.nome) + '</td><td>' + esc(x.unidade) +
-      '</td><td>' + esc(x.periodo || '—') + '</td><td>' + esc(x.origemPer || '') + '</td><td class="n">' + (x.ordens || '') + '</td><td class="muted" style="white-space:normal">' + esc(x.obs) + '</td></tr>';
+      '</td><td>' + esc(x.periodo || '—') + '</td><td>' + esc(x.origemPer || '') + '</td><td class="n">' + (x.ordens || '') + '</td><td>' +
+      (x.status === 'lido' ? tagRodape(NOTAS.filter(function (n) { return n.radArquivo === x.nome; })) : '<span class="muted">—</span>') + '</td><td class="muted" style="white-space:normal">' + esc(x.obs) + '</td></tr>';
   }).join('');
   var outros = (FONTE.ignorados || []).map(function (x) { return 'não é RAD: ' + x; }).concat((FONTE.consolidados || []).map(function (x) { return '“UNIAO RAD” ignorada: ' + x; }))
     .concat((FONTE.outros || []).map(function (x) { return 'não lido: ' + x; }));
@@ -1663,9 +2184,45 @@ function periodoDoCaminho(nome) {
   return lerPeriodo((m[3] === '1' ? '01' : '16') + '/' + m[1] + '/' + m[2] + ' a ' + (m[3] === '1' ? '15' : String(ult)) + '/' + m[1] + '/' + m[2]);
 }
 
+/*
+ * Rodapé do RAD ("Qtd de OS: 27 | Total: | 5.337,35 | N/A | …"): totais oficiais da Ticket Log. Os valores seguem a ordem das
+ * colunas do cabeçalho a partir de "Valor ICMS Deduzido". Serve para conferir se todas as ordens do arquivo foram lidas.
+ */
+var RODAPE_CAMPOS = [['valor icms deduzido', 'icms'], ['irrf', 'irPeca'], ['valor a pagar peca', 'vPeca'], ['valor issqn retido', 'iss'], ['irrf#2', 'irServ'],
+  ['valor a pagar servico', 'vServ'], ['valor total aprovado', 'aprovado'], ['valor total liquido', 'liquido'], ['valor taxa administracao', 'adm']];
+var RODAPE_ROT = { icms: 'ICMS desonerado', irPeca: 'IRRF Peça', vPeca: 'Valor a pagar peça', iss: 'ISSQN retido', irServ: 'IRRF Serviço', vServ: 'Valor a pagar serviço',
+  aprovado: 'Valor total aprovado', liquido: 'Valor líquido', adm: 'Taxa de administração', qtd: 'Qtd de OS' };
+function lerRodape(cab, l) {
+  var iTot = l.findIndex(function (v) { return /^total:?$/i.test(String(v).trim()); });
+  var cabN = cab.map(normCab), i0 = cabN.indexOf('valor icms deduzido');
+  if (iTot < 0 || i0 < 0) return null;
+  var vals = l.slice(iTot + 1), r = {}, vistos = {};
+  cabN.slice(i0).forEach(function (h, j) {
+    vistos[h] = (vistos[h] || 0) + 1;
+    var chave = vistos[h] > 1 ? h + '#' + vistos[h] : h;
+    RODAPE_CAMPOS.forEach(function (c) {
+      if (c[0] === chave && vals[j] != null && /\d/.test(vals[j])) r[c[1]] = r2(Number(String(vals[j]).replace(/[^\d,.\-]/g, '').replace(/\./g, '').replace(',', '.')) || 0);
+    });
+  });
+  var q = /qtd de os:?\s*(\d+)/i.exec(l.join(' ')); if (q) r.qtd = +q[1];
+  return Object.keys(r).length >= 5 ? r : null;
+}
+var RODAPES = {};   // nome do arquivo → totais do rodapé
+/** Soma das ordens lidas de um arquivo × rodapé do RAD. null = arquivo sem rodapé legível. */
+function conferirRodape(arquivo) {
+  var rod = RODAPES[arquivo]; if (!rod) return null;
+  var ns = NOTAS.filter(function (n) { return n.radArquivo === arquivo; }), difs = [];
+  Object.keys(rod).forEach(function (k) {
+    var soma = k === 'qtd' ? ns.length : r2(ns.reduce(function (a, n) { return a + (n[k] || 0); }, 0));
+    if (Math.abs(soma - rod[k]) > 0.01) difs.push({ campo: k, soma: soma, rodape: rod[k] });
+  });
+  return { ok: !difs.length, difs: difs, n: ns };
+}
+
 /** Lê vários RADs, junta as linhas e descarta arquivos/ordens repetidos. Devolve também o relatório arquivo a arquivo. */
 function notasDosRads(rads) {
   var notas = [], vistas = {}, avisos = [], conteudos = {}, relatorio = [];
+  RODAPES = {};
   // Ordem estável (pelo caminho/nome): entre arquivos duplicados fica sempre o mesmo.
   // Cópias ("(1)", "cópia", "copy") ficam por último: entre duplicados, fica o arquivo original.
   var copia = function (n) { return /\(\d+\)|c[oó]pia|copy/i.test(String(n).split('/').pop()) ? 1 : 0; };
@@ -1677,6 +2234,7 @@ function notasDosRads(rads) {
     try { rad = r.grade ? lerRadGrade(r.grade, r.nome) : lerRadHtml(r.html, r.nome); }
     catch (e) { avisos.push(e.message); rel.status = 'erro'; rel.obs = e.message; return; }
     rel.unidade = rad.unidade;
+    if (rad.rodape) RODAPES[r.nome] = rad.rodape;
     // Período: cabeçalho do RAD → nome da subpasta ("RAD 052026-1") → data de aprovação de cada ordem.
     var per = lerPeriodo(rad.periodo), origemPer = 'cabeçalho do RAD';
     if (!per) { per = periodoDoCaminho(r.nome); origemPer = 'nome da pasta'; }
@@ -2411,9 +2969,9 @@ var SETORES = { SOFI: 'SOFI', ALMOX: 'Almoxarifado' };
 function setorAtual() { return VIEW === 'almox' ? 'ALMOX' : 'SOFI'; }
 
 /** Totais de cada RAD (Unidade + período) a partir das ordens lidas. */
-function radsResumo() {
+function radsResumo(lista) {
   var g = {};
-  NOTAS.forEach(function (n) {
+  (lista || NOTAS).forEach(function (n) {
     var k = n.radChave;
     var r = g[k] = g[k] || { chave: k, unidade: n.unidade, periodo: n.periodo, qtd: 0, aprovado: 0, impostos: 0, adm: 0, liquido: 0, arquivos: {} };
     r.qtd++; r.aprovado += n.aprovado; r.impostos += n.totalImp; r.adm += n.adm; r.liquido += n.liquido;
@@ -2437,44 +2995,84 @@ function sofiCarregar() {
   var setor = setorAtual();
   chamar('listarPagamentos', setor).then(function (p) {
     if (setor !== setorAtual()) return; // trocou de aba enquanto carregava
-    SOFI.pagos = p; l.hidden = true; document.getElementById('sofiApp').hidden = false; sofiRender();
+    SOFI.pagos = p; if (setor === 'SOFI') PAG.sofi = p;
+    l.hidden = true; document.getElementById('sofiApp').hidden = false; sofiRender();
   }).catch(function (e) { l.textContent = 'Erro: ' + (e && e.message || e); })
     .then(function () { SOFI.carregando = false; if (!SOFI.pagos && (VIEW === 'sofi' || VIEW === 'almox')) sofiCarregar(); });
 }
 
+function resumoRad(r) { return { unidade: r.unidade, periodo: r.rotPeriodo, qtd: r.qtd, aprovado: r.aprovado, impostos: r.impostos, adm: r.adm, liquido: r.liquido }; }
+function isoParaBr(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+function brParaIso(v) { var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : ''; }
+
 function sofiRender() {
+  var setor = setorAtual(), perfil = perfilAtual();
   var rads = radsResumo(), pagos = SOFI.pagos || {};
-  // Pagos agora continuam na lista (mostrando "Pago") até atualizar/reabrir a tela; depois só em "Consultar RADs".
+  var stSofi = function (k) { return setor === 'SOFI' ? (pagos[k] || {}) : statusPag(k); };
+  var podeStatus = perfil === setor;                       // só o próprio setor altera (a Frota/P4 consulta)
+  var podeDados = setor === 'SOFI' && (perfil === 'SOFI' || perfil === 'GESTOR');
+  var podeEtapa = ['GESTOR', 'SOFI', 'ALMOX'].indexOf(perfil) > -1;
   var aPagar = rads.filter(function (r) { return !(pagos[r.chave] && pagos[r.chave].pago) || SOFI.nestaSessao[r.chave]; });
   var pendentes = aPagar.filter(function (r) { return !(pagos[r.chave] && pagos[r.chave].pago); });
   var pagosL = rads.filter(function (r) { return pagos[r.chave] && pagos[r.chave].pago; });
   var tot = function (l, c) { return r2(l.reduce(function (s, r) { return s + r[c]; }, 0)); };
+  var rotA = setor === 'SOFI' ? 'RADs a pagar' : 'RADs pendentes (Almoxarifado)';
   document.getElementById('sofiKpis').innerHTML = [
-    { l: 'RADs a pagar', v: int.format(pendentes.length), d: 'de ' + rads.length + ' RAD(s) lidos', c: 'gold' },
-    { l: 'Valor líquido a pagar', v: Rk(tot(pendentes, 'liquido')), d: R(tot(pendentes, 'liquido')) },
-    { l: 'Impostos retidos (a pagar)', v: Rk(tot(pendentes, 'impostos')), d: R(tot(pendentes, 'impostos')) },
-    { l: 'RADs pagos', v: int.format(pagosL.length), d: R(tot(pagosL, 'liquido')) + ' líquidos' }
+    { l: rotA, v: int.format(pendentes.length), d: 'de ' + rads.length + ' RAD(s) lidos', c: 'gold' },
+    { l: 'Valor líquido ' + (setor === 'SOFI' ? 'a pagar' : 'pendente'), v: Rk(tot(pendentes, 'liquido')), d: R(tot(pendentes, 'liquido')) },
+    { l: 'Valor total (aprovado) ' + (setor === 'SOFI' ? 'a pagar' : 'pendente'), v: Rk(tot(pendentes, 'aprovado')), d: R(tot(pendentes, 'aprovado')) },
+    { l: setor === 'SOFI' ? 'RADs pagos' : 'RADs concluídos (Almoxarifado)', v: int.format(pagosL.length), d: R(tot(pagosL, 'liquido')) + ' líquidos' }
   ].map(function (x) { return '<div class="kpi ' + (x.c || '') + '"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>'; }).join('');
+  document.getElementById('sofiAviso').innerHTML = setor === 'SOFI'
+    ? (podeStatus ? 'Altere o <b>Status de Pagamento</b> na lista: <span class="st-apagar">A PAGAR</span> → <span class="st-pago">PAGO</span> e confira a <b>data efetiva do pagamento</b>. O status aparece automaticamente para a Frota/P4 e o Almoxarifado.'
+                  : '🔒 Somente a SOFI altera o <b>Status de Pagamento</b>. Aqui você consulta' + (podeDados ? ' e pode informar o Nº do título, a NF da Ticket Log e a etapa' : '') + '.')
+    : 'Controle interno do Almoxarifado (independente da SOFI). A coluna <b>Status de Pagamento (SOFI)</b> mostra o que a SOFI registrou.';
 
-  var cab = '<tr><th>Unidade</th><th>Período</th><th class="n">Nº de OS</th><th class="n">Valor aprovado</th><th class="n">Impostos retidos</th><th class="n">Taxa adm.</th><th class="n">Valor líquido</th>';
+  var cab = '<tr><th>Nº RAD</th><th>Unidade</th><th>Período</th><th class="n">Nº de OS</th><th class="n">Valor total (aprovado)</th><th class="n">Deduções (ICMS deson. + retenções)</th>' +
+    '<th class="n">Taxa adm.</th><th class="n">Valor líquido</th>' +
+    (setor === 'SOFI' ? '<th>Status de Pagamento</th><th>Data do pagamento</th><th>Nº do título</th><th>NF Ticket Log</th><th>Etapa de tramitação</th><th>Atualizado</th>'
+                      : '<th>Controle do Almoxarifado</th><th>Status de Pagamento (SOFI)</th><th>Etapa de tramitação</th>') + '</tr>';
+  var ncols = setor === 'SOFI' ? 14 : 11;
   var linha = function (r) {
-    return '<td><b>' + esc(r.unidade) + '</b></td><td>' + esc(r.rotPeriodo) + '</td><td class="n">' + r.qtd + '</td><td class="n">' + R(r.aprovado) +
-      '</td><td class="n">' + R(r.impostos) + '</td><td class="n">' + R(r.adm) + '</td><td class="n"><b>' + R(r.liquido) + '</b></td>';
+    return '<td><a href="#" data-rad="' + esc(r.chave) + '"><b>' + esc(radNumDe(r)) + '</b></a></td><td><b>' + esc(r.unidade) + '</b></td><td>' + esc(r.rotPeriodo) + '</td><td class="n">' + r.qtd +
+      '</td><td class="n">' + R(r.aprovado) + '</td><td class="n">' + R(r.impostos) + '</td><td class="n">' + R(r.adm) + '</td><td class="n"><b>' + R(r.liquido) + '</b></td>';
+  };
+  var etapaCel = function (r) {
+    var e = stSofi(r.chave).etapa || '';
+    return '<td>' + (podeEtapa && (setor === 'SOFI' || PAG.sofi)
+      ? '<select class="pf-sel etapa-sel" data-chave="' + esc(r.chave) + '">' + ETAPAS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === e ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>'
+      : esc(etapaRot(e))) + '</td>';
+  };
+  var controles = function (r, naLista) {
+    var p = pagos[r.chave] || {}, pg = !!p.pago;
+    if (setor === 'SOFI') {
+      var status = podeStatus
+        ? '<select class="st-sel ' + (pg ? 'pago' : 'apagar') + '" data-chave="' + esc(r.chave) + '"><option value="A PAGAR"' + (pg ? '' : ' selected') + '>A PAGAR</option><option value="PAGO"' + (pg ? ' selected' : '') + '>PAGO</option></select>'
+        : (pg ? '<span class="st-pago">✓ PAGO</span>' : '<span class="st-apagar">A PAGAR</span>');
+      var data = pg ? (podeStatus ? '<input type="date" class="dt-pag" data-chave="' + esc(r.chave) + '" value="' + esc(brParaIso(p.dataPag)) + '">' : esc(p.dataPag || '—')) : '<span class="muted">—</span>';
+      var campo = function (c, v) { return podeDados ? '<input class="inf-rad" data-chave="' + esc(r.chave) + '" data-campo="' + c + '" value="' + esc(v || '') + '" placeholder="—" maxlength="60">' : esc(v || '—'); };
+      return '<td>' + status + '</td><td>' + data + '</td><td>' + campo('titulo', p.titulo) + '</td><td>' + campo('nfTicket', p.nfTicket) + '</td>' + etapaCel(r) +
+        '<td class="muted" style="font-size:11px">' + esc(p.em ? p.em + ' · ' + (p.por || '') : '—') + '</td>';
+    }
+    var botao = podeStatus ? (pg ? '<button class="btn pago" data-desfazer="' + esc(r.chave) + '"' + (naLista ? ' data-sem-confirmar="1"' : '') + ' title="Registrado em ' + esc(p.em || '') + ' — clique para desfazer">✓ Concluído</button>'
+                                 : '<button class="btn apagar" data-pagar="' + esc(r.chave) + '">Pendente</button>')
+                             : (pg ? '✓ Concluído' : 'Pendente');
+    return '<td>' + botao + '</td><td>' + tagStatusPag(statusPag(r.chave)) + '</td>' + etapaCel(r);
   };
   var rodape = function (l, extra) {
-    return l.length ? '<tr><td>Total</td><td></td><td class="n">' + tot(l, 'qtd') + '</td><td class="n">' + R(tot(l, 'aprovado')) + '</td><td class="n">' + R(tot(l, 'impostos')) +
+    return l.length ? '<tr><td>Total</td><td></td><td></td><td class="n">' + tot(l, 'qtd') + '</td><td class="n">' + R(tot(l, 'aprovado')) + '</td><td class="n">' + R(tot(l, 'impostos')) +
       '</td><td class="n">' + R(tot(l, 'adm')) + '</td><td class="n">' + R(tot(l, 'liquido')) + '</td>' + extra + '</tr>' : '';
   };
-  document.querySelector('#sofiTabela thead').innerHTML = cab + '<th>Situação</th></tr>';
+  var vazios = function (n) { return new Array(n + 1).join('<td></td>'); };
+  document.querySelector('#sofiTabela thead').innerHTML = cab;
   document.querySelector('#sofiTabela tbody').innerHTML = aPagar.length ? aPagar.map(function (r) {
     var pg = pagos[r.chave] && pagos[r.chave].pago;
-    return '<tr' + (pg ? ' class="rad-pago"' : '') + '>' + linha(r) + '<td>' + (pg
-      ? '<button class="btn pago" data-desfazer="' + esc(r.chave) + '" data-sem-confirmar="1" title="Pago em ' + esc(pagos[r.chave].em) + ' — clique para desfazer">✓ Pago</button>'
-      : '<button class="btn apagar" data-pagar="' + esc(r.chave) + '" title="Clique quando o RAD for pago">A pagar</button>') + '</td></tr>';
-  }).join('') : '<tr><td class="empty" colspan="8">Nenhum RAD pendente de pagamento. 🎉</td></tr>';
-  document.querySelector('#sofiTabela tfoot').innerHTML = rodape(pendentes, '<td></td>');
-  document.getElementById('sofiCont').textContent = pendentes.length + ' RAD(s) aguardando pagamento' +
-    (aPagar.length > pendentes.length ? ' · os marcados como pagos saem da lista ao atualizar' : '');
+    return '<tr' + (pg ? ' class="rad-pago"' : '') + '>' + linha(r) + controles(r, true) + '</tr>';
+  }).join('') : '<tr><td class="empty" colspan="' + ncols + '">' + (setor === 'SOFI' ? 'Nenhum RAD a pagar. 🎉' : 'Nenhum RAD pendente. 🎉') + '</td></tr>';
+  document.querySelector('#sofiTabela tfoot').innerHTML = rodape(pendentes, vazios(ncols - 8));
+  document.getElementById('sofiCont').textContent = pendentes.length + ' RAD(s) ' + (setor === 'SOFI' ? 'a pagar' : 'pendente(s)') +
+    (aPagar.length > pendentes.length ? ' · os que mudaram para ' + (setor === 'SOFI' ? 'PAGO' : 'concluído') + ' saem da lista ao atualizar (continuam na consulta)' : '');
+  document.getElementById('sofiTitTabela').textContent = rotA;
 
   var cons = document.getElementById('sofiConsulta');
   cons.hidden = !SOFI.consulta;
@@ -2482,47 +3080,309 @@ function sofiRender() {
   if (SOFI.consulta) {
     var f = document.getElementById('sofiFiltro').value;
     var lista = rads.filter(function (r) { var pg = !!(pagos[r.chave] && pagos[r.chave].pago); return !f || (f === 'pago') === pg; });
-    document.querySelector('#sofiTodos thead').innerHTML = cab + '<th>Situação</th><th>Pago em</th><th>Por</th><th>Arquivo(s) RAD</th></tr>';
+    document.querySelector('#sofiTodos thead').innerHTML = cab;
     document.querySelector('#sofiTodos tbody').innerHTML = lista.length ? lista.map(function (r) {
       var pg = pagos[r.chave] && pagos[r.chave].pago;
-      // Uma única indicação de situação: o botão mostra o estado atual e, ao clicar, troca.
-      return '<tr' + (pg ? ' class="rad-pago"' : '') + '>' + linha(r) + '<td>' + (pg
-          ? '<button class="btn pago" data-desfazer="' + esc(r.chave) + '" title="Clique para desfazer o pagamento">✓ Pago</button>'
-          : '<button class="btn apagar" data-pagar="' + esc(r.chave) + '" title="Clique quando o RAD for pago">A pagar</button>') + '</td>' +
-        '<td>' + esc(pg ? pagos[r.chave].em : '—') + '</td><td>' + esc(pg ? pagos[r.chave].por : '—') + '</td>' +
-        '<td class="muted" style="white-space:normal;max-width:260px">' + esc(Object.keys(r.arquivos).join(', ')) + '</td></tr>';
-    }).join('') : '<tr><td class="empty" colspan="11">Nenhum RAD.</td></tr>';
-    document.querySelector('#sofiTodos tfoot').innerHTML = rodape(lista, '<td></td><td></td><td></td><td></td>');
+      return '<tr' + (pg ? ' class="rad-pago"' : '') + '>' + linha(r) + controles(r, false) + '</tr>';
+    }).join('') : '<tr><td class="empty" colspan="' + ncols + '">Nenhum RAD.</td></tr>';
+    document.querySelector('#sofiTodos tfoot').innerHTML = rodape(lista, vazios(ncols - 8));
     rolagemHorizontal('sofiTodos');
   }
-  document.querySelectorAll('#viewSofi button[data-pagar]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.pagar, true); }; });
-  document.querySelectorAll('#viewSofi button[data-desfazer]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.desfazer, false, !!b.dataset.semConfirmar); }; });
+  var v = document.getElementById('viewSofi');
+  v.querySelectorAll('button[data-pagar]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.pagar, true); }; });
+  v.querySelectorAll('button[data-desfazer]').forEach(function (b) { b.onclick = function () { sofiMarcar(b, b.dataset.desfazer, false, !!b.dataset.semConfirmar); }; });
+  v.querySelectorAll('select.st-sel').forEach(function (el) {
+    el.onchange = function () {
+      var pago = el.value === 'PAGO', dt = el.closest('tr').querySelector('.dt-pag');
+      sofiStatus(el, el.dataset.chave, pago, pago ? isoParaBr(dt && dt.value) || hojeBr() : '');
+    };
+  });
+  v.querySelectorAll('input.dt-pag').forEach(function (el) {
+    el.onchange = function () { if (!el.value) { el.value = brParaIso((pagos[el.dataset.chave] || {}).dataPag); return; } sofiStatus(el, el.dataset.chave, true, isoParaBr(el.value), true); };
+  });
+  v.querySelectorAll('input.inf-rad').forEach(function (el) {
+    el.onchange = function () { var c = {}; c[el.dataset.campo] = el.value.trim(); sofiInfo(el, el.dataset.chave, c); };
+  });
+  v.querySelectorAll('select.etapa-sel').forEach(function (el) { el.onchange = function () { sofiInfo(el, el.dataset.chave, { etapa: el.value }); }; });
+  v.querySelectorAll('a[data-rad]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); abrirRad(a.dataset.rad); }; });
   rolagemHorizontal('sofiTabela');
 }
+function hojeBr() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear(); }
+function rotRad(chave) { var r = radsResumo().filter(function (x) { return x.chave === chave; })[0]; return r; }
+/** SOFI: Status de Pagamento (A PAGAR / PAGO) com a data efetiva do pagamento. */
+function sofiStatus(el, chave, pago, dataBr, soData) {
+  var r = rotRad(chave); if (!r) return;
+  if (!soData && !confirm(pago ? 'Confirmar o PAGAMENTO do RAD ' + radNumDe(r) + ' · ' + r.unidade + '?\nValor líquido: ' + R(r.liquido) + '\nData do pagamento: ' + dataBr +
+                                 '\n\n(Use somente quando o pagamento estiver efetivamente realizado — o simples envio à SOFI não é pagamento.)'
+                               : 'Voltar o RAD ' + radNumDe(r) + ' · ' + r.unidade + ' para A PAGAR?')) { sofiRender(); return; }
+  if (pago) SOFI.nestaSessao[chave] = 1;
+  el.disabled = true;
+  chamar('marcarPago', chave, resumoRad(r), pago, 'SOFI', dataBr).then(function (res) { aplicarPagto(chave, res); })
+    .catch(function (e) { alert('Não foi possível registrar: ' + (e && e.message || e)); sofiRender(); });
+}
+function sofiInfo(el, chave, campos) {
+  var r = rotRad(chave); if (!r) return;
+  el.disabled = true;
+  chamar('salvarInfoRad', chave, resumoRad(r), campos).then(function (res) { aplicarPagto(chave, res); })
+    .catch(function (e) { alert('Não foi possível gravar: ' + (e && e.message || e)); sofiRender(); });
+}
+/** Resposta do servidor (registro completo do RAD na SOFI) → atualiza todas as telas. */
+function aplicarPagto(chave, res) {
+  if (!PAG.sofi) PAG.sofi = {};
+  PAG.sofi[chave] = res;
+  if (SOFI.setor === 'SOFI') { SOFI.pagos = SOFI.pagos || {}; SOFI.pagos[chave] = res; }
+  atualizarTelasPagto();
+  if (VIEW !== 'sofi' && VIEW !== 'almox') return;
+  sofiRender();
+}
 
+/** Almoxarifado: controle interno (Pendente / Concluído), separado do Status de Pagamento da SOFI. */
 function sofiMarcar(b, chave, pago, semConfirmar) {
-  var r = radsResumo().filter(function (x) { return x.chave === chave; })[0];
+  var r = rotRad(chave);
   if (!r) return;
-  var msg = pago ? 'Confirmar o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '?\nValor líquido: ' + R(r.liquido)
-                 : 'Desfazer o pagamento do RAD ' + r.unidade + ' — ' + r.rotPeriodo + '? Ele volta para “A pagar”.';
+  var msg = pago ? 'Marcar o RAD ' + radNumDe(r) + ' · ' + r.unidade + ' como concluído no Almoxarifado?' : 'Voltar o RAD ' + radNumDe(r) + ' · ' + r.unidade + ' para pendente no Almoxarifado?';
   if (!semConfirmar && !confirm(msg)) return;
   if (pago) SOFI.nestaSessao[chave] = 1;
   b.disabled = true; b.textContent = '⏳';
-  chamar('marcarPago', chave, { unidade: r.unidade, periodo: r.rotPeriodo, qtd: r.qtd, aprovado: r.aprovado, impostos: r.impostos, adm: r.adm, liquido: r.liquido }, pago, setorAtual())
-    .then(function (res) { SOFI.pagos[chave] = { pago: res.pago, em: res.em, por: res.por }; sofiRender(); })
+  chamar('marcarPago', chave, resumoRad(r), pago, setorAtual(), pago ? hojeBr() : '')
+    .then(function (res) { SOFI.pagos[chave] = res; sofiRender(); })
     .catch(function (e) { alert('Não foi possível registrar: ' + (e && e.message || e)); sofiRender(); });
 }
 
 function sofiCsv() {
-  var pagos = SOFI.pagos || {}, f = document.getElementById('sofiFiltro').value;
-  var cel = celCsv;
+  var pagos = SOFI.pagos || {}, f = document.getElementById('sofiFiltro').value, setor = setorAtual();
   var linhas = radsResumo().filter(function (r) { var pg = !!(pagos[r.chave] && pagos[r.chave].pago); return !f || (f === 'pago') === pg; }).map(function (r) {
-    var pg = pagos[r.chave] && pagos[r.chave].pago;
-    return [r.unidade, r.rotPeriodo, r.qtd, brNum(r.aprovado), brNum(r.impostos), brNum(r.adm), brNum(r.liquido), pg ? 'Pago' : 'A pagar',
-            pg ? pagos[r.chave].em : '', pg ? pagos[r.chave].por : '', Object.keys(r.arquivos).join(', ')].map(cel).join(';');
+    var p = pagos[r.chave] || {}, s = statusPag(r.chave);
+    return [radNumDe(r), r.unidade, r.rotPeriodo, r.qtd, r.aprovado, r.impostos, r.adm, r.liquido,
+            setor === 'SOFI' ? (p.pago ? 'PAGO' : 'A PAGAR') : (p.pago ? 'Concluído' : 'Pendente'), setor === 'SOFI' ? p.dataPag || '' : (s.pago ? 'PAGO' : 'A PAGAR'),
+            etapaRot(setor === 'SOFI' ? p.etapa : s.etapa), setor === 'SOFI' ? p.titulo || '' : s.titulo || '', setor === 'SOFI' ? p.nfTicket || '' : s.nfTicket || '',
+            p.em || '', p.por || '', Object.keys(r.arquivos).join(', ')];
   });
-  var csv = '\ufeffUnidade;Período;Nº de OS;Valor aprovado;Impostos retidos;Taxa adm.;Valor líquido;Situação;Pago em;Por;Arquivo(s) RAD\n' + linhas.join('\n');
-  baixarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'rads_' + setorAtual().toLowerCase() + '.csv');
+  baixarCsvLinhas(['Nº RAD', 'Unidade', 'Período', 'Nº de OS', 'Valor total (aprovado)', 'Deduções (ICMS deson. + retenções)', 'Taxa adm.', 'Valor líquido',
+    setor === 'SOFI' ? 'Status de Pagamento' : 'Controle do Almoxarifado', setor === 'SOFI' ? 'Data do pagamento' : 'Status de Pagamento (SOFI)', 'Etapa de tramitação',
+    'Nº do título', 'NF Ticket Log', 'Atualizado em', 'Por', 'Arquivo(s) RAD'], linhas, 'rads_' + setor.toLowerCase() + '.csv');
+}
+
+/* ================= Status de Pagamento (SOFI) — item 7 ================= */
+/*
+ * O Status de Pagamento de cada RAD (Unidade + quinzena) é registrado pela SOFI. A Frota/P4 e o Almoxarifado só consultam.
+ * PAG.sofi = { chave: {pago, dataPag, em, por, etapa, titulo, nfTicket, …} } — lido do servidor e atualizado a cada alteração.
+ */
+var PAG = { sofi: null, carregando: false, timer: null, filtro: { status: '', busca: '', unidade: '', mes: '', q: '' }, sort: { key: 'ord', dir: -1 } };
+var ETAPAS = [['', '—'], ['FROTA/P4', 'Frota/P4'], ['ALMOXARIFADO', 'Almoxarifado'], ['SOFI', 'SOFI']];
+function perfilAtual() { return MODO === 'offline' ? '' : (SESSAO && SESSAO.perfil) || ''; }
+function veePagamentos() { return ['GESTOR', 'SOFI', 'ALMOX'].indexOf(perfilAtual()) > -1; }
+function statusPag(chave) { return (PAG.sofi && PAG.sofi[chave]) || { pago: false }; }
+function tagStatusPag(st) {
+  if (!PAG.sofi) return '<span class="muted">—</span>';
+  return st.pago ? '<span class="st-pago">✓ PAGO</span>' + (st.dataPag ? '<div class="muted" style="font-size:11px">em ' + esc(st.dataPag) + '</div>' : '')
+                 : '<span class="st-apagar">A PAGAR</span>';
+}
+function carregarPagamentos(depois) {
+  if (MODO !== 'appsscript' || !veePagamentos() || PAG.carregando) return;
+  PAG.carregando = true;
+  chamar('listarPagamentos', 'SOFI').then(function (p) {
+    PAG.sofi = p;
+    if (SOFI.setor === 'SOFI') SOFI.pagos = p;
+    atualizarTelasPagto();
+    if (depois) depois();
+  }).catch(function (e) { statusTopo('Não foi possível ler o Status de Pagamento: ' + (e && e.message || e), true); })
+    .then(function () { PAG.carregando = false; });
+}
+function atualizarTelasPagto() {
+  if (!NOTAS.length) return;
+  if (VIEW === 'impostos' || VIEW === 'sofi' || VIEW === 'almox') { var d = filtrar(); renderKpisPagto(); renderRadAtual(); renderPendRad(d); renderEvolucao(d); }
+  if (VIEW === 'sofi' || VIEW === 'almox') sofiRender();
+  if (VIEW === 'pagamentos') pagRender();
+}
+/** Notas filtradas só por Unidade e Período (os RADs são sempre inteiros: Unidade × quinzena). */
+function notasDosRadsFiltrados() {
+  var uni = document.getElementById('fUnidade').value, per = document.getElementById('fPeriodo').value;
+  return NOTAS.filter(function (n) { return (!uni || n.unidade === uni) && (!per || periodoConfere(n, per)); });
+}
+function radNumDe(r) { return r.periodo ? r.periodo.mes.slice(5) + '/' + r.periodo.mes.slice(0, 4) + '-' + r.periodo.q : 'sem período'; }
+
+/* ---- Indicadores de pagamento (7.4) — clique abre a consulta ---- */
+function renderKpisPagto() {
+  var box = document.getElementById('kpisPagto');
+  box.hidden = !PAG.sofi;
+  if (!PAG.sofi) return;
+  var rads = radsResumo(notasDosRadsFiltrados());
+  var pg = rads.filter(function (r) { return statusPag(r.chave).pago; }), ap = rads.filter(function (r) { return !statusPag(r.chave).pago; });
+  var tot = function (l, c) { return r2(l.reduce(function (s, r) { return s + r[c]; }, 0)); };
+  var k = [
+    { l: 'RADs pagos', v: int.format(pg.length), d: 'de ' + rads.length + ' RAD(s) nos filtros — clique para ver', s: 'pago', c: 'kpi-pago' },
+    { l: 'Valor dos RADs pagos', v: Rk(tot(pg, 'aprovado')), d: R(tot(pg, 'aprovado')) + ' aprovado · ' + R(tot(pg, 'liquido')) + ' líquido', s: 'pago', c: 'kpi-pago' },
+    { l: 'RADs a pagar', v: int.format(ap.length), d: 'de ' + rads.length + ' RAD(s) nos filtros — clique para ver', s: 'apagar', c: 'kpi-apagar' },
+    { l: 'Valor dos RADs a pagar', v: Rk(tot(ap, 'aprovado')), d: R(tot(ap, 'aprovado')) + ' aprovado · ' + R(tot(ap, 'liquido')) + ' líquido', s: 'apagar', c: 'kpi-apagar' }
+  ];
+  box.innerHTML = '<div class="kpis-titulo">💳 Status de Pagamento (informado pela SOFI) · Unidade e Período dos filtros</div>' + k.map(function (x) {
+    return '<div class="kpi clicavel ' + x.c + '" data-s="' + x.s + '"><div class="l">' + esc(x.l) + '</div><div class="v">' + esc(x.v) + '</div><div class="d">' + esc(x.d) + '</div></div>';
+  }).join('');
+  box.querySelectorAll('.kpi').forEach(function (el) { el.onclick = function () { abrirConsultaPag(el.dataset.s, true); }; });
+}
+/** Abre a "Consulta de RADs por Status de Pagamento" já filtrada (status e, se pedido, Unidade/Período do painel). */
+function abrirConsultaPag(status, comFiltros) {
+  var f = PAG.filtro;
+  f.status = status || ''; f.busca = ''; f.unidade = ''; f.mes = ''; f.q = '';
+  if (comFiltros) {
+    f.unidade = document.getElementById('fUnidade').value;
+    var per = document.getElementById('fPeriodo').value, m;
+    if ((m = /^m:(.+)$/.exec(per))) f.mes = m[1];
+    if ((m = /^q:(.+):(\d)$/.exec(per))) { f.mes = m[1]; f.q = m[2]; }
+  }
+  mostrarView('pagamentos');
+}
+
+/* ---- RAD em foco no painel (7.2): com uma quinzena escolhida, mostra o(s) RAD(s) e o Status de Pagamento ---- */
+function renderRadAtual() {
+  var box = document.getElementById('radAtual'), per = document.getElementById('fPeriodo').value;
+  if (!/^q:/.test(per)) { box.hidden = true; return; }
+  var rads = radsResumo(notasDosRadsFiltrados());
+  box.hidden = !rads.length;
+  box.innerHTML = rads.map(function (r) {
+    var st = statusPag(r.chave);
+    return '<button class="rad-card" data-rad="' + esc(r.chave) + '"><div class="rad-num">RAD ' + esc(radNumDe(r)) + ' · <b>' + esc(r.unidade) + '</b></div>' +
+      '<div>Valor total: <b>' + R(r.aprovado) + '</b> · Líquido: ' + R(r.liquido) + '</div>' +
+      '<div>Status de Pagamento: ' + (PAG.sofi ? (st.pago ? '<span class="st-pago">✓ PAGO</span>' + (st.dataPag ? ' em ' + esc(st.dataPag) : '') : '<span class="st-apagar">A PAGAR</span>') : '<span class="muted">disponível no Apps Script</span>') + '</div></button>';
+  }).join('');
+  box.querySelectorAll('[data-rad]').forEach(function (b) { b.onclick = function () { abrirRad(b.dataset.rad); }; });
+}
+
+/* ---- Ficha do RAD (7.2) ---- */
+function abrirRad(chave) {
+  var r = radsResumo(NOTAS.filter(function (n) { return n.radChave === chave; }))[0];
+  if (!r) return;
+  var notas = NOTAS.filter(function (n) { return n.radChave === chave; }), st = statusPag(chave);
+  var tr = {}; IMPOSTOS.forEach(function (t) { tr[t.id] = docsDoTributo(notas, t.id); });
+  var pend = pendencias(notas);
+  var lin = function (rot, val) { return '<tr><th style="text-align:left">' + rot + '</th><td class="n">' + val + '</td></tr>'; };
+  var corpo = '<div class="rad-ficha"><div class="rad-status ' + (st.pago ? 'pago' : 'apagar') + '">Status de Pagamento: <b>' + (PAG.sofi ? (st.pago ? '✓ PAGO' : 'A PAGAR') : '—') + '</b>' +
+      (st.pago && st.dataPag ? ' · Data do pagamento: <b>' + esc(st.dataPag) + '</b>' : '') + '</div>' +
+    '<div class="grid2"><table class="ficha">' +
+      lin('RAD', '<b>' + esc(radNumDe(r)) + '</b>') + lin('Unidade', esc(r.unidade)) + lin('Período', esc(r.rotPeriodo)) + lin('Ordens de serviço', r.qtd) +
+      lin('Notas fiscais distintas', docsDistintos(notas, 'peca') + ' NF-e · ' + docsDistintos(notas, 'serv') + ' NFS-e') +
+      lin('Valor total (aprovado)', '<b>' + R(r.aprovado) + '</b>') + lin('Taxa de administração', R(r.adm)) + lin('Valor líquido', '<b>' + R(r.liquido) + '</b>') +
+    '</table><table class="ficha">' +
+      lin('ICMS desonerado', R(tr.icms.valor)) + lin('IRRF Peça', R(tr.irPeca.valor)) + lin('IRRF Serviço', R(tr.irServ.valor)) + lin('ISSQN retido', R(tr.iss.valor)) +
+      lin('Retenções efetivas', '<b>' + R(r2(tr.irPeca.valor + tr.irServ.valor + tr.iss.valor)) + '</b>') +
+      lin('Etapa de tramitação', esc(etapaRot(st.etapa)) + (st.etapaEm ? '<div class="muted" style="font-size:11px">' + esc(st.etapaEm + ' · ' + (st.etapaPor || '')) + '</div>' : '')) +
+      lin('Nº do título', esc(st.titulo || '—')) + lin('NF Ticket Log', esc(st.nfTicket || '—')) +
+      lin('Status atualizado', esc(st.em ? st.em + ' · ' + (st.por || '') : '—')) +
+      lin('Pendências', pend.length ? '<span class="tag bad">' + pend.length + '</span>' : '<span class="tag ok">✓ nenhuma</span>') +
+    '</table></div><p class="hint">Arquivo(s): ' + esc(Object.keys(r.arquivos).join(', ') || '—') + '</p></div>';
+  var botoes = [];
+  if (pend.length) botoes.push({ rot: 'Ver pendências (' + pend.length + ')', fn: function () { detalharPendencias('Pendências do RAD ' + radNumDe(r) + ' · ' + r.unidade, pend); } });
+  botoes.push({ rot: 'Ver este RAD no painel', fn: function () { fecharModal(); verRadNoPainel(r); } });
+  botoes.push({ rot: 'Fechar', fn: fecharModal, primary: true });
+  abrirModal('RAD ' + radNumDe(r) + ' · ' + r.unidade, esc(r.rotPeriodo), corpo, botoes);
+}
+function etapaRot(e) { var x = ETAPAS.filter(function (y) { return y[0] === (e || ''); })[0]; return x ? x[1] : e; }
+function verRadNoPainel(r) {
+  limparFiltros(true);
+  document.getElementById('fUnidade').value = r.unidade;
+  if (r.periodo) document.getElementById('fPeriodo').value = 'q:' + r.periodo.mes + ':' + r.periodo.q;
+  if (VIEW !== 'impostos' && VIEW !== 'sofi' && VIEW !== 'almox') mostrarView(perfilAtual() === 'ALMOX' ? 'almox' : 'impostos');
+  render();
+  document.getElementById('radAtual').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* ---- Consulta de RADs por Status de Pagamento (7.3) ---- */
+function pagLinhas() {
+  return radsResumo(NOTAS).map(function (r) {
+    var st = statusPag(r.chave);
+    return { chave: r.chave, rad: radNumDe(r), mes: r.periodo ? r.periodo.mes : '', q: r.periodo ? String(r.periodo.q) : '', comp: r.periodo ? r.periodo.rotMes : 'Sem período',
+      quinzena: r.periodo ? r.periodo.q + 'ª' : '—', unidade: r.unidade, qtd: r.qtd, aprovado: r.aprovado, liquido: r.liquido, pago: !!st.pago,
+      status: st.pago ? 'PAGO' : 'A PAGAR', dataPag: st.dataPag || '', em: st.em || '', por: st.por || '', etapa: etapaRot(st.etapa), titulo: st.titulo || '', nfTicket: st.nfTicket || '',
+      ord: (r.periodo ? r.periodo.ini : '0000') + r.unidade };
+  });
+}
+function pagFiltradas() {
+  var f = PAG.filtro, b = f.busca.trim().toLowerCase();
+  return pagLinhas().filter(function (x) {
+    if (f.status === 'pago' && !x.pago) return false;
+    if (f.status === 'apagar' && x.pago) return false;
+    if (f.unidade && x.unidade !== f.unidade) return false;
+    if (f.mes && x.mes !== f.mes) return false;
+    if (f.q && x.q !== f.q) return false;
+    if (b && (x.rad + ' ' + x.rad.replace('/', '') + ' ' + x.unidade + ' ' + x.titulo + ' ' + x.nfTicket).toLowerCase().indexOf(b) < 0) return false;
+    return true;
+  });
+}
+var PAG_COLS = [
+  { k: 'rad', t: 'Nº RAD', o: 'ord' }, { k: 'comp', t: 'Competência', o: 'ord' }, { k: 'quinzena', t: 'Quinzena', o: 'ord' }, { k: 'unidade', t: 'Unidade' },
+  { k: 'qtd', t: 'OS', n: 1 }, { k: 'aprovado', t: 'Valor total', m: 1 }, { k: 'liquido', t: 'Valor líquido', m: 1 }, { k: 'status', t: 'Status de Pagamento' },
+  { k: 'dataPag', t: 'Data do pagamento', o: 'dataPagOrd' }, { k: 'etapa', t: 'Etapa de tramitação' }, { k: 'titulo', t: 'Nº do título' }, { k: 'nfTicket', t: 'NF Ticket Log' },
+  { k: 'em', t: 'Atualizado em' }, { k: 'por', t: 'Responsável' }
+];
+function pagRender() {
+  if (!NOTAS.length) { document.getElementById('pagLoading').hidden = false; document.getElementById('pagApp').hidden = true; return; }
+  document.getElementById('pagLoading').hidden = !!PAG.sofi; document.getElementById('pagApp').hidden = !PAG.sofi;
+  if (!PAG.sofi) return;
+  var f = PAG.filtro, todas = pagLinhas();
+  var sel = function (id, opts) {
+    var el = document.getElementById(id);
+    el.innerHTML = opts.map(function (o) { return '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>'; }).join('');
+  };
+  sel('pgUnidade', [['', 'Todas']].concat(unicos(todas.map(function (x) { return x.unidade; })).map(function (u) { return [u, u]; })));
+  var meses = {}; todas.forEach(function (x) { if (x.mes) meses[x.mes] = x.comp; });
+  sel('pgMes', [['', 'Todas']].concat(Object.keys(meses).sort().reverse().map(function (m) { return [m, m.slice(5) + '/' + m.slice(0, 4) + ' (' + meses[m] + ')']; })));
+  document.getElementById('pgStatus').value = f.status; document.getElementById('pgBusca').value = f.busca;
+  document.getElementById('pgUnidade').value = f.unidade; document.getElementById('pgMes').value = f.mes; document.getElementById('pgQ').value = f.q;
+  var l = pagFiltradas(), s = PAG.sort;
+  l.forEach(function (x) { var m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(x.dataPag); x.dataPagOrd = m ? m[3] + m[2] + m[1] : ''; });
+  l.sort(function (a, b) {
+    var x = a[s.key], y = b[s.key];
+    return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true })) * s.dir || a.ord.localeCompare(b.ord);
+  });
+  var tot = function (lst, c) { return r2(lst.reduce(function (acc, x) { return acc + x[c]; }, 0)); };
+  var pg = l.filter(function (x) { return x.pago; }), ap = l.filter(function (x) { return !x.pago; });
+  document.getElementById('pgKpis').innerHTML = [
+    { l: 'RADs encontrados', v: int.format(l.length), d: 'Valor total ' + R(tot(l, 'aprovado')) },
+    { l: 'RADs pagos', v: int.format(pg.length), d: R(tot(pg, 'aprovado')) + ' · líquido ' + R(tot(pg, 'liquido')), c: 'kpi-pago', s: 'pago' },
+    { l: 'RADs a pagar', v: int.format(ap.length), d: R(tot(ap, 'aprovado')) + ' · líquido ' + R(tot(ap, 'liquido')), c: 'kpi-apagar', s: 'apagar' }
+  ].map(function (x) { return '<div class="kpi ' + (x.c || '') + (x.s ? ' clicavel' : '') + '"' + (x.s ? ' data-s="' + x.s + '"' : '') + '><div class="l">' + x.l + '</div><div class="v">' + x.v + '</div><div class="d">' + esc(x.d) + '</div></div>'; }).join('');
+  document.querySelectorAll('#pgKpis [data-s]').forEach(function (el) { el.onclick = function () { PAG.filtro.status = el.dataset.s; pagRender(); }; });
+  var setaFeita = false;
+  document.querySelector('#pgTabela thead').innerHTML = '<tr>' + PAG_COLS.map(function (c) {
+    var k = c.o || c.k, seta = s.key === k && !setaFeita;
+    if (seta) setaFeita = true;
+    return '<th class="sort' + (c.m || c.n ? ' n' : '') + '" data-k="' + k + '">' + esc(c.t) + '<span class="arr">' + (seta ? (s.dir > 0 ? '▲' : '▼') : '') + '</span></th>';
+  }).join('') + '</tr>';
+  document.querySelectorAll('#pgTabela th.sort').forEach(function (th) {
+    th.onclick = function () { var k = th.dataset.k; PAG.sort = { key: k, dir: PAG.sort.key === k ? -PAG.sort.dir : 1 }; pagRender(); };
+  });
+  document.querySelector('#pgTabela tbody').innerHTML = l.length ? l.map(function (x) {
+    return '<tr class="clicavel" data-rad="' + esc(x.chave) + '">' + PAG_COLS.map(function (c) {
+      var v = x[c.k];
+      if (c.k === 'status') return '<td>' + (x.pago ? '<span class="st-pago">✓ PAGO</span>' : '<span class="st-apagar">A PAGAR</span>') + '</td>';
+      if (c.m) return '<td class="n">' + R(v) + '</td>';
+      if (c.n) return '<td class="n">' + v + '</td>';
+      return '<td>' + (c.k === 'rad' ? '<b>' + esc(v) + '</b>' : esc(v || '—')) + '</td>';
+    }).join('') + '</tr>';
+  }).join('') : '<tr><td class="empty" colspan="' + PAG_COLS.length + '">Nenhum RAD com esses filtros.</td></tr>';
+  document.querySelector('#pgTabela tfoot').innerHTML = l.length ? '<tr><td>Total</td><td colspan="3">' + l.length + ' RAD(s)</td><td class="n">' + tot(l, 'qtd') + '</td><td class="n">' + R(tot(l, 'aprovado')) +
+    '</td><td class="n">' + R(tot(l, 'liquido')) + '</td><td colspan="7"></td></tr>' : '';
+  document.querySelectorAll('#pgTabela tr[data-rad]').forEach(function (tr) { tr.onclick = function () { abrirRad(tr.dataset.rad); }; });
+  document.getElementById('pgCont').textContent = l.length + ' RAD(s) encontrado(s) · soma do valor total: ' + R(tot(l, 'aprovado')) + ' · líquido: ' + R(tot(l, 'liquido')) +
+    ' · atualizado automaticamente a cada minuto.';
+  rolagemHorizontal('pgTabela');
+}
+/** Exporta a relação filtrada para Excel (.xlsx); sem a biblioteca, cai para CSV (abre no Excel). */
+function pagExportar() {
+  var l = pagFiltradas(), cab = PAG_COLS.map(function (c) { return c.t; });
+  var linhas = l.map(function (x) { return PAG_COLS.map(function (c) { return x[c.k]; }); });
+  var nome = 'rads_status_pagamento';
+  carregarScript(LIB.xlsx, function () { return window.XLSX; }).then(function () {
+    var ws = XLSX.utils.aoa_to_sheet([cab].concat(linhas));
+    ws['!cols'] = cab.map(function (c) { return { wch: Math.max(10, c.length + 2) }; });
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'RADs');
+    XLSX.writeFile(wb, nome + '.xlsx');
+  }).catch(function () { baixarCsvLinhas(cab, linhas, nome + '.csv'); });
+}
+function pagIniciarAuto() {
+  clearInterval(PAG.timer);
+  PAG.timer = setInterval(function () { if (VIEW === 'pagamentos' && !document.hidden) carregarPagamentos(); else if (VIEW !== 'pagamentos') clearInterval(PAG.timer); }, 60000);
 }
 
 /* ---------------- Navegação lateral ---------------- */
@@ -2531,10 +3391,10 @@ function mostrarView(v) {
     if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   VIEW = v;
-  var titulos = { tutorial: 'Tutorial do painel', impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', almox: 'Almoxarifado — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
+  var titulos = { pagamentos: 'Consulta de RADs por Status de Pagamento', tutorial: 'Tutorial do painel', impostos: 'Painel de Impostos — RAD', sofi: 'SOFI — Pagamento dos RADs', almox: 'Almoxarifado — Pagamento dos RADs', prefat: 'Pré-faturamento — Gestão',
                   acessos: 'Gestão de Acessos', usuario: 'Minhas notas — Pré-faturamento', login: 'Pré-faturamento — RAD' };
   document.getElementById('topoTitulo').textContent = titulos[v] || '';
-  ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi', 'tutorial'].forEach(function (k) {
+  ['impostos', 'prefat', 'acessos', 'usuario', 'login', 'sofi', 'tutorial', 'pagamentos'].forEach(function (k) {
     var setorial = v === 'sofi' || v === 'almox';
     document.getElementById('view' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = !(v === k || (setorial && (k === 'sofi' || k === 'impostos')));
   });
@@ -2543,6 +3403,7 @@ function mostrarView(v) {
   document.body.classList.toggle('modo-sofi', setorial);
   if (v === 'acessos') acCarregar();
   if (v === 'tutorial') montarTutorial();
+  if (v === 'pagamentos') { pagRender(); carregarPagamentos(); pagIniciarAuto(); }
   if (setorial) {
     var setor = setorAtual();
     document.getElementById('sofiTitulo').textContent = SETORES[setor] + ' — Pagamento dos RADs';
@@ -2753,7 +3614,7 @@ function iniciar() {
       document.querySelectorAll('.so-gestor').forEach(function (el) { el.hidden = true; });
       // SOFI continua vendo também a aba Impostos; o Almoxarifado vê só a própria aba.
       document.querySelectorAll('#lateral .nav-btn[data-view]').forEach(function (b) {
-        if (b.dataset.view !== propria && b.dataset.view !== 'tutorial' && !(propria === 'sofi' && b.dataset.view === 'impostos')) b.hidden = true;
+        if (b.dataset.view !== propria && b.dataset.view !== 'tutorial' && b.dataset.view !== 'pagamentos' && !(propria === 'sofi' && b.dataset.view === 'impostos')) b.hidden = true;
       });
       ['btnInserirRad', 'btnInserirNota', 'btnPasta'].forEach(function (id) { document.getElementById(id).hidden = true; });
       document.getElementById('navQuem').textContent = '👤 ' + (s.nome || '') + ' · ' + SETORES[s.perfil];
@@ -3073,6 +3934,15 @@ document.addEventListener('DOMContentLoaded', function () {
     inNota.onchange = function () { inserirNotas(inNota.files); inNota.value = ''; };
   }
   document.getElementById('btnCsv').onclick = exportarCsv;
+  document.getElementById('mdFechar').onclick = fecharModal;
+  document.getElementById('modal').onclick = function (e) { if (e.target.id === 'modal') fecharModal(); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !document.getElementById('modal').hidden) fecharModal(); });
+  var pgF = function (id, k, ev) { document.getElementById(id)[ev || 'onchange'] = function () { PAG.filtro[k] = this.value; pagRender(); }; };
+  pgF('pgStatus', 'status'); pgF('pgUnidade', 'unidade'); pgF('pgMes', 'mes'); pgF('pgQ', 'q'); pgF('pgBusca', 'busca', 'oninput');
+  document.getElementById('pgLimpar').onclick = function () { PAG.filtro = { status: '', busca: '', unidade: '', mes: '', q: '' }; pagRender(); };
+  document.getElementById('pgAtualizar').onclick = function () { carregarPagamentos(); };
+  document.getElementById('pgExcel').onclick = pagExportar;
+  document.querySelectorAll('#tabsFinal .chip').forEach(function (b) { b.onclick = function () { state.tabFinal = b.dataset.tab; renderTabela(filtrar()); }; });
   document.getElementById('btnZip').onclick = baixarZip;
   document.getElementById('btnTema').onclick = function () {
     var root = document.documentElement;
@@ -3121,5 +3991,12 @@ document.addEventListener('DOMContentLoaded', function () {
   iniciar();
 });
 </script>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mdTitulo">
+  <div class="modal-box">
+    <div class="modal-cab"><div><h2 id="mdTitulo"></h2><div class="hint" id="mdSub" style="margin:0"></div></div><button class="btn" id="mdFechar" aria-label="Fechar">✕</button></div>
+    <div id="mdCorpo"></div>
+    <div class="modal-rod" id="mdRodape"></div>
+  </div>
+</div>
 </body>
 </html>

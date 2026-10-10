@@ -14,6 +14,20 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
   **Tomador** (ISSQN retido e recolhido à prefeitura) e **Prestador**, com NFs, municípios e ISSQN de cada grupo; segue os filtros.
 - **Tabela final** com todas as ordens (ordenável, exporta CSV). Ela e a tabela de notas fiscais vêm classificadas por **município**.
 
+## Acompanhamento Frota/P4, Almoxarifado e SOFI (out/2026)
+
+- **Indicadores**: valor movimentado, ICMS desonerado (fora das retenções), IRRF Peça, IRRF Serviço, ISSQN retido, retenções efetivas,
+  NFs distintas, líquido e pendências — e, em cima, RADs pagos/a pagar (quantidade e valor), clicáveis.
+- **Pendências por RAD** e janela de detalhamento: NF, OS, unidade, tipo, tributo, valor no RAD (Ticket Log), recalculado, diferença e motivo
+  (cálculo, regra fiscal ou rodapé do RAD). O rodapé de cada RAD é conferido com a soma das ordens lidas.
+- **Gráficos**: nº de NFs distintas em cada barra (clique abre as notas); valor por alíquota só das notas com valor (soma = total);
+  linhas de evolução (movimentação e retenções) em "Todos os períodos".
+- **Quadro final** em abas: NF-e de peças, NFS-e de serviços e ordens.
+- **Status de Pagamento**: só a SOFI altera (A PAGAR/PAGO + data); Frota/P4 e Almoxarifado consultam. Etapa de tramitação, Nº do título
+  e NF Ticket Log por RAD (aba oculta `_rads_pagos`, com novas colunas acrescentadas automaticamente).
+- **💳 Pagamentos dos RADs**: consulta de todos os RADs por status, com filtros, ordenação, soma e exportação para Excel; ficha de cada RAD.
+- Conferência automatizada antes da entrega: totais = rodapé da Ticket Log de cada RAD; cálculos por ordem idênticos à versão validada.
+
 ## Senhas
 
 - **Nova senha** (aba Acessos): gera uma senha temporária de 8 caracteres (maiúsculas e números, sem 0/O/1/I/L), mostrada uma vez
