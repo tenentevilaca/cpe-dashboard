@@ -2009,6 +2009,7 @@ function carregar() {
       notas = r.notas; avisos = r.avisos;
       if (res.versao !== VERSAO_PAINEL) avisos.unshift('O Code.gs publicado está desatualizado (versão ' + (res.versao || 'antiga') + '; o painel espera ' + VERSAO_PAINEL +
         '). Cole o Code.gs novo no Apps Script e publique uma nova versão — sem isso a pasta de RADs pode não ser a correta.');
+      if (res.avisoPasta) avisos.push(res.avisoPasta);
       if (!res.rads.length) avisos.push('Nenhum RAD encontrado na pasta de RADs.');
       if (!res.pdfs.length) avisos.push('Nenhum PDF encontrado na pasta de notas.');
       if ((res.ignorados || []).length) avisos.push('Arquivos ignorados por não serem RAD: ' + res.ignorados.join(', '));
@@ -2135,7 +2136,7 @@ function periodoPorData(data) {
   return p;
 }
 
-var VERSAO_PAINEL = '2026-10-10'; // deve ser igual a VERSAO_CODIGO do Code.gs
+var VERSAO_PAINEL = '2026-10-19'; // deve ser igual a VERSAO_CODIGO do Code.gs
 
 /** Quadro "Arquivos lidos da pasta": o que entrou, o que foi desconsiderado e por quê. */
 function renderRelatorioArquivos() {

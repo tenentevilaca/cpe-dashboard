@@ -26,7 +26,7 @@ var PASTA_RAIZ = '1LVWFCLeEDHZ6np-GlUoTana73Hqz1ZLQ';
 var PASTA_FONTES = '1rZfLyvlpOswe5IsnHm8mIXWbtCnpvbYl';
 
 // Versão do Code.gs: o painel avisa se o Index.html for mais novo que o Code.gs publicado.
-var VERSAO_CODIGO = '2026-10-10';
+var VERSAO_CODIGO = '2026-10-19';
 
 // Arquivos de RAD que NÃO devem ser lidos: a "UNIAO RAD" é só a junção dos RADs das unidades.
 var IGNORAR_RADS = /uni[aã]o[\s_-]*rad/i;
@@ -103,11 +103,22 @@ function descobrir_(forcar) {
   if (!forcar) {
     try {
       var d0 = JSON.parse(props.getProperty('DESCOBERTA') || 'null');
-      if (d0 && d0.raiz === raiz && Date.now() - (d0.em || 0) < 6 * 3600 * 1000) return d0;
+      if (d0 && (d0.raizConfig || d0.raiz) === raiz && Date.now() - (d0.em || 0) < 6 * 3600 * 1000) return d0;
     } catch (e) {}
   }
-  var pastaRaiz = abrirPasta_(raiz, 'raiz');
-  var achado = { raiz: raiz, rads: '', notas: '', prefat: '', prefatXlsx: '', em: Date.now() };
+  var pastaRaiz, aviso = '';
+  try { pastaRaiz = abrirPasta_(raiz, 'raiz'); }
+  catch (e) {
+    if (!PASTA_FONTES) throw e;
+    // Sem acesso à raiz: os RADs e as notas vêm de PASTA_FONTES; para achar a planilha de pré-faturamento,
+    // procura a partir da pasta acima dela (ou dela mesma). Assim o painel não trava por causa da raiz.
+    var fontes = abrirPasta_(PASTA_FONTES, 'RADs e notas');
+    pastaRaiz = fontes;
+    try { var pais = fontes.getParents(); if (pais.hasNext()) pastaRaiz = pais.next(); } catch (e2) {}
+    aviso = 'Sem acesso à pasta raiz configurada (' + raiz + ') com a conta que publicou o painel — a planilha de pré-faturamento é ' +
+            'procurada em “' + pastaRaiz.getName() + '”. Para corrigir, compartilhe a raiz com essa conta ou escolha outra em “📁 Pastas do Drive”.';
+  }
+  var achado = { raiz: pastaRaiz.getId(), raizConfig: raiz, aviso: aviso, rads: '', notas: '', prefat: '', prefatXlsx: '', em: Date.now() };
   var nivel = [{ p: pastaRaiz, prof: 0 }];
   while (nivel.length) {
     var prox = [];
@@ -144,7 +155,7 @@ function descobrir_(forcar) {
 
 function idsPastas_() {
   var d = descobrir_(false);
-  if (PASTA_FONTES) return { rads: PASTA_FONTES, notas: PASTA_FONTES, prefat: d.prefat, prefatXlsx: d.prefatXlsx, raiz: d.raiz };
+  if (PASTA_FONTES) return { rads: PASTA_FONTES, notas: PASTA_FONTES, prefat: d.prefat, prefatXlsx: d.prefatXlsx, raiz: d.raiz, aviso: d.aviso || '' };
   return { rads: d.rads || d.raiz, notas: d.notas || d.raiz, prefat: d.prefat, prefatXlsx: d.prefatXlsx, raiz: d.raiz };
 }
 
@@ -251,7 +262,7 @@ function getFontes(token) {
                          : [pastaRads && 'RADs e notas: “' + pastaRads.getName() + '”'].filter(String);
   return {
     modo: 'drive', origem: nomes.join(' · '), atualizadoEm: agora, rads: rads, pdfs: pdfs, ignorados: ignorados, consolidados: consolidados,
-    outros: outros, radsPdf: radsPdf, versao: VERSAO_CODIGO,
+    outros: outros, radsPdf: radsPdf, versao: VERSAO_CODIGO, avisoPasta: ids.aviso || '',
     inventario: Object.keys(inventario).sort().map(function (k) { return inventario[k]; }), pastaRads: pastaRads ? { id: pastaRads.getId(), nome: pastaRads.getName(), url: pastaRads.getUrl() } : null
   };
 }
