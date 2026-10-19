@@ -1429,3 +1429,27 @@ function diagnosticoPasta() {
   Logger.log(linhas.join('\n'));
   return linhas.join('\n');
 }
+
+/* ------------------------------------------------------------------ */
+/* Recuperar o acesso do administrador (rodar no editor do Apps Script) */
+/* ------------------------------------------------------------------ */
+/**
+ * No editor: escolha "recuperarAdmin" no menu de funções › Executar › veja o "Registro de execução".
+ * Volta o login frotaCPE para a senha inicial (a troca é pedida no próximo acesso), libera o bloqueio por tentativas
+ * e mostra o endereço da planilha do painel. Só funciona para a conta dona do script, pelo editor.
+ */
+function recuperarAdmin() {
+  if (!gestorGoogle_()) throw new Error('Rode esta função pelo editor do Apps Script, com a conta dona do script.');
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var u = lerUsuarios_().filter(function (x) { return x.login === ADMIN_INICIAL.login; })[0];
+    if (!u) throw new Error('Administrador não encontrado na aba _usuarios.');
+    u.hash = ADMIN_INICIAL.hash; u.sal = ADMIN_INICIAL.sal; u.status = 'APROVADO'; u.perfil = 'GESTOR'; u.trocar_senha = 'SIM';
+    gravarUsuario_(u);
+  } finally { lock.releaseLock(); }
+  CacheService.getScriptCache().remove('tent_' + ADMIN_INICIAL.login);
+  var msg = 'Administrador redefinido: login frotaCPE com a senha inicial combinada na criação do painel. ' +
+            'Ao entrar, o painel pede para criar uma senha nova.\nPlanilha do painel: ' + painelSS_().getUrl();
+  Logger.log(msg);
+  return msg;
+}

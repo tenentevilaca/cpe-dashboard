@@ -30,6 +30,9 @@ Painel que lê os **RADs (Relatório Sintético da Despesa) de cada unidade** e 
 
 ## Senhas
 
+- **Esqueceu a senha do administrador?** No editor do Apps Script, escolha a função `recuperarAdmin` › Executar: o login `frotaCPE`
+  volta para a senha inicial (o painel pede uma nova no acesso seguinte) e o Registro de execução mostra o endereço da planilha do painel.
+
 - **Nova senha** (aba Acessos): gera uma senha temporária de 8 caracteres (maiúsculas e números, sem 0/O/1/I/L), mostrada uma vez
   para copiar. Ao entrar com ela, o usuário é obrigado a criar a senha pessoal antes de usar o painel.
 - Os dados de login são gravados como texto na aba `_usuarios` (evita que a planilha transforme o hash da senha em fórmula).
