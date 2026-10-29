@@ -4,102 +4,270 @@
 <base target="_top">
 <meta charset="utf-8">
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --tx:#1d2330; --mut:#5d6675; --bd:#dde1e7; --pri:#1f3864;
-          --red:#c0392b; --redbg:#fbe3e0; --amb:#a86400; --ambbg:#fdf0d9; --grn:#1e7b46; --grnbg:#dff2e6; }
+  :root { --bg:#f6f7f9; --card:#fff; --tx:#1d2330; --mut:#5d6675; --bd:#dde1e7; --pri:#1f3864; --pad:#9e9e9e;
+          --red:#c0392b; --redbg:#fbe3e0; --amb:#a86400; --ambbg:#fdf0d9; --grn:#1e7b46; --grnbg:#dff2e6; --edit:#fffbe8; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#14171c; --card:#1d2128; --tx:#e6e9ee; --mut:#9aa3b2; --bd:#2e343e; --pri:#8fb0e8;
-            --red:#ff8a7a; --redbg:#3a2220; --amb:#f0b75e; --ambbg:#3a2e1a; --grn:#6fd39b; --grnbg:#1a3326; }
+    :root { --bg:#14171c; --card:#1d2128; --tx:#e6e9ee; --mut:#9aa3b2; --bd:#2e343e; --pri:#8fb0e8; --pad:#7d8590;
+            --red:#ff8a7a; --redbg:#3a2220; --amb:#f0b75e; --ambbg:#3a2e1a; --grn:#6fd39b; --grnbg:#1a3326; --edit:#2a2718; }
   }
   * { box-sizing:border-box; }
   body { margin:0; padding:16px; background:var(--bg); color:var(--tx); font:14px/1.4 Arial, sans-serif; }
-  h1 { font-size:20px; margin:0 0 4px; color:var(--pri); }
+  h1 { font-size:20px; margin:0; color:var(--pri); }
+  .topo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:10px; }
   .mut { color:var(--mut); font-size:12px; }
-  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
+  button { padding:7px 12px; border:1px solid var(--pri); background:var(--pri); color:#fff; border-radius:6px; cursor:pointer; font:inherit; }
+  button.sec { background:var(--card); color:var(--pri); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .abas { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--bd); margin:8px 0 12px; }
+  .aba { padding:8px 12px; cursor:pointer; border-radius:6px 6px 0 0; color:var(--mut); }
+  .aba.on { background:var(--card); color:var(--pri); font-weight:bold; border:1px solid var(--bd); border-bottom-color:var(--card); margin-bottom:-1px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:8px; padding:16px; max-width:420px; }
+  .card input { width:100%; margin:4px 0 10px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:6px 0 14px; }
   .kpi { background:var(--card); border:1px solid var(--bd); border-radius:8px; padding:12px; cursor:pointer; }
   .kpi b { display:block; font-size:26px; }
   .kpi.on { outline:2px solid var(--pri); }
-  .filtros { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .filtros { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; }
   select, input { padding:6px 8px; border:1px solid var(--bd); border-radius:6px; background:var(--card); color:var(--tx); font:inherit; }
-  .wrap { overflow-x:auto; background:var(--card); border:1px solid var(--bd); border-radius:8px; }
-  table { border-collapse:collapse; width:100%; min-width:900px; }
-  th, td { padding:7px 8px; border-bottom:1px solid var(--bd); text-align:left; vertical-align:top; }
-  th { position:sticky; top:0; background:var(--card); font-size:12px; color:var(--mut); cursor:pointer; }
+  .wrap { overflow:auto; max-height:70vh; background:var(--card); border:1px solid var(--bd); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:6px 7px; border-bottom:1px solid var(--bd); text-align:left; vertical-align:top; }
+  th { position:sticky; top:0; z-index:1; background:var(--card); font-size:11px; color:var(--mut); }
+  th[data-k] { cursor:pointer; }
   td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  td input, td select { width:100%; min-width:64px; padding:4px 5px; font-size:13px; background:var(--edit); }
+  td select { min-width:112px; }
+  td input.padrao, td select.padrao { color:var(--pad); font-style:italic; background:transparent; }
+  td input.mudou, td select.mudou { outline:2px solid var(--amb); }
+  .desc { min-width:220px; max-width:320px; font-size:12px; }
+  .clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .tag { display:inline-block; padding:2px 6px; border-radius:4px; font-size:12px; white-space:nowrap; }
   .r { background:var(--redbg); color:var(--red); } .a { background:var(--ambbg); color:var(--amb); } .g { background:var(--grnbg); color:var(--grn); }
-  .just { font-size:12px; color:var(--mut); max-width:420px; }
+  .just { font-size:12px; color:var(--mut); min-width:260px; }
   .meses { display:flex; gap:4px; align-items:flex-end; height:90px; margin:6px 0 14px; }
   .mes { flex:1; text-align:center; font-size:11px; color:var(--mut); }
   .mes div { background:var(--pri); border-radius:3px 3px 0 0; margin:0 auto 3px; width:70%; min-height:2px; }
+  .barra { position:sticky; bottom:0; background:var(--card); border:1px solid var(--bd); border-radius:8px; padding:8px 12px; margin-top:10px; display:none; gap:10px; align-items:center; }
+  .barra.on { display:flex; }
+  .legenda span { margin-right:12px; }
+  #msg { margin:8px 0; }
+  .oculto { display:none; }
 </style>
 </head>
 <body>
-  <h1>Diagnóstico de estoque mínimo</h1>
-  <div class="mut" id="atual">Carregando…</div>
-  <div class="kpis" id="kpis"></div>
-  <div class="mut">Processos de compra a iniciar por mês (próximos 12 meses)</div>
-  <div class="meses" id="meses"></div>
-  <div class="filtros">
-    <select id="fClasse"><option value="">Todas as classes</option><option>Operacional</option><option>Funcional</option><option>Administrativo</option></select>
-    <select id="fFamilia"><option value="">Todas as famílias</option></select>
-    <input id="fBusca" placeholder="Buscar item…">
-  </div>
-  <div class="wrap"><table>
-    <thead><tr>
-      <th data-k="Situação">Situação</th><th data-k="Data limite p/ iniciar compra">Iniciar compra até</th>
-      <th data-k="Descrição">Item</th><th data-k="Classe">Classe</th>
-      <th data-k="Posição (saldo + trânsito)">Posição</th><th data-k="Estoque mínimo / gatilho (ou reserva técnica)">Mínimo</th>
-      <th data-k="Estoque máximo">Máximo</th><th data-k="Qtd sugerida">Qtd sugerida</th><th>Justificativa</th>
-    </tr></thead>
-    <tbody id="corpo"></tbody>
-  </table></div>
+<div class="topo">
+  <div><h1>Diagnóstico de estoque mínimo</h1><div class="mut" id="estado">Carregando…</div></div>
+  <div><button id="btAtualizar" class="oculto">Atualizar do CPELOG</button> <a id="lkPlanilha" class="mut" target="_blank"></a></div>
+</div>
+<div id="msg" class="mut"></div>
+
+<div id="login" class="card oculto">
+  <b>Acesso ao CPELOG</b>
+  <p class="mut">O painel lê os dados do inventário (inventario.cpelog.com.br) com o seu login. A senha fica guardada só nas propriedades deste script.</p>
+  <label>Número de polícia<input id="lgUsuario" autocomplete="username"></label>
+  <label>Senha<input id="lgSenha" type="password" autocomplete="current-password"></label>
+  <button id="btLogin">Entrar e importar</button>
+</div>
+
+<div id="app" class="oculto">
+  <div class="abas" id="abas"></div>
+
+  <section data-aba="diag">
+    <div class="kpis" id="kpis"></div>
+    <div class="mut">Processos de compra a iniciar por mês (próximos 12 meses)</div>
+    <div class="meses" id="meses"></div>
+    <div class="filtros">
+      <select id="dClasse"><option value="">Todas as classes</option><option>Operacional</option><option>Funcional</option><option>Administrativo</option></select>
+      <select id="dFamilia" class="selFam"><option value="">Todas as famílias</option></select>
+      <select id="dTipo"><option value="">Consumo e permanentes</option><option>CONSUMO</option><option>PERMANENTE</option></select>
+      <input id="dBusca" placeholder="Buscar item…">
+    </div>
+    <div class="wrap"><table id="tDiag"></table></div>
+  </section>
+
+  <section data-aba="itens">
+    <div class="filtros">
+      <select id="iFamilia" class="selFam"><option value="">Todas as famílias</option></select>
+      <select id="iTipo"><option value="">Consumo e permanentes</option><option>CONSUMO</option><option>PERMANENTE</option></select>
+      <input id="iBusca" placeholder="Buscar item…">
+      <span class="mut legenda"><span style="color:var(--pad);font-style:italic">cinza = padrão do sistema</span><span>preto = informado</span></span>
+    </div>
+    <div class="wrap"><table id="tItens"></table></div>
+    <div class="mut" id="iPag"></div>
+  </section>
+
+  <section data-aba="familias">
+    <p class="mut">Notas de 1 (baixo) a 5 (alto). A nota final e a classe usam os pesos da aba Parâmetros. Tempo de compra padrão = da demanda à entrega, sem distribuição.</p>
+    <div class="wrap"><table id="tFamilias"></table></div>
+  </section>
+
+  <section data-aba="parametros">
+    <div class="wrap"><table id="tParametros"></table></div>
+  </section>
+
+  <section data-aba="unidades">
+    <p class="mut">Viaturas e frações vêm do CPELOG. O efetivo (nº de policiais) precisa ser informado: ele multiplica a taxa dos itens com base POLICIAL.</p>
+    <div class="wrap"><table id="tUnidades"></table></div>
+  </section>
+
+  <section data-aba="processos">
+    <p class="mut">Histórico de processos de compra. Com datas preenchidas, o prazo médio da família substitui o padrão do sistema. Para incluir processos, use a <a id="lkProc" target="_blank">planilha</a> (aba PROCESSOS).</p>
+    <div class="wrap"><table id="tProcessos"></table></div>
+  </section>
+
+  <div class="barra" id="barra"><b id="nAlt"></b><button id="btSalvar">Salvar e recalcular</button><button class="sec" id="btDescartar">Descartar</button></div>
+</div>
+
 <script>
-var D = { itens: [] }, filtroKpi = null, ordem = { k: 'Data limite p/ iniciar compra', asc: true };
-function diasAte(s) { if (!s || s === 'IMEDIATO') return s === 'IMEDIATO' ? -1 : Infinity; return (new Date(s) - new Date()) / 864e5; }
-var KPIS = [
-  { id: 'iniciar', nome: 'Iniciar compra agora', f: function (x) { return x['Situação'] === 'INICIAR COMPRA'; }, c: 'r' },
-  { id: '90', nome: 'Iniciar em até 90 dias', f: function (x) { var d = diasAte(x['Data limite p/ iniciar compra']); return d >= 0 && d <= 90; }, c: 'a' },
-  { id: 'reserva', nome: 'Reserva técnica insuficiente', f: function (x) { return x['Situação'] === 'RESERVA INSUFICIENTE'; }, c: 'r' },
-  { id: 'excesso', nome: 'Excesso (acima do máximo)', f: function (x) { return x['Situação'] === 'EXCESSO'; }, c: 'a' },
-  { id: 'sem', nome: 'Sem demanda informada', f: function (x) { return x['Situação'] === 'Sem demanda informada'; }, c: '' },
-  { id: 'ok', nome: 'Dentro da faixa', f: function (x) { return x['Situação'] === 'Dentro da faixa'; }, c: 'g' }
-];
+var D = null, alt = {}, abaAtual = 'diag', filtroKpi = null, pagina = 0, POR_PAG = 100;
+var ABAS_UI = [['diag', 'Diagnóstico'], ['itens', 'Itens'], ['familias', 'Famílias e notas'], ['parametros', 'Pesos e parâmetros'], ['unidades', 'Unidades e efetivo'], ['processos', 'Processos de compra']];
+function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-function fmt(n) { return n === '' || n === null || n === undefined ? '' : Number(n).toLocaleString('pt-BR'); }
-function tag(s) { var c = s === 'INICIAR COMPRA' || s === 'RESERVA INSUFICIENTE' || s === 'FAMÍLIA INEXISTENTE' ? 'r' : s === 'EXCESSO' ? 'a' : s === 'Dentro da faixa' ? 'g' : ''; return '<span class="tag ' + c + '">' + esc(s) + '</span>'; }
-function render() {
-  var cl = fClasse.value, fa = fFamilia.value, q = fBusca.value.toLowerCase();
-  var base = D.itens.filter(function (x) { return (!cl || x['Classe'] === cl) && (!fa || x['Família'] === fa) && (!q || String(x['Descrição']).toLowerCase().indexOf(q) >= 0 || String(x['Código']).toLowerCase().indexOf(q) >= 0); });
-  kpis.innerHTML = KPIS.map(function (k) { return '<div class="kpi ' + (filtroKpi === k.id ? 'on' : '') + '" data-id="' + k.id + '"><b class="' + k.c + '" style="background:none">' + base.filter(k.f).length + '</b>' + k.nome + '</div>'; }).join('');
-  var hoje = new Date(), cont = [];
-  for (var i = 0; i < 12; i++) { var m = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1); cont.push({ m: m, n: 0 }); }
-  base.forEach(function (x) { var s = x['Data limite p/ iniciar compra']; var d = s === 'IMEDIATO' ? hoje : s ? new Date(s) : null; if (!d) return; var idx = (d.getFullYear() - hoje.getFullYear()) * 12 + d.getMonth() - hoje.getMonth(); if (idx >= 0 && idx < 12) cont[idx].n++; });
-  var mx = Math.max.apply(null, cont.map(function (c) { return c.n; }).concat([1]));
-  meses.innerHTML = cont.map(function (c) { return '<div class="mes"><div style="height:' + (c.n / mx * 60) + 'px" title="' + c.n + '"></div>' + c.m.toLocaleDateString('pt-BR', { month: 'short' }) + '<br>' + c.n + '</div>'; }).join('');
-  var k = KPIS.filter(function (k) { return k.id === filtroKpi; })[0];
-  var lista = k ? base.filter(k.f) : base;
-  lista.sort(function (a, b) {
-    var va = a[ordem.k], vb = b[ordem.k];
-    if (ordem.k === 'Data limite p/ iniciar compra') { va = diasAte(va); vb = diasAte(vb); }
-    return (va > vb ? 1 : va < vb ? -1 : 0) * (ordem.asc ? 1 : -1);
-  });
-  corpo.innerHTML = lista.slice(0, 500).map(function (x) {
-    var dl = x['Data limite p/ iniciar compra'];
-    return '<tr><td>' + tag(x['Situação']) + '</td><td>' + esc(dl === 'IMEDIATO' ? 'IMEDIATO' : dl ? new Date(dl + 'T12:00').toLocaleDateString('pt-BR') : '') + '</td>' +
-      '<td><b>' + esc(x['Código']) + '</b> ' + esc(x['Descrição']) + '<div class="mut">' + esc(x['Família']) + ' · ' + esc(D.familias[x['Família']] || '') + '</div></td>' +
-      '<td>' + esc(x['Classe']) + '</td><td class="n">' + fmt(x['Posição (saldo + trânsito)']) + '</td><td class="n">' + fmt(x['Estoque mínimo / gatilho (ou reserva técnica)']) + '</td>' +
-      '<td class="n">' + fmt(x['Estoque máximo']) + '</td><td class="n">' + fmt(x['Qtd sugerida']) + '</td><td class="just">' + esc(x['Justificativa (rastro decisório)']) + '</td></tr>';
-  }).join('') + (lista.length > 500 ? '<tr><td colspan="9" class="mut">Mostrando 500 de ' + lista.length + '. Use os filtros.</td></tr>' : '');
+function fmt(n) { return n === '' || n === null || n === undefined ? '' : (isNaN(n) ? esc(n) : Number(n).toLocaleString('pt-BR')); }
+function dt(s) { return !s ? '' : s === 'IMEDIATO' ? 'IMEDIATO' : new Date(s + 'T12:00').toLocaleDateString('pt-BR'); }
+function quando(s) { return s ? new Date(s).toLocaleString('pt-BR') : 'nunca'; }
+function chama(fn, args, ok, txt) {
+  ocupado(true, txt);
+  var r = google.script.run.withSuccessHandler(function (x) { ocupado(false); ok(x); }).withFailureHandler(function (e) { ocupado(false); $('msg').innerHTML = '<span class="tag r">Erro: ' + esc(e.message) + '</span>'; });
+  r[fn].apply(r, args || []);
 }
-kpis.onclick = function (e) { var el = e.target.closest('.kpi'); if (!el) return; filtroKpi = filtroKpi === el.dataset.id ? null : el.dataset.id; render(); };
-document.querySelector('thead').onclick = function (e) { var k = e.target.dataset.k; if (!k) return; ordem = { k: k, asc: ordem.k === k ? !ordem.asc : true }; render(); };
-[fClasse, fFamilia].forEach(function (el) { el.onchange = render; }); fBusca.oninput = render;
-google.script.run.withSuccessHandler(function (d) {
-  D = d;
-  atual.textContent = d.atualizado ? 'Último cálculo: ' + new Date(d.atualizado).toLocaleString('pt-BR') + ' · ' + d.itens.length + ' itens' : 'Ainda não calculado: use o menu Estoque mínimo > Recalcular.';
-  Object.keys(d.familias).sort().forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = id + ' - ' + d.familias[id]; fFamilia.appendChild(o); });
+function ocupado(on, txt) { ['btAtualizar', 'btLogin', 'btSalvar'].forEach(function (b) { $(b).disabled = on; }); if (on) $('msg').textContent = txt || 'Processando…'; else if ($('msg').textContent.indexOf('Erro') < 0) $('msg').textContent = ''; }
+
+/* ---------- carga ---------- */
+function mostrarEstado(e) {
+  $('estado').textContent = 'Login ' + (e.acesso ? e.usuario : 'não configurado') + ' · importado do CPELOG: ' + quando(e.ultimoImport) + ' · último cálculo: ' + quando(e.ultimoCalculo) + ' · ' + e.itens + ' itens';
+  $('lkPlanilha').href = $('lkProc').href = e.planilha; $('lkPlanilha').textContent = 'abrir planilha de dados';
+  $('btAtualizar').classList.toggle('oculto', !e.acesso);
+  $('login').classList.toggle('oculto', e.acesso); $('app').classList.toggle('oculto', !e.acesso);
+}
+function receber(d) {
+  D = d; alt = {}; mostrarEstado(d.estado); barra();
+  D.res = {}; d.resultados.linhas.forEach(function (r) { D.res[String(r.v[0])] = r.v; });
+  D.famNome = {}; d.familias.linhas.forEach(function (r) { D.famNome[r.v[0]] = r.v[1]; });
+  document.querySelectorAll('.selFam').forEach(function (s) {
+    var v = s.value; s.length = 1;
+    Object.keys(D.famNome).sort().forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = id + ' - ' + D.famNome[id]; s.appendChild(o); });
+    s.value = v;
+  });
+  if (!d.estado.itens || d.estado.itens < 2) $('msg').textContent = 'Nenhum item ainda: clique em "Atualizar do CPELOG".';
   render();
-}).withFailureHandler(function (e) { atual.textContent = 'Erro: ' + e.message; }).dadosPainel();
+}
+function iniciar() {
+  $('abas').innerHTML = ABAS_UI.map(function (a) { return '<div class="aba" data-a="' + a[0] + '">' + a[1] + '</div>'; }).join('');
+  $('abas').onclick = function (e) { var a = e.target.dataset.a; if (a) { abaAtual = a; pagina = 0; render(); } };
+  chama('estadoWeb', [], function (e) {
+    mostrarEstado(e);
+    if (e.acesso) chama('dadosWeb', [], receber, 'Carregando dados…');
+  }, 'Verificando acesso…');
+}
+$('btLogin').onclick = function () {
+  chama('salvarAcesso', [$('lgUsuario').value, $('lgSenha').value], function (e) {
+    mostrarEstado(e); $('lgSenha').value = '';
+    chama('atualizarDoCpelog', [], receber, 'Importando todos os dados do CPELOG (cerca de 1 minuto)…');
+  }, 'Validando login…');
+};
+$('btAtualizar').onclick = function () { chama('atualizarDoCpelog', [], receber, 'Importando todos os dados do CPELOG e recalculando (cerca de 1 minuto)…'); };
+
+/* ---------- edição ---------- */
+function chave(aba, l, c) { return aba + '|' + l + '|' + c; }
+function campo(aba, linha, col, valor, opts) {
+  opts = opts || {};
+  var k = chave(aba, linha.l, col + 1), v = alt[k] !== undefined ? alt[k] : valor;
+  var cls = (opts.padrao && alt[k] === undefined ? 'padrao' : '') + (alt[k] !== undefined ? ' mudou' : '');
+  var data = ' data-k="' + esc(k) + '" data-o="' + esc(valor) + '"';
+  if (opts.lista) return '<select class="' + cls + '"' + data + '>' + opts.lista.map(function (o) { return '<option' + (String(o) === String(v) ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>';
+  return '<input class="' + cls + '"' + data + ' value="' + esc(v) + '"' + (opts.w ? ' style="min-width:' + opts.w + 'px"' : '') + '>';
+}
+document.addEventListener('change', function (e) {
+  var el = e.target; if (!el.dataset || !el.dataset.k) return;
+  if (String(el.value) === String(el.dataset.o) && !el.classList.contains('padrao')) delete alt[el.dataset.k]; else alt[el.dataset.k] = el.value;
+  el.classList.remove('padrao'); el.classList.toggle('mudou', alt[el.dataset.k] !== undefined); barra();
+});
+function barra() { var n = Object.keys(alt).length; $('barra').classList.toggle('on', n > 0); $('nAlt').textContent = n + ' alteração(ões) não salva(s)'; }
+$('btDescartar').onclick = function () { alt = {}; barra(); render(); };
+$('btSalvar').onclick = function () {
+  var lista = Object.keys(alt).map(function (k) { var p = k.split('|'); return { aba: p[0], linha: Number(p[1]), coluna: Number(p[2]), valor: alt[k] }; });
+  chama('salvarAlteracoes', [lista], receber, 'Salvando e recalculando…');
+};
+
+/* ---------- diagnóstico ---------- */
+var R = { cod: 0, desc: 1, fam: 2, tipo: 3, classe: 4, nota: 5, dem: 6, fonte: 7, lt: 8, origem: 9, ss: 10, min: 11, max: 12, pos: 13, cob: 14, sit: 15, data: 16, sug: 17, just: 18 };
+function diasAte(s) { if (!s) return Infinity; if (s === 'IMEDIATO') return -1; return (new Date(s) - new Date()) / 864e5; }
+var KPIS = [
+  { id: 'iniciar', nome: 'Iniciar compra agora', f: function (x) { return x[R.sit] === 'INICIAR COMPRA'; }, c: 'r' },
+  { id: '90', nome: 'Iniciar em até 90 dias', f: function (x) { var d = diasAte(x[R.data]); return d >= 0 && d <= 90; }, c: 'a' },
+  { id: 'reserva', nome: 'Reserva técnica insuficiente', f: function (x) { return x[R.sit] === 'RESERVA INSUFICIENTE'; }, c: 'r' },
+  { id: 'excesso', nome: 'Excesso (acima do máximo)', f: function (x) { return x[R.sit] === 'EXCESSO'; }, c: 'a' },
+  { id: 'sem', nome: 'Sem demanda informada', f: function (x) { return x[R.sit] === 'Sem demanda informada'; }, c: '' },
+  { id: 'ok', nome: 'Dentro da faixa', f: function (x) { return x[R.sit] === 'Dentro da faixa'; }, c: 'g' }
+];
+function tag(s) { var c = s === 'INICIAR COMPRA' || s === 'RESERVA INSUFICIENTE' || s === 'FAMÍLIA INEXISTENTE' ? 'r' : s === 'EXCESSO' ? 'a' : s === 'Dentro da faixa' ? 'g' : ''; return '<span class="tag ' + c + '">' + esc(s) + '</span>'; }
+function renderDiag() {
+  var cl = $('dClasse').value, fa = $('dFamilia').value, tp = $('dTipo').value, q = $('dBusca').value.toLowerCase();
+  var base = D.resultados.linhas.map(function (r) { return r.v; }).filter(function (x) {
+    return (!cl || x[R.classe] === cl) && (!fa || x[R.fam] === fa) && (!tp || x[R.tipo] === tp) && (!q || (x[R.desc] + ' ' + x[R.cod]).toLowerCase().indexOf(q) >= 0);
+  });
+  $('kpis').innerHTML = KPIS.map(function (k) { return '<div class="kpi ' + (filtroKpi === k.id ? 'on' : '') + '" data-id="' + k.id + '"><b class="' + k.c + '" style="background:none">' + base.filter(k.f).length + '</b>' + k.nome + '</div>'; }).join('');
+  var hoje = new Date(), cont = [];
+  for (var i = 0; i < 12; i++) cont.push({ m: new Date(hoje.getFullYear(), hoje.getMonth() + i, 1), n: 0 });
+  base.forEach(function (x) { var s = x[R.data]; var d = s === 'IMEDIATO' ? hoje : s ? new Date(s) : null; if (!d) return; var idx = (d.getFullYear() - hoje.getFullYear()) * 12 + d.getMonth() - hoje.getMonth(); if (idx >= 0 && idx < 12) cont[idx].n++; });
+  var mx = Math.max.apply(null, cont.map(function (c) { return c.n; }).concat([1]));
+  $('meses').innerHTML = cont.map(function (c) { return '<div class="mes"><div style="height:' + (c.n / mx * 60) + 'px"></div>' + c.m.toLocaleDateString('pt-BR', { month: 'short' }) + '<br>' + c.n + '</div>'; }).join('');
+  var k = KPIS.filter(function (k) { return k.id === filtroKpi; })[0];
+  var lista = (k ? base.filter(k.f) : base).sort(function (a, b) { return diasAte(a[R.data]) - diasAte(b[R.data]) || (b[R.nota] - a[R.nota]); });
+  $('tDiag').innerHTML = '<tr><th>Situação</th><th>Iniciar compra até</th><th>Item</th><th>Classe</th><th>Demanda/mês</th><th>Prazo (dias)</th><th>Posição</th><th>Mínimo / reserva</th><th>Máximo</th><th>Qtd sugerida</th><th>Justificativa</th></tr>' +
+    lista.slice(0, 500).map(function (x) {
+      return '<tr><td>' + tag(x[R.sit]) + '</td><td>' + dt(x[R.data]) + '</td><td class="desc"><b>' + esc(x[R.cod]) + '</b> ' + esc(x[R.desc]) + '<div class="mut">' + esc(x[R.fam]) + ' · ' + esc(D.famNome[x[R.fam]] || '') + '</div></td>' +
+        '<td>' + esc(x[R.classe]) + ' <span class="mut">' + fmt(x[R.nota]) + '</span></td><td class="n">' + fmt(x[R.dem]) + '</td><td class="n">' + fmt(x[R.lt]) + '</td><td class="n">' + fmt(x[R.pos]) + '</td><td class="n">' + fmt(x[R.min]) + '</td><td class="n">' + fmt(x[R.max]) + '</td><td class="n">' + fmt(x[R.sug]) + '</td><td class="just">' + esc(x[R.just]) + '</td></tr>';
+    }).join('') + (lista.length > 500 ? '<tr><td colspan="11" class="mut">Mostrando 500 de ' + lista.length + '. Use os filtros.</td></tr>' : '');
+}
+$('kpis').onclick = function (e) { var el = e.target.closest('.kpi'); if (!el) return; filtroKpi = filtroKpi === el.dataset.id ? null : el.dataset.id; renderDiag(); };
+
+/* ---------- itens ---------- */
+function renderItens() {
+  var C = D.col, fa = $('iFamilia').value, tp = $('iTipo').value, q = $('iBusca').value.toLowerCase();
+  var lista = D.itens.linhas.filter(function (r) { var v = r.v; return (!fa || v[C.FAMILIA] === fa) && (!tp || v[C.TIPO] === tp) && (!q || (v[C.DESCRICAO] + ' ' + v[C.CODIGO]).toLowerCase().indexOf(q) >= 0); });
+  var tot = lista.length; lista = lista.slice(pagina * POR_PAG, (pagina + 1) * POR_PAG);
+  var cab = ['Item', 'Família', 'Saldo', 'Parque', 'Base de consumo', 'Taxa por base/mês', 'Consumo histórico/mês', 'Desvio', 'Em trânsito', 'Ata vigente', 'Prazo ata (dias)', 'Fase interna', 'Licitação', 'Contratação', 'Entrega', 'Distribuição', 'Classe', 'Mínimo', 'Situação', 'Iniciar compra até'];
+  $('tItens').innerHTML = '<tr>' + cab.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr>' + lista.map(function (r) {
+    var v = r.v, perm = v[C.TIPO] === 'PERMANENTE', res = D.res[String(v[C.CODIGO])] || [];
+    function f(col, o) { o = o || {}; o.padrao = r.p && r.p.indexOf(col) >= 0; return '<td>' + campo('ITENS', r, col, v[col], o) + '</td>'; }
+    return '<tr><td class="desc" title="' + esc(v[C.DESCRICAO]) + '"><div class="clamp"><b>' + esc(v[C.CODIGO]) + '</b> ' + esc(v[C.DESCRICAO]) + '</div><div class="mut clamp">' + esc(v[C.TIPO]) + ' · ' + esc(v[C.GRUPO]) + '</div></td>' +
+      f(C.FAMILIA, { w: 60 }) + '<td class="n">' + fmt(v[C.SALDO]) + '</td><td class="n">' + fmt(v[C.PARQUE]) + '</td>' +
+      (perm ? '<td class="mut">-</td><td class="mut">-</td><td class="mut">-</td><td class="mut">-</td>' : f(C.BASE, { lista: ['POLICIAL', 'VIATURA', 'UNIDADE', 'HISTORICO'] }) + f(C.TAXA) + f(C.HIST) + f(C.DESVIO)) +
+      f(C.TRANSITO) + f(C.ATA, { lista: ['', 'S', 'N'] }) + f(C.PRAZO_ATA) +
+      f(C.FASE_INTERNA) + f(C.LICITACAO) + f(C.CONTRATACAO) + f(C.ENTREGA) + f(C.DISTRIBUICAO) +
+      '<td>' + esc(res[R.classe] || '') + '</td><td class="n">' + fmt(res[R.min]) + '</td><td>' + (res[R.sit] ? tag(res[R.sit]) : '') + '</td><td>' + dt(res[R.data]) + '</td></tr>';
+  }).join('');
+  var np = Math.ceil(tot / POR_PAG);
+  $('iPag').innerHTML = tot + ' itens · página ' + (pagina + 1) + ' de ' + Math.max(np, 1) + ' ' + (pagina > 0 ? '<button class="sec" onclick="pagina--;renderItens()">anterior</button> ' : '') + (pagina < np - 1 ? '<button class="sec" onclick="pagina++;renderItens()">próxima</button>' : '');
+}
+
+/* ---------- tabelas simples ---------- */
+function renderTabela(id, aba, t, editaveis, listas, ro) {
+  $(id).innerHTML = '<tr>' + t.cab.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' + t.linhas.map(function (r) {
+    return '<tr>' + r.v.map(function (x, i) {
+      if (editaveis.indexOf(i) >= 0) return '<td>' + campo(aba, r, i, x, { lista: listas && listas[i] }) + '</td>';
+      return '<td class="' + (typeof x === 'number' ? 'n' : '') + (ro && ro.indexOf(i) >= 0 ? ' mut' : '') + '">' + (typeof x === 'number' ? fmt(Math.round(x * 100) / 100) : esc(x)) + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+}
+var NOTA = ['', 1, 2, 3, 4, 5];
+
+function render() {
+  if (!D) return;
+  document.querySelectorAll('.aba').forEach(function (a) { a.classList.toggle('on', a.dataset.a === abaAtual); });
+  document.querySelectorAll('section[data-aba]').forEach(function (s) { s.classList.toggle('oculto', s.dataset.aba !== abaAtual); });
+  if (abaAtual === 'diag') renderDiag();
+  if (abaAtual === 'itens') renderItens();
+  if (abaAtual === 'familias') renderTabela('tFamilias', 'FAMILIAS', D.familias, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13], { 4: NOTA, 5: NOTA, 6: NOTA, 7: NOTA, 8: NOTA, 9: NOTA, 10: NOTA, 12: ['', 'POLICIAL', 'VIATURA', 'UNIDADE', 'HISTORICO'] }, [14, 15]);
+  if (abaAtual === 'parametros') renderTabela('tParametros', 'PARAMETROS', D.parametros, [1]);
+  if (abaAtual === 'unidades') renderTabela('tUnidades', 'UNIDADES', D.unidades, [2, 3, 4, 5], { 5: ['S', 'N'] });
+  if (abaAtual === 'processos') renderTabela('tProcessos', 'PROCESSOS', D.processos, [1, 2, 3, 4, 5, 6, 7], null, [8, 9, 10, 11, 12]);
+}
+['dClasse', 'dFamilia', 'dTipo'].forEach(function (id) { $(id).onchange = renderDiag; }); $('dBusca').oninput = renderDiag;
+['iFamilia', 'iTipo'].forEach(function (id) { $(id).onchange = function () { pagina = 0; renderItens(); }; }); $('iBusca').oninput = function () { pagina = 0; renderItens(); };
+iniciar();
 </script>
 </body>
 </html>

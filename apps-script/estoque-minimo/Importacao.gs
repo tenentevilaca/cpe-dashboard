@@ -101,7 +101,6 @@ function lerCatalogoCpelog_() {
 /** Importa e mescla: atualiza colunas do sistema, preserva tudo o que o usuário digitou. */
 function importarCpelog() {
   var ss = planilha_();
-  if (!ss.getSheetByName('ITENS')) configurar();
   var dados = lerCatalogoCpelog_(), agora = new Date();
 
   var sh = ss.getSheetByName('ITENS'), nc = ABAS.ITENS.length;
@@ -140,7 +139,8 @@ function importarCpelog() {
   }
   preencherPadroes_(ss);
   importarUnidades_(ss, dados.viaturasPorFracao);
-  SpreadsheetApp.getActive().toast(saida.length + ' materiais (' + novos + ' novos). Recalcule para ver os resultados.', 'Importado do CPELOG', 8);
+  PropertiesService.getScriptProperties().setProperty('ULTIMO_IMPORT', agora.toISOString());
+  aviso_(saida.length + ' materiais (' + novos + ' novos). Recalcule para ver os resultados.', 'Importado do CPELOG');
 }
 
 /** UNIDADES por batalhão/UEOp: frações e viaturas vêm do CPELOG; o efetivo é digitado. */

@@ -14,15 +14,29 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * Planilha onde ficam os dados. Se o projeto não estiver ligado a uma planilha
+ * (Apps Script avulso, publicado como app da web), cria uma no Drive na primeira vez.
+ */
 function planilha_() {
-  var id = PropertiesService.getScriptProperties().getProperty('PLANILHA_ID');
-  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActive();
+  var props = PropertiesService.getScriptProperties(), id = props.getProperty('PLANILHA_ID'), ss = null;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch (e) { ss = null; } }
+  if (!ss) ss = SpreadsheetApp.getActive();
+  if (!ss) ss = SpreadsheetApp.create('Estoque mínimo - CPELOG (dados do painel)');
+  if (ss.getId() !== id) props.setProperty('PLANILHA_ID', ss.getId());
+  if (!ss.getSheetByName('RESULTADOS')) configurarAbas_(ss);
+  return ss;
 }
 
+/** Mensagem rápida na planilha, quando houver uma aberta (no app da web não há). */
+function aviso_(msg, titulo) {
+  try { var a = SpreadsheetApp.getActive(); if (a) a.toast(msg, titulo || 'Estoque mínimo', 6); } catch (e) { /* sem interface */ }
+}
+
+function configurar() { configurarAbas_(planilha_()); aviso_('Abas criadas. Configure o acesso e importe do CPELOG.'); }
+
 /** Cria as abas que faltarem, com cabeçalho, parâmetros, famílias e exemplos. Não apaga nada. */
-function configurar() {
-  var ss = planilha_();
-  PropertiesService.getScriptProperties().setProperty('PLANILHA_ID', ss.getId());
+function configurarAbas_(ss) {
   var seeds = { PARAMETROS: PARAMETROS_PADRAO, FAMILIAS: FAMILIAS_PADRAO, UNIDADES: UNIDADES_EXEMPLO, ITENS: ITENS_EXEMPLO, PROCESSOS: PROCESSOS_EXEMPLO };
   Object.keys(ABAS).forEach(function (nome) {
     if (ss.getSheetByName(nome)) return;
@@ -43,7 +57,6 @@ function configurar() {
   var padrao = ss.getSheetByName('Página1') || ss.getSheetByName('Sheet1');
   if (padrao && padrao.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(padrao);
   preencherPadroes_(ss);
-  SpreadsheetApp.getActive().toast('Abas criadas. Configure o acesso e importe do CPELOG.', 'Estoque mínimo', 8);
 }
 
 function linhas_(ss, nome) {
@@ -133,7 +146,7 @@ function recalcular() {
     }));
   }
   PropertiesService.getScriptProperties().setProperty('ULTIMO_CALCULO', new Date().toISOString());
-  SpreadsheetApp.getActive().toast(saida.length + ' itens calculados.', 'Estoque mínimo', 5);
+  aviso_(saida.length + ' itens calculados.');
 }
 
 function ehPadrao_(cor) { return String(cor || '').toLowerCase() === COR_PADRAO; }
@@ -192,20 +205,88 @@ function doGet() {
 }
 
 function abrirPainel() {
-  var html = HtmlService.createTemplateFromFile('Painel').evaluate().setWidth(1200).setHeight(800);
+  var html = HtmlService.createTemplateFromFile('Painel').evaluate().setWidth(1400).setHeight(850);
   SpreadsheetApp.getUi().showModalDialog(html, 'Diagnóstico de estoque');
 }
 
-/** Dados para o painel (chamado pelo HTML via google.script.run). */
-function dadosPainel() {
+/* ---------- Funções chamadas pelo painel (google.script.run) ---------- */
+
+function estadoWeb() {
+  var props = PropertiesService.getScriptProperties();
   var ss = planilha_();
-  var cab = ABAS.RESULTADOS;
-  var linhas = linhas_(ss, 'RESULTADOS').map(function (r) {
-    var o = {};
-    cab.forEach(function (c, i) { o[c] = r[i] instanceof Date ? Utilities.formatDate(r[i], ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd') : r[i]; });
-    return o;
+  var sh = ss.getSheetByName('ITENS');
+  return {
+    acesso: !!(props.getProperty('CPELOG_USUARIO') && props.getProperty('CPELOG_SENHA')),
+    usuario: props.getProperty('CPELOG_USUARIO') || '',
+    planilha: ss.getUrl(),
+    ultimoImport: props.getProperty('ULTIMO_IMPORT'),
+    ultimoCalculo: props.getProperty('ULTIMO_CALCULO'),
+    itens: sh ? Math.max(sh.getLastRow() - 1, 0) : 0
+  };
+}
+
+/** Grava e valida o login do CPELOG digitado no painel. */
+function salvarAcesso(usuario, senha) {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('CPELOG_USUARIO', String(usuario || '').replace(/\D/g, ''));
+  props.setProperty('CPELOG_SENHA', String(senha || ''));
+  try { tokenCpelog_(true); } catch (e) { props.deleteProperty('CPELOG_SENHA'); throw e; }
+  return estadoWeb();
+}
+
+/** Puxa tudo do CPELOG, recalcula e devolve os dados do painel. */
+function atualizarDoCpelog() {
+  importarCpelog();
+  recalcular();
+  return dadosWeb();
+}
+
+/**
+ * Grava edições feitas no painel e recalcula.
+ * alteracoes: [{aba, linha (da planilha), coluna (1 = A), valor}]
+ */
+function salvarAlteracoes(alteracoes) {
+  var ss = planilha_(), editaveis = { ITENS: 1, FAMILIAS: 1, PARAMETROS: 1, UNIDADES: 1, PROCESSOS: 1 };
+  (alteracoes || []).forEach(function (a) {
+    if (!editaveis[a.aba] || !(a.linha >= 2) || !(a.coluna >= 1)) return;
+    var sh = ss.getSheetByName(a.aba), v = String(a.valor === null || a.valor === undefined ? '' : a.valor).trim();
+    var cel = sh.getRange(a.linha, a.coluna);
+    cel.setValue(/^-?\d+([.,]\d+)?$/.test(v) ? Number(v.replace(',', '.')) : v);
+    if (a.aba === 'ITENS' && COLUNAS_PADRAO.indexOf(a.coluna - 1) >= 0) cel.setFontColor('#000000').setFontStyle('normal');
   });
-  var fam = {};
-  linhas_(ss, 'FAMILIAS').forEach(function (r) { fam[r[0]] = r[1]; });
-  return { itens: linhas, familias: fam, atualizado: PropertiesService.getScriptProperties().getProperty('ULTIMO_CALCULO') };
+  recalcular();
+  return dadosWeb();
+}
+
+function serial_(v, tz) { return v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : v; }
+
+function tabelaWeb_(ss, nome, comCores) {
+  var sh = ss.getSheetByName(nome), cab = ABAS[nome], tz = ss.getSpreadsheetTimeZone();
+  var n = sh && sh.getLastRow() > 1 ? sh.getLastRow() - 1 : 0;
+  if (!n) return { cab: cab, linhas: [] };
+  var rg = sh.getRange(2, 1, n, cab.length), v = rg.getValues(), c = comCores ? rg.getFontColors() : null;
+  var linhas = [];
+  v.forEach(function (r, i) {
+    if (String(r[0]).trim() === '') return;
+    var o = { l: i + 2, v: r.map(function (x) { return serial_(x, tz); }) };
+    if (c) o.p = COLUNAS_PADRAO.filter(function (k) { return ehPadrao_(c[i][k]); });
+    linhas.push(o);
+  });
+  return { cab: cab, linhas: linhas };
+}
+
+/** Todas as informações do painel: resultados, itens (com o que é padrão), famílias, parâmetros, unidades, processos. */
+function dadosWeb() {
+  var ss = planilha_();
+  return {
+    estado: estadoWeb(),
+    resultados: tabelaWeb_(ss, 'RESULTADOS'),
+    itens: tabelaWeb_(ss, 'ITENS', true),
+    familias: tabelaWeb_(ss, 'FAMILIAS'),
+    parametros: tabelaWeb_(ss, 'PARAMETROS'),
+    unidades: tabelaWeb_(ss, 'UNIDADES'),
+    processos: tabelaWeb_(ss, 'PROCESSOS'),
+    colunasPadrao: COLUNAS_PADRAO,
+    col: COL
+  };
 }

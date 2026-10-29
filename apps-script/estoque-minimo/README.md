@@ -90,22 +90,32 @@ A base `VIATURA` multiplica pela frota inteira. Para itens que só servem a part
 
 ## Instalação
 
-1. Crie uma planilha nova no Google Drive (conta institucional, se houver).
-2. Menu **Extensões → Apps Script**. Apague o conteúdo do `Código.gs` padrão.
-3. Crie os arquivos de script `Calculo`, `Classificacao`, `Configuracao`, `Importacao`, `Codigo`
-   e o arquivo HTML `Painel`, e cole o conteúdo dos arquivos desta pasta.
-4. Em **Configurações do projeto**, marque *Mostrar arquivo de manifesto "appsscript.json"* e
-   substitua o conteúdo pelo desta pasta.
-5. Salve, volte à planilha e recarregue. Aparece o menu **Estoque mínimo**:
-   1. *Configurar planilha* (autorize na primeira vez);
-   2. *Configurar acesso ao CPELOG* (número de polícia e senha);
-   3. *Importar do CPELOG*;
-   4. preencha o efetivo em `UNIDADES` e as taxas dos itens principais em `ITENS`;
-   5. *Recalcular*.
-6. Painel web: **Implantar → Nova implantação → App da Web**. O manifesto vem com acesso `MYSELF`
-   (só você). Libere para a organização apenas em conta institucional: os dados incluem material controlado.
+Funciona de dois jeitos. Em ambos, os dados vêm do CPELOG pela API (somente leitura).
 
-Alternativa com [clasp](https://github.com/google/clasp): `clasp create --type sheets` nesta pasta e `clasp push`.
+**A) Projeto Apps Script avulso, publicado como app da web (recomendado)**
+
+1. Em [script.google.com](https://script.google.com) crie um projeto novo.
+2. Crie os arquivos de script `Calculo`, `Classificacao`, `Configuracao`, `Importacao`, `Codigo`
+   e o arquivo HTML `Painel`, e cole o conteúdo dos arquivos desta pasta (apague o `Código.gs` padrão).
+3. Em **Configurações do projeto**, marque *Mostrar arquivo de manifesto "appsscript.json"* e
+   substitua o conteúdo pelo desta pasta.
+4. **Implantar → Nova implantação → App da Web** (executar como: você; acesso: só você). Autorize.
+5. Abra a URL do app. Na primeira vez ele pede o número de polícia e a senha do CPELOG, cria
+   sozinho uma planilha no seu Drive para guardar os dados e importa tudo. Depois disso use o
+   botão **Atualizar do CPELOG** sempre que quiser os dados mais recentes.
+6. Todas as informações ficam no painel, em abas: Diagnóstico, Itens, Famílias e notas, Pesos e
+   parâmetros, Unidades e efetivo, Processos de compra. Edite direto na tela e clique em
+   **Salvar e recalcular**. O link "abrir planilha de dados" leva à planilha, que também pode ser editada.
+
+Ao alterar o código depois, use **Implantar → Gerenciar implantações → editar → Nova versão**,
+senão a URL continua servindo a versão antiga.
+
+**B) Ligado a uma planilha**
+
+Abra uma planilha, **Extensões → Apps Script**, cole os mesmos arquivos e recarregue a planilha.
+O menu **Estoque mínimo** faz as mesmas operações (configurar, acesso, importar, recalcular, abrir painel).
+
+Alternativa com [clasp](https://github.com/google/clasp): `clasp create --type webapp` nesta pasta e `clasp push`.
 
 ## Testes
 
