@@ -24,7 +24,7 @@ const est = C.estatisticaProcessos([{ familia: 'C43', dias: 172 }, { familia: 'C
 assert.strictEqual(est.C43.n, 2); assert.strictEqual(est.C43.media, 154.5);
 
 // Papel toalha: 0,5 pacote/policial/mês x 200 policiais = 100/mês; prazo = média dos processos + 7 dias
-const papel = { codigo: 'EX-001', familia: 'C43', base: 'POLICIAL', taxa: 0.5, consumoHistorico: 110, desvioHistorico: 20, saldo: 300, emTransito: 0, diasDistribuicao: 7 };
+const papel = { codigo: 'EX-001', familia: 'C43', base: 'POLICIAL', taxa: 0.5, consumoHistorico: 110, desvioHistorico: 20, saldo: 300, emTransito: 0, fases: { distribuicao: 7 }, fasesReais: {} };
 const r1 = C.calcularItem(papel, fam.C43, ef, est, p, hoje);
 assert.strictEqual(r1.demanda, 100);
 assert.strictEqual(Math.round(r1.leadTime), 162);
@@ -36,7 +36,7 @@ assert.strictEqual(r1.status, 'INICIAR COMPRA');
 assert.strictEqual(r1.dataLimite, null);
 
 // Pneu com ata vigente: prazo cai para o da ata
-const pneu = { codigo: 'EX-002', familia: 'C13', base: 'VIATURA', taxa: 0.15, saldo: 12, ataVigente: true, prazoAta: 30, diasDistribuicao: 10 };
+const pneu = { codigo: 'EX-002', familia: 'C13', base: 'VIATURA', taxa: 0.15, saldo: 12, ataVigente: true, prazoAta: 30, fases: { distribuicao: 10 }, fasesReais: {} };
 const r2 = C.calcularItem(pneu, fam.C13, ef, {}, p, hoje);
 assert.strictEqual(r2.leadTime, 40);
 assert.strictEqual(r2.origemLeadTime, 'ata de registro de preços');
@@ -48,10 +48,19 @@ const c = C.criticidade({ ESS: 5, SEG: 1, SUB: 1, CTL: 1, VAR: 1, TR: 1, TRV: 1 
 assert.strictEqual(c.classe, 'Operacional');
 
 // Permanente: reserva técnica
-const radio = { codigo: 'EX-003', familia: 'P07', parque: 200, saldo: 4, taxaIndisponibilidade: 0.10, diasDistribuicao: 15 };
+const radio = { codigo: 'EX-003', familia: 'P07', parque: 200, saldo: 4, taxaIndisponibilidade: 0.10, fases: { distribuicao: 15 }, fasesReais: {} };
 const r3 = C.calcularItem(radio, fam.P07, ef, {}, p, hoje);
 assert.strictEqual(r3.minimo, Math.round(200 * 0.10 * (375 / 365) * 1.5));
 assert.strictEqual(r3.status, 'RESERVA INSUFICIENTE');
+
+// Fases: padrão do sistema x valores reais digitados
+const fp = C.fasesPadrao(180, { interna: 0.2, licitacao: 0.45, contratacao: 0.1, entrega: 0.25 }, 10);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(fp)), { interna: 36, licitacao: 81, contratacao: 18, entrega: 45, distribuicao: 10 });
+const ltPadrao = C.tempoReposicao({ fases: fp, fasesReais: {} }, fam.C43, est.C43);
+assert.strictEqual(ltPadrao.origem, 'histórico de 2 processo(s)', 'histórico vence o padrão do sistema');
+const ltReal = C.tempoReposicao({ fases: Object.assign({}, fp, { licitacao: 150 }), fasesReais: { licitacao: true } }, fam.C43, est.C43);
+assert.strictEqual(ltReal.dias, 36 + 150 + 18 + 45 + 10); assert.strictEqual(ltReal.origem, 'fases informadas no item');
+assert.strictEqual(C.tempoReposicao({ fases: fp, fasesReais: {} }, fam.C43, null).origem, 'padrão do sistema');
 
 // Sem dado de consumo
 const r4 = C.calcularItem({ codigo: 'X', familia: 'C42', base: 'HISTORICO' }, fam.C42, ef, {}, p, hoje);

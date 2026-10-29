@@ -6,7 +6,9 @@
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Estoque mínimo')
     .addItem('1. Configurar planilha (cria as abas)', 'configurar')
-    .addItem('2. Recalcular', 'recalcular')
+    .addItem('2. Configurar acesso ao CPELOG', 'configurarAcesso')
+    .addItem('3. Importar do CPELOG', 'importarCpelog')
+    .addItem('4. Recalcular', 'recalcular')
     .addSeparator()
     .addItem('Abrir painel', 'abrirPainel')
     .addToUi();
@@ -40,7 +42,8 @@ function configurar() {
   });
   var padrao = ss.getSheetByName('Página1') || ss.getSheetByName('Sheet1');
   if (padrao && padrao.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(padrao);
-  SpreadsheetApp.getActive().toast('Abas criadas. Preencha UNIDADES, ITENS e PROCESSOS e use "Recalcular".', 'Estoque mínimo', 8);
+  preencherPadroes_(ss);
+  SpreadsheetApp.getActive().toast('Abas criadas. Configure o acesso e importe do CPELOG.', 'Estoque mínimo', 8);
 }
 
 function linhas_(ss, nome) {
@@ -66,8 +69,8 @@ function recalcular() {
 
   var ef = { policiais: 0, viaturas: 0, unidades: 0 };
   linhas_(ss, 'UNIDADES').forEach(function (r) {
-    if (r[4] !== '' && !sim_(r[4])) return;
-    ef.policiais += num_(r[2]) || 0; ef.viaturas += num_(r[3]) || 0; ef.unidades += 1;
+    if (r[5] !== '' && !sim_(r[5])) return;
+    ef.policiais += num_(r[2]) || 0; ef.viaturas += num_(r[3]) || 0; ef.unidades += num_(r[4]) || 0;
   });
 
   // Processos: calcula a duração de cada fase e o total (demanda -> entrega).
@@ -84,17 +87,25 @@ function recalcular() {
   }
   var estat = estatisticaProcessos(procs);
 
+  preencherPadroes_(ss);
+  var shI = ss.getSheetByName('ITENS');
+  var li = shI.getLastRow() > 1 ? shI.getRange(2, 1, shI.getLastRow() - 1, ABAS.ITENS.length).getValues() : [];
+  var cores = li.length ? shI.getRange(2, 1, li.length, ABAS.ITENS.length).getFontColors() : [];
   var hoje = new Date(), saida = [];
-  linhas_(ss, 'ITENS').forEach(function (r) {
-    var fam = familias[String(r[2]).trim()];
-    if (!fam) { saida.push([r[0], r[1], r[2], '', '', '', '', '', '', '', '', '', '', '', '', 'FAMÍLIA INEXISTENTE', '', '', 'Corrigir a família na aba ITENS']); return; }
+  li.forEach(function (r, idx) {
+    if (String(r[COL.CODIGO]).trim() === '') return;
+    var fam = familias[String(r[COL.FAMILIA]).trim()];
+    if (!fam) { saida.push([r[0], r[1], r[COL.FAMILIA], '', '', '', '', '', '', '', '', '', '', '', '', 'FAMÍLIA INEXISTENTE', '', '', 'Corrigir a família na aba ITENS']); return; }
+    var real = function (c) { return r[c] !== '' && !ehPadrao_(cores[idx][c]); };
     var item = {
-      codigo: String(r[0]).trim(), descricao: r[1], familia: fam.id,
-      base: String(r[4]).trim().toUpperCase() || fam.base || 'HISTORICO',
-      taxa: num_(r[5]), consumoHistorico: num_(r[6]), desvioHistorico: num_(r[7]),
-      saldo: num_(r[8]) || 0, emTransito: num_(r[9]) || 0,
-      ataVigente: sim_(r[10]), prazoAta: num_(r[11]), leadTimeDias: num_(r[12]), diasDistribuicao: num_(r[13]) || 0,
-      parque: num_(r[14]) || 0, taxaIndisponibilidade: num_(r[15]) !== null ? num_(r[15]) : (fam.taxaIndisponibilidade || 0)
+      codigo: String(r[COL.CODIGO]).trim(), descricao: r[COL.DESCRICAO], familia: fam.id,
+      base: String(r[COL.BASE]).trim().toUpperCase() || fam.base || 'HISTORICO',
+      taxa: num_(r[COL.TAXA]), consumoHistorico: num_(r[COL.HIST]), desvioHistorico: num_(r[COL.DESVIO]),
+      saldo: num_(r[COL.SALDO]) || 0, emTransito: num_(r[COL.TRANSITO]) || 0,
+      ataVigente: sim_(r[COL.ATA]), prazoAta: num_(r[COL.PRAZO_ATA]),
+      fases: { interna: num_(r[COL.FASE_INTERNA]), licitacao: num_(r[COL.LICITACAO]), contratacao: num_(r[COL.CONTRATACAO]), entrega: num_(r[COL.ENTREGA]), distribuicao: num_(r[COL.DISTRIBUICAO]) },
+      fasesReais: { interna: real(COL.FASE_INTERNA), licitacao: real(COL.LICITACAO), contratacao: real(COL.CONTRATACAO), entrega: real(COL.ENTREGA) },
+      parque: num_(r[COL.PARQUE]) || 0, taxaIndisponibilidade: num_(r[COL.INDISP]) !== null ? num_(r[COL.INDISP]) : (fam.taxaIndisponibilidade || 0)
     };
     var x = calcularItem(item, fam, ef, estat, p, hoje);
     saida.push([x.codigo, x.descricao, x.familia, x.tipo, x.classe, Math.round(x.nota), arred_(x.demanda, 1), x.fonteDemanda || '',
@@ -123,6 +134,52 @@ function recalcular() {
   }
   PropertiesService.getScriptProperties().setProperty('ULTIMO_CALCULO', new Date().toISOString());
   SpreadsheetApp.getActive().toast(saida.length + ' itens calculados.', 'Estoque mínimo', 5);
+}
+
+function ehPadrao_(cor) { return String(cor || '').toLowerCase() === COR_PADRAO; }
+
+/**
+ * Preenche, em cinza, as células vazias das colunas com padrão do sistema (base de consumo,
+ * taxa de indisponibilidade e fases do processo de compra). Valores digitados pelo usuário
+ * ficam em preto e nunca são sobrescritos; os cinzas acompanham mudanças na aba FAMILIAS.
+ */
+function preencherPadroes_(ss) {
+  var sh = ss.getSheetByName('ITENS'), fs = ss.getSheetByName('FAMILIAS');
+  if (!sh || !fs || sh.getLastRow() < 2) return;
+  var fam = {};
+  linhas_(ss, 'FAMILIAS').forEach(function (r) { fam[String(r[0]).trim()] = { tipo: String(r[2]).toUpperCase(), lt: num_(r[11]), base: r[12], indisp: r[13] }; });
+  var n = sh.getLastRow() - 1, nc = ABAS.ITENS.length;
+  var rg = sh.getRange(2, 1, n, nc), v = rg.getValues(), c = rg.getFontColors();
+  var mudou = false;
+  v.forEach(function (r, i) {
+    var f = fam[String(r[COL.FAMILIA]).trim()]; if (!f) return;
+    var fp = fasesPadrao(f.lt, DIVISAO_FASES, DISTRIBUICAO_PADRAO_DIAS);
+    var padrao = {};
+    padrao[COL.BASE] = f.tipo === 'CONSUMO' ? f.base : '';
+    padrao[COL.INDISP] = f.tipo === 'PERMANENTE' ? f.indisp : '';
+    padrao[COL.FASE_INTERNA] = fp.interna; padrao[COL.LICITACAO] = fp.licitacao; padrao[COL.CONTRATACAO] = fp.contratacao;
+    padrao[COL.ENTREGA] = fp.entrega; padrao[COL.DISTRIBUICAO] = fp.distribuicao;
+    COLUNAS_PADRAO.forEach(function (col) {
+      if (r[col] === '' || ehPadrao_(c[i][col])) {
+        if (r[col] !== padrao[col] || (padrao[col] !== '' && !ehPadrao_(c[i][col]))) { r[col] = padrao[col]; mudou = true; }
+        c[i][col] = padrao[col] === '' ? null : COR_PADRAO;
+      }
+    });
+  });
+  if (mudou) rg.setValues(v);
+  rg.setFontColors(c);
+}
+
+/** Ao digitar sobre um valor padrão (cinza), o valor passa a ser real (preto). */
+function onEdit(e) {
+  var sh = e.range.getSheet();
+  if (sh.getName() !== 'ITENS' || e.range.getRow() < 2) return;
+  var c0 = e.range.getColumn() - 1, nc = e.range.getNumColumns();
+  for (var j = 0; j < nc; j++) {
+    if (COLUNAS_PADRAO.indexOf(c0 + j) < 0) continue;
+    var col = sh.getRange(e.range.getRow(), c0 + j + 1, e.range.getNumRows(), 1);
+    col.setFontColor('#000000').setFontStyle('normal');
+  }
 }
 
 function arred_(v, c) { if (v === null || v === undefined || v === '') return ''; var f = Math.pow(10, c); return Math.round(v * f) / f; }

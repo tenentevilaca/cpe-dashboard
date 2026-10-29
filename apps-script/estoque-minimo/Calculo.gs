@@ -71,16 +71,31 @@ function demandaMensal(item, efetivo) {
 
 /**
  * Tempo total de reposição (dias): da demanda à entrega na ponta.
- * Com ata de registro de preços vigente e com saldo, o prazo é o de entrega da ata.
+ * item.fases = {interna, licitacao, contratacao, entrega, distribuicao}; item.fasesReais indica
+ * quais foram digitadas pelo usuário (as demais são o padrão do sistema).
+ * Prioridade: ata vigente > fases reais do item > histórico de processos > padrão do sistema.
  */
 function tempoReposicao(item, familia, historico) {
-  var distrib = Number(item.diasDistribuicao) || 0;
+  var f = item.fases || {}, reais = item.fasesReais || {};
+  var distrib = Number(f.distribuicao) || 0;
+  var compra = ['interna', 'licitacao', 'contratacao', 'entrega'];
+  var algumaReal = compra.some(function (k) { return reais[k]; });
   if (item.ataVigente && item.prazoAta > 0) {
     return { dias: item.prazoAta + distrib, desvio: 0, origem: 'ata de registro de preços' };
   }
-  if (item.leadTimeDias > 0) return { dias: item.leadTimeDias + distrib, desvio: item.leadTimeDesvio || 0, origem: 'informado no item' };
+  if (algumaReal) {
+    return { dias: compra.reduce(function (s, k) { return s + (Number(f[k]) || 0); }, 0) + distrib, desvio: 0, origem: 'fases informadas no item' };
+  }
   if (historico && historico.n > 0) return { dias: historico.media + distrib, desvio: historico.desvio, origem: 'histórico de ' + historico.n + ' processo(s)' };
-  return { dias: (Number(familia.leadTimeDias) || 0) + distrib, desvio: 0, origem: 'padrão da família' };
+  var padrao = compra.reduce(function (s, k) { return s + (Number(f[k]) || 0); }, 0) || Number(familia.leadTimeDias) || 0;
+  return { dias: padrao + distrib, desvio: 0, origem: 'padrão do sistema' };
+}
+
+/** Divide o tempo de compra padrão da família entre as fases. */
+function fasesPadrao(leadTimeDias, divisao, distribuicao) {
+  var lt = Number(leadTimeDias) || 0;
+  return { interna: Math.round(lt * divisao.interna), licitacao: Math.round(lt * divisao.licitacao),
+    contratacao: Math.round(lt * divisao.contratacao), entrega: Math.round(lt * divisao.entrega), distribuicao: distribuicao };
 }
 
 /**
@@ -179,5 +194,5 @@ function calcularItem(item, familia, efetivo, estatProc, p, hoje) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { notaPorPrazo: notaPorPrazo, notaPorCV: notaPorCV, criticidade: criticidade, demandaMensal: demandaMensal, tempoReposicao: tempoReposicao, niveisConsumo: niveisConsumo, situacao: situacao, reservaTecnica: reservaTecnica, estatisticaProcessos: estatisticaProcessos, calcularItem: calcularItem };
+  module.exports = { notaPorPrazo: notaPorPrazo, notaPorCV: notaPorCV, criticidade: criticidade, demandaMensal: demandaMensal, tempoReposicao: tempoReposicao, fasesPadrao: fasesPadrao, niveisConsumo: niveisConsumo, situacao: situacao, reservaTecnica: reservaTecnica, estatisticaProcessos: estatisticaProcessos, calcularItem: calcularItem };
 }

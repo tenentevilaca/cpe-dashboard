@@ -54,27 +54,56 @@ segurança, classe), que é o rastro decisório pedido pelo documento.
 | Aba | Quem preenche | Conteúdo |
 |---|---|---|
 | `PARAMETROS` | P4 | Pesos, limites, nível de serviço, margens |
-| `FAMILIAS` | Especialista | 97 famílias de criticidade já cadastradas, com notas sugeridas |
-| `UNIDADES` | P4 | Efetivo e viaturas de cada fração |
-| `ITENS` | Almoxarifado | Material, família, base de consumo, taxa, saldo, ata |
+| `FAMILIAS` | Especialista | 99 famílias de criticidade já cadastradas, com notas sugeridas |
+| `UNIDADES` | CPELOG + P4 | Uma linha por UEOp; viaturas e frações vêm do CPELOG, **o efetivo é digitado** |
+| `ITENS` | CPELOG + almoxarifado | Os materiais do CPELOG já classificados em famílias; taxas, ata e prazos são digitados |
 | `PROCESSOS` | Seção de compras | Datas de cada processo; o script calcula a duração das fases |
 | `RESULTADOS` | Script | Saída do cálculo (não editar) |
 
-As abas vêm com linhas `EXEMPLO` (fictícias). Apague-as ao carregar os dados reais.
+### Valores padrão do sistema (texto cinza)
+
+Na aba `ITENS`, as colunas de base de consumo, taxa de indisponibilidade e as cinco fases do
+processo de compra (fase interna, licitação, contratação, entrega e distribuição) vêm preenchidas
+com o **padrão do sistema em cinza**. Ao digitar um valor real, ele fica preto e passa a valer.
+Apagar a célula devolve o padrão cinza no próximo recálculo. A justificativa de cada item diz se o
+prazo usado foi `padrão do sistema`, `fases informadas no item`, `histórico de N processo(s)` ou
+`ata de registro de preços`.
+
+O padrão das fases divide o tempo de compra da família em 20% fase interna, 45% licitação,
+10% contratação e 25% entrega, mais 10 dias de distribuição (`DIVISAO_FASES` em `Configuracao.gs`).
+
+### Importação do CPELOG
+
+`Importar do CPELOG` lê (somente leitura) o estoque do Consumo PRO e os bens do BIMG, enquadra
+cada material novo numa família e **mescla**: atualiza descrição, saldo e parque, e preserva tudo
+o que foi digitado (família corrigida, taxas, ata, fases). Itens que deixarem de existir no CPELOG
+ficam no fim da aba com a marca `Não encontrado no CPELOG`. Leva cerca de 30 segundos.
+
+O login e a senha ficam nas **Propriedades do script** (menu `Configurar acesso ao CPELOG`),
+nunca no código ou na planilha. Quem tiver permissão de edição no projeto Apps Script pode
+vê-los, então mantenha o projeto restrito.
+
+### Cuidados na taxa por base
+
+A base `VIATURA` multiplica pela frota inteira. Para itens que só servem a parte da frota
+(pneu de uma medida, filtro de um modelo), use `HISTORICO` ou ajuste a taxa para a frota toda.
 
 ## Instalação
 
-1. Crie uma planilha nova no Google Drive.
+1. Crie uma planilha nova no Google Drive (conta institucional, se houver).
 2. Menu **Extensões → Apps Script**. Apague o conteúdo do `Código.gs` padrão.
-3. Crie os arquivos `Calculo.gs`, `Configuracao.gs`, `Codigo.gs` (tipo *Script*) e `Painel.html`
-   (tipo *HTML*) e cole o conteúdo de cada um desta pasta.
-4. Em **Configurações do projeto**, marque *Mostrar arquivo de manifesto* e substitua o
-   `appsscript.json` pelo desta pasta.
-5. Salve, volte à planilha e recarregue a página. Aparece o menu **Estoque mínimo**.
-6. **Estoque mínimo → 1. Configurar planilha** (autorize na primeira vez) e depois **2. Recalcular**.
-7. Painel web: no Apps Script, **Implantar → Nova implantação → App da Web**. O manifesto vem com
-   acesso `MYSELF` (só você). Para liberar ao P4, troque para *Qualquer pessoa da organização*
-   apenas se a conta for institucional, porque os dados incluem material controlado.
+3. Crie os arquivos de script `Calculo`, `Classificacao`, `Configuracao`, `Importacao`, `Codigo`
+   e o arquivo HTML `Painel`, e cole o conteúdo dos arquivos desta pasta.
+4. Em **Configurações do projeto**, marque *Mostrar arquivo de manifesto "appsscript.json"* e
+   substitua o conteúdo pelo desta pasta.
+5. Salve, volte à planilha e recarregue. Aparece o menu **Estoque mínimo**:
+   1. *Configurar planilha* (autorize na primeira vez);
+   2. *Configurar acesso ao CPELOG* (número de polícia e senha);
+   3. *Importar do CPELOG*;
+   4. preencha o efetivo em `UNIDADES` e as taxas dos itens principais em `ITENS`;
+   5. *Recalcular*.
+6. Painel web: **Implantar → Nova implantação → App da Web**. O manifesto vem com acesso `MYSELF`
+   (só você). Libere para a organização apenas em conta institucional: os dados incluem material controlado.
 
 Alternativa com [clasp](https://github.com/google/clasp): `clasp create --type sheets` nesta pasta e `clasp push`.
 
@@ -84,4 +113,6 @@ O motor de cálculo não depende do Google e pode ser testado localmente:
 
 ```bash
 node apps-script/estoque-minimo/teste/calculo.test.js
+# ponta a ponta contra o CPELOG (somente leitura):
+U=<numero> P=<senha> node apps-script/estoque-minimo/teste/importacao.e2e.js apps-script/estoque-minimo
 ```

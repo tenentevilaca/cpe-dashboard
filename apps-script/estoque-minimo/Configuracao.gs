@@ -10,12 +10,15 @@ var ABAS = {
     'CTL Controle institucional (1-5)', 'VAR Variabilidade da demanda (1-5)', 'TR Duração da reposição (1-5)', 'TRV Incerteza da reposição (1-5)',
     'Tempo de compra padrão (dias)', 'Base de consumo padrão', 'Taxa de indisponibilidade anual (permanentes)',
     'Nota (calculada)', 'Classe (calculada)'],
-  UNIDADES: ['Código', 'Unidade', 'Policiais (efetivo)', 'Viaturas', 'Considerar no cálculo (S/N)'],
-  ITENS: ['Código', 'Descrição', 'Família', 'Unidade de medida', 'Base de consumo (POLICIAL/VIATURA/UNIDADE/HISTORICO)',
-    'Taxa por base por mês', 'Consumo histórico mensal', 'Desvio padrão do consumo mensal', 'Saldo em estoque',
-    'Em trânsito / empenhado', 'Ata de registro de preços vigente (S/N)', 'Prazo de entrega da ata (dias)',
-    'Tempo de compra específico (dias)', 'Dias de distribuição até a ponta', 'Parque instalado (permanentes)',
-    'Taxa de indisponibilidade anual (permanentes)'],
+  UNIDADES: ['Código (UEOp)', 'Unidade', 'Policiais (efetivo)', 'Viaturas', 'Frações (sedes)', 'Considerar no cálculo (S/N)'],
+  ITENS: ['Código', 'Descrição', 'Tipo', 'Família', 'Grupo no painel CPELOG', 'Unidade de medida',
+    'Base de consumo (POLICIAL/VIATURA/UNIDADE/HISTORICO)', 'Taxa por base por mês', 'Consumo histórico mensal',
+    'Desvio padrão do consumo mensal', 'Saldo em estoque (permanentes: estocado)', 'Em trânsito / empenhado',
+    'Parque instalado (permanentes)', 'Taxa de indisponibilidade anual (permanentes)',
+    'Ata de registro de preços vigente (S/N)', 'Prazo de entrega da ata (dias)',
+    'Fase interna: demanda até abertura do processo (dias)', 'Licitação: abertura até homologação (dias)',
+    'Contratação: homologação até empenho (dias)', 'Entrega do fornecedor (dias)', 'Distribuição até a ponta (dias)',
+    'Atualizado do CPELOG em'],
   PROCESSOS: ['Nº do processo', 'Código do item', 'Família', 'Data da demanda', 'Data de abertura do processo',
     'Data da homologação', 'Data do empenho', 'Data de entrega no almoxarifado',
     'Fase interna (dias)', 'Licitação (dias)', 'Contratação (dias)', 'Entrega (dias)', 'Total (dias)'],
@@ -170,17 +173,32 @@ var FAMILIAS_PADRAO = [
   ["P37", "Equipamentos administrativos", "PERMANENTE", "Fragmentadoras, guilhotinas, encadernadoras, rotuladores, protocoladoras", 1, 1, 1, 1, "", 2, 2, 180, "", 0.05],
   ["P38", "Mobiliário e alojamento", "PERMANENTE", "Armários, mesas, cadeiras, arquivos, estantes, camas, roupeiros", 1, 1, 1, 1, "", 3, 2, 240, "", 0.02],
   ["P39", "Acervo, arte e cerimonial", "PERMANENTE", "Relógios, objetos religiosos, acervo bibliográfico, manequins", 1, 1, 1, 1, "", 2, 2, 180, "", 0.02],
+  ["C99", "A revisar (consumo)", "CONSUMO", "Não enquadrados pelas regras: reclassificar na aba ITENS", 3, 3, 3, 3, 3, 3, 3, 180, "HISTORICO", ""],
+  ["P99", "A revisar (permanente)", "PERMANENTE", "Não enquadrados pelas regras: reclassificar na aba ITENS", 3, 3, 3, 3, "", 3, 3, 240, "", 0.05],
 ];
+
+/** Índices (base 0) das colunas da aba ITENS. */
+var COL = { CODIGO: 0, DESCRICAO: 1, TIPO: 2, FAMILIA: 3, GRUPO: 4, UNIDADE_MEDIDA: 5, BASE: 6, TAXA: 7, HIST: 8, DESVIO: 9,
+  SALDO: 10, TRANSITO: 11, PARQUE: 12, INDISP: 13, ATA: 14, PRAZO_ATA: 15, FASE_INTERNA: 16, LICITACAO: 17,
+  CONTRATACAO: 18, ENTREGA: 19, DISTRIBUICAO: 20, ATUALIZADO: 21 };
+
+/** Colunas que o sistema preenche com valor padrão (texto cinza) e o usuário pode substituir pelo real. */
+var COLUNAS_PADRAO = [COL.BASE, COL.INDISP, COL.FASE_INTERNA, COL.LICITACAO, COL.CONTRATACAO, COL.ENTREGA, COL.DISTRIBUICAO];
+var COR_PADRAO = '#9e9e9e';
+
+/** Como o tempo de compra padrão da família se divide entre as fases (estimativa; o real substitui). */
+var DIVISAO_FASES = { interna: 0.20, licitacao: 0.45, contratacao: 0.10, entrega: 0.25 };
+var DISTRIBUICAO_PADRAO_DIAS = 10;
 
 /** Exemplos fictícios para mostrar o formato esperado. Apague ao carregar os dados reais. */
 var UNIDADES_EXEMPLO = [
-  ['0000001', 'EXEMPLO - 1ª Cia (fictício)', 120, 15, 'S'],
-  ['0000002', 'EXEMPLO - 2ª Cia (fictício)', 80, 10, 'S']
+  ['EXEMPLO-1', 'EXEMPLO - Batalhão A (fictício)', 120, 15, 8, 'S'],
+  ['EXEMPLO-2', 'EXEMPLO - Batalhão B (fictício)', 80, 10, 6, 'S']
 ];
 var ITENS_EXEMPLO = [
-  ['EX-001', 'EXEMPLO - PAPEL TOALHA (fictício)', 'C43', 'pacote', 'POLICIAL', 0.5, 110, 20, 300, 0, 'N', '', '', 7, '', ''],
-  ['EX-002', 'EXEMPLO - PNEU 205/65 R15 (fictício)', 'C13', 'unidade', 'VIATURA', 0.15, '', '', 12, 0, 'S', 30, '', 10, '', ''],
-  ['EX-003', 'EXEMPLO - RÁDIO TRANSCEPTOR (fictício)', 'P07', 'unidade', '', '', '', '', 4, 0, 'N', '', '', 15, 200, '']
+  ['EX-001', 'EXEMPLO - PAPEL TOALHA (fictício)', 'CONSUMO', 'C43', '', 'pacote', 'POLICIAL', 0.5, 110, 20, 300, 0, '', '', 'N', '', '', '', '', '', 7, ''],
+  ['EX-002', 'EXEMPLO - PNEU 205/65 R15 (fictício)', 'CONSUMO', 'C13', '', 'unidade', 'VIATURA', 0.15, '', '', 12, 0, '', '', 'S', 30, '', '', '', '', '', ''],
+  ['EX-003', 'EXEMPLO - RÁDIO TRANSCEPTOR (fictício)', 'PERMANENTE', 'P07', '', 'unidade', '', '', '', '', 4, 0, 200, '', 'N', '', '', '', '', '', '', '']
 ];
 var PROCESSOS_EXEMPLO = [
   ['EX-PROC-1', '', 'C43', '2025-02-03', '2025-03-10', '2025-06-20', '2025-07-01', '2025-07-25'],
