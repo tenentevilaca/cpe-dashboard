@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --tx:#1d2330; --mut:#5d6675; --bd:#dde1e7; --pri:#1f3864;
+          --red:#c0392b; --redbg:#fbe3e0; --amb:#a86400; --ambbg:#fdf0d9; --grn:#1e7b46; --grnbg:#dff2e6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171c; --card:#1d2128; --tx:#e6e9ee; --mut:#9aa3b2; --bd:#2e343e; --pri:#8fb0e8;
+            --red:#ff8a7a; --redbg:#3a2220; --amb:#f0b75e; --ambbg:#3a2e1a; --grn:#6fd39b; --grnbg:#1a3326; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--tx); font:14px/1.4 Arial, sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; color:var(--pri); }
+  .mut { color:var(--mut); font-size:12px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
+  .kpi { background:var(--card); border:1px solid var(--bd); border-radius:8px; padding:12px; cursor:pointer; }
+  .kpi b { display:block; font-size:26px; }
+  .kpi.on { outline:2px solid var(--pri); }
+  .filtros { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  select, input { padding:6px 8px; border:1px solid var(--bd); border-radius:6px; background:var(--card); color:var(--tx); font:inherit; }
+  .wrap { overflow-x:auto; background:var(--card); border:1px solid var(--bd); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; min-width:900px; }
+  th, td { padding:7px 8px; border-bottom:1px solid var(--bd); text-align:left; vertical-align:top; }
+  th { position:sticky; top:0; background:var(--card); font-size:12px; color:var(--mut); cursor:pointer; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .tag { display:inline-block; padding:2px 6px; border-radius:4px; font-size:12px; white-space:nowrap; }
+  .r { background:var(--redbg); color:var(--red); } .a { background:var(--ambbg); color:var(--amb); } .g { background:var(--grnbg); color:var(--grn); }
+  .just { font-size:12px; color:var(--mut); max-width:420px; }
+  .meses { display:flex; gap:4px; align-items:flex-end; height:90px; margin:6px 0 14px; }
+  .mes { flex:1; text-align:center; font-size:11px; color:var(--mut); }
+  .mes div { background:var(--pri); border-radius:3px 3px 0 0; margin:0 auto 3px; width:70%; min-height:2px; }
+</style>
+</head>
+<body>
+  <h1>Diagnóstico de estoque mínimo</h1>
+  <div class="mut" id="atual">Carregando…</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="mut">Processos de compra a iniciar por mês (próximos 12 meses)</div>
+  <div class="meses" id="meses"></div>
+  <div class="filtros">
+    <select id="fClasse"><option value="">Todas as classes</option><option>Operacional</option><option>Funcional</option><option>Administrativo</option></select>
+    <select id="fFamilia"><option value="">Todas as famílias</option></select>
+    <input id="fBusca" placeholder="Buscar item…">
+  </div>
+  <div class="wrap"><table>
+    <thead><tr>
+      <th data-k="Situação">Situação</th><th data-k="Data limite p/ iniciar compra">Iniciar compra até</th>
+      <th data-k="Descrição">Item</th><th data-k="Classe">Classe</th>
+      <th data-k="Posição (saldo + trânsito)">Posição</th><th data-k="Estoque mínimo / gatilho (ou reserva técnica)">Mínimo</th>
+      <th data-k="Estoque máximo">Máximo</th><th data-k="Qtd sugerida">Qtd sugerida</th><th>Justificativa</th>
+    </tr></thead>
+    <tbody id="corpo"></tbody>
+  </table></div>
+<script>
+var D = { itens: [] }, filtroKpi = null, ordem = { k: 'Data limite p/ iniciar compra', asc: true };
+function diasAte(s) { if (!s || s === 'IMEDIATO') return s === 'IMEDIATO' ? -1 : Infinity; return (new Date(s) - new Date()) / 864e5; }
+var KPIS = [
+  { id: 'iniciar', nome: 'Iniciar compra agora', f: function (x) { return x['Situação'] === 'INICIAR COMPRA'; }, c: 'r' },
+  { id: '90', nome: 'Iniciar em até 90 dias', f: function (x) { var d = diasAte(x['Data limite p/ iniciar compra']); return d >= 0 && d <= 90; }, c: 'a' },
+  { id: 'reserva', nome: 'Reserva técnica insuficiente', f: function (x) { return x['Situação'] === 'RESERVA INSUFICIENTE'; }, c: 'r' },
+  { id: 'excesso', nome: 'Excesso (acima do máximo)', f: function (x) { return x['Situação'] === 'EXCESSO'; }, c: 'a' },
+  { id: 'sem', nome: 'Sem demanda informada', f: function (x) { return x['Situação'] === 'Sem demanda informada'; }, c: '' },
+  { id: 'ok', nome: 'Dentro da faixa', f: function (x) { return x['Situação'] === 'Dentro da faixa'; }, c: 'g' }
+];
+function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function fmt(n) { return n === '' || n === null || n === undefined ? '' : Number(n).toLocaleString('pt-BR'); }
+function tag(s) { var c = s === 'INICIAR COMPRA' || s === 'RESERVA INSUFICIENTE' || s === 'FAMÍLIA INEXISTENTE' ? 'r' : s === 'EXCESSO' ? 'a' : s === 'Dentro da faixa' ? 'g' : ''; return '<span class="tag ' + c + '">' + esc(s) + '</span>'; }
+function render() {
+  var cl = fClasse.value, fa = fFamilia.value, q = fBusca.value.toLowerCase();
+  var base = D.itens.filter(function (x) { return (!cl || x['Classe'] === cl) && (!fa || x['Família'] === fa) && (!q || String(x['Descrição']).toLowerCase().indexOf(q) >= 0 || String(x['Código']).toLowerCase().indexOf(q) >= 0); });
+  kpis.innerHTML = KPIS.map(function (k) { return '<div class="kpi ' + (filtroKpi === k.id ? 'on' : '') + '" data-id="' + k.id + '"><b class="' + k.c + '" style="background:none">' + base.filter(k.f).length + '</b>' + k.nome + '</div>'; }).join('');
+  var hoje = new Date(), cont = [];
+  for (var i = 0; i < 12; i++) { var m = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1); cont.push({ m: m, n: 0 }); }
+  base.forEach(function (x) { var s = x['Data limite p/ iniciar compra']; var d = s === 'IMEDIATO' ? hoje : s ? new Date(s) : null; if (!d) return; var idx = (d.getFullYear() - hoje.getFullYear()) * 12 + d.getMonth() - hoje.getMonth(); if (idx >= 0 && idx < 12) cont[idx].n++; });
+  var mx = Math.max.apply(null, cont.map(function (c) { return c.n; }).concat([1]));
+  meses.innerHTML = cont.map(function (c) { return '<div class="mes"><div style="height:' + (c.n / mx * 60) + 'px" title="' + c.n + '"></div>' + c.m.toLocaleDateString('pt-BR', { month: 'short' }) + '<br>' + c.n + '</div>'; }).join('');
+  var k = KPIS.filter(function (k) { return k.id === filtroKpi; })[0];
+  var lista = k ? base.filter(k.f) : base;
+  lista.sort(function (a, b) {
+    var va = a[ordem.k], vb = b[ordem.k];
+    if (ordem.k === 'Data limite p/ iniciar compra') { va = diasAte(va); vb = diasAte(vb); }
+    return (va > vb ? 1 : va < vb ? -1 : 0) * (ordem.asc ? 1 : -1);
+  });
+  corpo.innerHTML = lista.slice(0, 500).map(function (x) {
+    var dl = x['Data limite p/ iniciar compra'];
+    return '<tr><td>' + tag(x['Situação']) + '</td><td>' + esc(dl === 'IMEDIATO' ? 'IMEDIATO' : dl ? new Date(dl + 'T12:00').toLocaleDateString('pt-BR') : '') + '</td>' +
+      '<td><b>' + esc(x['Código']) + '</b> ' + esc(x['Descrição']) + '<div class="mut">' + esc(x['Família']) + ' · ' + esc(D.familias[x['Família']] || '') + '</div></td>' +
+      '<td>' + esc(x['Classe']) + '</td><td class="n">' + fmt(x['Posição (saldo + trânsito)']) + '</td><td class="n">' + fmt(x['Estoque mínimo / gatilho (ou reserva técnica)']) + '</td>' +
+      '<td class="n">' + fmt(x['Estoque máximo']) + '</td><td class="n">' + fmt(x['Qtd sugerida']) + '</td><td class="just">' + esc(x['Justificativa (rastro decisório)']) + '</td></tr>';
+  }).join('') + (lista.length > 500 ? '<tr><td colspan="9" class="mut">Mostrando 500 de ' + lista.length + '. Use os filtros.</td></tr>' : '');
+}
+kpis.onclick = function (e) { var el = e.target.closest('.kpi'); if (!el) return; filtroKpi = filtroKpi === el.dataset.id ? null : el.dataset.id; render(); };
+document.querySelector('thead').onclick = function (e) { var k = e.target.dataset.k; if (!k) return; ordem = { k: k, asc: ordem.k === k ? !ordem.asc : true }; render(); };
+[fClasse, fFamilia].forEach(function (el) { el.onchange = render; }); fBusca.oninput = render;
+google.script.run.withSuccessHandler(function (d) {
+  D = d;
+  atual.textContent = d.atualizado ? 'Último cálculo: ' + new Date(d.atualizado).toLocaleString('pt-BR') + ' · ' + d.itens.length + ' itens' : 'Ainda não calculado: use o menu Estoque mínimo > Recalcular.';
+  Object.keys(d.familias).sort().forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = id + ' - ' + d.familias[id]; fFamilia.appendChild(o); });
+  render();
+}).withFailureHandler(function (e) { atual.textContent = 'Erro: ' + e.message; }).dadosPainel();
+</script>
+</body>
+</html>
