@@ -182,7 +182,12 @@ function calcularItem(item, familia, efetivo, estatProc, p, hoje) {
   }
   var dm = demandaMensal(item, efetivo);
   r.demanda = dm.demanda; r.fonteDemanda = dm.fonte; r.divergencia = dm.divergencia;
-  if (!(dm.demanda > 0)) { r.status = 'Sem demanda informada'; r.justificativa = 'Informar taxa por ' + (item.base || 'base').toLowerCase() + ' ou consumo histórico.'; return r; }
+  if (!(dm.demanda > 0)) {
+    var porBase = { POLICIAL: 'por policial (e o efetivo em Unidades)', VIATURA: 'por viatura', UNIDADE: 'por fração' }[item.base];
+    r.status = 'Sem demanda informada';
+    r.justificativa = 'Falta o consumo: informe ' + (porBase ? 'a taxa ' + porBase + ' ou ' : '') + 'o consumo histórico mensal na aba Itens.';
+    return r;
+  }
   var nv = niveisConsumo(dm.demanda, lt, crit.classe, item, notas.VAR, p);
   var posicao = (Number(item.saldo) || 0) + (Number(item.emTransito) || 0);
   var st = situacao(posicao, dm.demanda, nv, hoje);
