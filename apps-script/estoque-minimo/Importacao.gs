@@ -43,6 +43,15 @@ function tokenCpelog_(forcar) {
   return tok;
 }
 
+/** Guarda nome e posto do usuário (para o cabeçalho e a marca-d'água do painel). */
+function guardarPerfil_() {
+  try {
+    var u = PropertiesService.getScriptProperties().getProperty('CPELOG_USUARIO');
+    var p = lerTabela_('profiles', 'select=nome,posto_graduacao&numero_policia=eq.' + encodeURIComponent(u));
+    if (p.length) PropertiesService.getScriptProperties().setProperty('CPELOG_NOME', [p[0].posto_graduacao, p[0].nome].filter(Boolean).join(' '));
+  } catch (e) { /* opcional */ }
+}
+
 /** Lê uma tabela inteira, em páginas buscadas em paralelo. */
 function lerTabela_(tabela, consulta) {
   var h = { apikey: CPELOG.chavePublica, Authorization: 'Bearer ' + tokenCpelog_() };
@@ -102,6 +111,7 @@ function lerCatalogoCpelog_() {
 function importarCpelog() {
   var ss = planilha_();
   var dados = lerCatalogoCpelog_(), agora = new Date();
+  guardarPerfil_();
 
   var sh = ss.getSheetByName('ITENS'), nc = ABAS.ITENS.length;
   var existentes = {}, ordem = [];

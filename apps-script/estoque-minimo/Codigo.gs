@@ -223,6 +223,7 @@ function estadoWeb() {
   return {
     acesso: !!(props.getProperty('CPELOG_USUARIO') && props.getProperty('CPELOG_SENHA')),
     usuario: props.getProperty('CPELOG_USUARIO') || '',
+    nome: props.getProperty('CPELOG_NOME') || '',
     planilha: ss.getUrl(),
     ultimoImport: props.getProperty('ULTIMO_IMPORT'),
     ultimoCalculo: props.getProperty('ULTIMO_CALCULO'),
@@ -236,6 +237,7 @@ function salvarAcesso(usuario, senha) {
   props.setProperty('CPELOG_USUARIO', String(usuario || '').replace(/\D/g, ''));
   props.setProperty('CPELOG_SENHA', String(senha || ''));
   try { tokenCpelog_(true); } catch (e) { props.deleteProperty('CPELOG_SENHA'); throw e; }
+  guardarPerfil_();
   return estadoWeb();
 }
 

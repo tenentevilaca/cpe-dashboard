@@ -3,239 +3,346 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  :root { --bg:#f4f6f9; --card:#fff; --tx:#1d2330; --mut:#5f6878; --fraco:#8a93a3; --bd:#e1e5eb; --pri:#1f3864; --pri2:#e8eef8;
-          --red:#b3261e; --redbg:#fbe4e1; --amb:#8a5300; --ambbg:#fdf0d6; --grn:#1b6e3f; --grnbg:#dcf1e4; --cin:#59616e; --cinbg:#eceff3;
-          --op:#b3261e; --fu:#8a5300; --ad:#1b6e3f; --edit:#fffdf3; --pad:#9aa1ad; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#13161b; --card:#1c2027; --tx:#e7eaef; --mut:#a1a9b7; --fraco:#7c8492; --bd:#2d333d; --pri:#9bb8ec; --pri2:#232c3b;
-            --red:#ff8f80; --redbg:#3b2421; --amb:#f2bb63; --ambbg:#3a2f1b; --grn:#74d6a0; --grnbg:#1b3427; --cin:#b3bac6; --cinbg:#2a2f37;
-            --op:#ff8f80; --fu:#f2bb63; --ad:#74d6a0; --edit:#25231a; --pad:#7c8492; }
-  }
+  :root { --preto:#0f0f10; --preto2:#1b1b1d; --dourado:#A08F63; --dourado2:#D9C68F; --ouro-txt:#9a7d2e; --bg:#EFEBE0; --card:#fff; --soft:#F6F3EA; --tx:#2b2a28; --mut:#6d6a63; --fraco:#9b978d; --bd:#E2DCCB;
+          --red:#a3201b; --redbg:#f8e1df; --amb:#9a6200; --ambbg:#f8ecd3; --grn:#2f6b3c; --grnbg:#e1efe2; --cin:#5b5f66; --cinbg:#ecebe6; --edit:#fffdf3; --pad:#a09f9a;
+          --sombra:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.05); }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--tx); font:14px/1.45 Arial, sans-serif; }
-  header { background:var(--card); border-bottom:1px solid var(--bd); padding:14px 20px 0; }
-  .topo { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; justify-content:space-between; }
-  h1 { font-size:20px; margin:0; color:var(--pri); }
-  h2 { font-size:15px; margin:0 0 4px; }
-  main { padding:18px 20px 80px; max-width:1500px; }
-  .mut { color:var(--mut); font-size:12px; }
-  .acoes { display:flex; gap:8px; align-items:center; }
-  button, .bt { padding:8px 14px; border:1px solid var(--pri); background:var(--pri); color:#fff; border-radius:6px; cursor:pointer; font:inherit; text-decoration:none; }
-  .sec { background:transparent; color:var(--pri); }
-  button:disabled { opacity:.5; cursor:wait; }
-  a { color:var(--pri); }
-  .abas { display:flex; flex-wrap:wrap; gap:2px; margin-top:12px; }
-  .aba { padding:9px 14px; cursor:pointer; color:var(--mut); border-bottom:3px solid transparent; }
-  .aba.on { color:var(--pri); font-weight:bold; border-bottom-color:var(--pri); }
-  .bloco { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:16px; margin-bottom:16px; }
-  .grade { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
-  .passo { border:1px solid var(--bd); border-radius:8px; padding:12px; }
-  .passo b { font-size:20px; }
-  .prog { height:6px; background:var(--cinbg); border-radius:3px; margin:8px 0; overflow:hidden; }
-  .prog i { display:block; height:100%; background:var(--grn); }
-  .passo.falta .prog i { background:var(--amb); }
-  .kpis { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); }
-  .kpi { border:1px solid var(--bd); border-radius:8px; padding:10px 12px; cursor:pointer; background:var(--card); }
-  .kpi b { display:block; font-size:24px; }
-  .kpi.on { outline:2px solid var(--pri); }
-  .kpi.zero { opacity:.55; }
-  .filtros { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:12px 0; }
-  select, input { padding:7px 9px; border:1px solid var(--bd); border-radius:6px; background:var(--card); color:var(--tx); font:inherit; }
-  .wrap { overflow:auto; max-height:68vh; border:1px solid var(--bd); border-radius:8px; background:var(--card); }
+  body { margin:0; background:var(--bg); color:var(--tx); font:14px/1.45 Inter, Arial, sans-serif; }
+  .layout { display:flex; min-height:100vh; }
+  aside { width:250px; flex-shrink:0; background:var(--preto); color:#fff; position:sticky; top:0; height:100vh; overflow:auto; padding:10px 8px; }
+  .grupo-nav { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--dourado2); padding:14px 12px 6px; font-weight:700; }
+  .item-nav { display:flex; align-items:center; gap:12px; padding:11px 12px; margin:2px 0; cursor:pointer; color:#eee; border-radius:8px; font-size:15px; }
+  .item-nav:hover { background:rgba(255,255,255,.07); }
+  .item-nav.on { background:var(--dourado2); color:var(--preto); font-weight:700; }
+  .item-nav .ic { width:24px; text-align:center; font-size:18px; }
+  .item-nav .cont { margin-left:auto; font-size:11px; background:rgba(255,255,255,.14); padding:1px 8px; border-radius:9px; font-weight:600; }
+  .item-nav.on .cont { background:rgba(0,0,0,.12); }
+  .item-nav .cont.r { background:#a3201b; color:#fff; } .item-nav .cont.a { background:#9a6200; color:#fff; }
+  .conteudo { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .topo { background:var(--preto); color:#fff; padding:18px 28px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+  .topo .id { display:flex; align-items:center; gap:18px; }
+  .topo img { width:72px; height:72px; object-fit:contain; }
+  .topo .sup { font-size:12px; color:var(--dourado2); font-weight:700; letter-spacing:.6px; text-transform:uppercase; }
+  .topo h1 { font-size:28px; margin:2px 0 0; font-weight:700; }
+  .topo .dir { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .usuario { border:1px solid var(--dourado); border-radius:8px; padding:8px 16px; font-size:15px; color:var(--dourado2); text-transform:uppercase; }
+  .bt-ouro { background:transparent; border:1px solid var(--dourado); color:var(--dourado2); border-radius:8px; padding:6px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  .bt-ouro:hover { background:rgba(160,143,99,.18); }
+  .sinc { font-size:12px; color:#bdb8aa; }
+  .faixa { background:var(--dourado); color:#fff; text-align:center; font-weight:600; padding:8px 12px; }
+  main { padding:18px 28px 90px; }
+  .filtrobar { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:12px 18px; display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; box-shadow:var(--sombra); margin-bottom:18px; }
+  .fg { display:flex; flex-direction:column; gap:4px; } .fg label { font-size:12px; font-weight:700; color:var(--mut); text-transform:uppercase; letter-spacing:.5px; }
+  select, input { padding:8px 10px; border:1px solid var(--bd); border-radius:6px; background:#fff; color:var(--tx); font:inherit; }
+  .bt { padding:8px 14px; border:1px solid var(--bd); background:#fff; color:var(--tx); border-radius:6px; cursor:pointer; font:inherit; font-weight:600; }
+  .bt.pri { background:var(--dourado); border-color:var(--dourado); color:#fff; }
+  .bt:disabled, .bt-ouro:disabled { opacity:.5; cursor:wait; }
+  .ativos { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-left:auto; font-size:12px; color:var(--mut); }
+  .tagf { background:var(--soft); border:1px solid var(--bd); border-radius:12px; padding:3px 10px; cursor:pointer; color:var(--tx); }
+  .tagf:hover { border-color:var(--red); }
+  .titulo { display:flex; align-items:baseline; gap:12px; margin:6px 0 4px; flex-wrap:wrap; }
+  .titulo h2 { font-size:19px; font-weight:800; letter-spacing:.3px; text-transform:uppercase; margin:0; }
+  .titulo span { color:var(--ouro-txt); font-size:14px; }
+  .dica { color:var(--mut); margin:0 0 14px; }
+  .secao { margin-bottom:22px; } .secao > h3 { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); margin:0 0 10px; }
+  .cards { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(178px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:16px 18px; box-shadow:var(--sombra); position:relative; }
+  .card.clic { cursor:pointer; } .card.clic:hover { border-color:var(--dourado); box-shadow:0 6px 18px rgba(0,0,0,.08); }
+  .card .seta { position:absolute; top:14px; right:16px; color:var(--fraco); font-size:16px; }
+  .card .rot { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; padding-right:16px; }
+  .card .val { font-size:32px; font-weight:800; margin:8px 0 4px; font-variant-numeric:tabular-nums; }
+  .card .det { font-size:13px; color:var(--ouro-txt); }
+  .card.r .val { color:var(--red); } .card.a .val { color:var(--amb); } .card.g .val { color:var(--grn); }
+  .card.zero { opacity:.6; }
+  .prog { height:6px; background:var(--soft); border-radius:3px; margin:8px 0 0; overflow:hidden; } .prog i { display:block; height:100%; background:var(--dourado); }
+  .graficos { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); }
+  .grafico { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:14px 16px; box-shadow:var(--sombra); }
+  .grafico .rot { font-size:13px; font-weight:800; text-transform:uppercase; } .grafico .det { font-size:12px; color:var(--mut); margin-bottom:8px; }
+  .grafico .tela { position:relative; height:260px; }
+  .chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .c-Operacional, .s-r { background:var(--redbg); color:var(--red); } .c-Funcional, .s-a { background:var(--ambbg); color:var(--amb); } .c-Administrativo, .s-g { background:var(--grnbg); color:var(--grn); } .s-c { background:var(--cinbg); color:var(--cin); }
+  .wrap { overflow:auto; max-height:70vh; border:1px solid var(--bd); border-radius:10px; background:var(--card); box-shadow:var(--sombra); }
   table { border-collapse:collapse; width:100%; }
-  th, td { padding:8px 9px; border-bottom:1px solid var(--bd); text-align:left; vertical-align:middle; }
-  th { position:sticky; top:0; z-index:2; background:var(--card); font-size:11px; font-weight:bold; color:var(--mut); text-transform:uppercase; letter-spacing:.02em; }
-  thead tr.grupo th { top:0; text-align:center; border-bottom:none; color:var(--pri); }
-  thead tr.grupo + tr th { top:29px; }
-  tr.clic { cursor:pointer; } tr.clic:hover td { background:var(--pri2); }
-  tr.sel td { background:var(--pri2); }
+  th, td { padding:9px 10px; border-bottom:1px solid var(--bd); text-align:left; vertical-align:middle; }
+  th { position:sticky; top:0; z-index:2; background:var(--soft); font-size:11px; font-weight:800; color:var(--mut); text-transform:uppercase; letter-spacing:.4px; }
+  thead tr.grupo th { text-align:center; color:var(--ouro-txt); border-bottom:none; }
+  thead tr.grupo + tr th { top:31px; }
+  tr.clic { cursor:pointer; } tr.clic:hover td { background:var(--soft); }
   td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .nome { font-weight:bold; }
-  .cod { color:var(--fraco); font-size:12px; }
-  .sub { color:var(--mut); font-size:12px; }
-  .chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; white-space:nowrap; font-weight:bold; }
-  .c-Operacional { background:var(--redbg); color:var(--op); } .c-Funcional { background:var(--ambbg); color:var(--fu); } .c-Administrativo { background:var(--grnbg); color:var(--ad); }
-  .s-r { background:var(--redbg); color:var(--red); } .s-a { background:var(--ambbg); color:var(--amb); } .s-g { background:var(--grnbg); color:var(--grn); } .s-c { background:var(--cinbg); color:var(--cin); }
-  .num-r { color:var(--red); font-weight:bold; } .num-a { color:var(--amb); font-weight:bold; }
-  details summary { cursor:pointer; color:var(--pri); font-size:12px; }
-  details p { margin:6px 0 0; font-size:12px; color:var(--mut); max-width:520px; }
+  .nome { font-weight:700; } .sub { color:var(--mut); font-size:12px; }
+  .num-r { color:var(--red); font-weight:800; } .num-a { color:var(--amb); font-weight:800; }
+  details summary { cursor:pointer; color:var(--ouro-txt); font-size:12px; font-weight:700; }
+  details p { margin:6px 0 0; font-size:12px; color:var(--mut); max-width:480px; }
   td input, td select { width:100%; min-width:70px; padding:5px 6px; font-size:13px; background:var(--edit); }
   td select { min-width:112px; }
   td input.padrao, td select.padrao { color:var(--pad); font-style:italic; background:transparent; }
   td input.mudou, td select.mudou { outline:2px solid var(--amb); }
-  .fixa { position:sticky; left:0; z-index:1; background:var(--card); min-width:240px; max-width:300px; }
-  th.fixa { z-index:3; }
-  .barra { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--bd); padding:10px 20px; display:none; gap:12px; align-items:center; z-index:5; }
+  .fixa { position:sticky; left:0; z-index:1; background:var(--card); min-width:230px; max-width:290px; } th.fixa { z-index:3; background:var(--soft); }
+  .pag { display:flex; gap:8px; align-items:center; margin-top:8px; color:var(--mut); font-size:12px; }
+  .fundo { position:fixed; inset:0; background:rgba(10,10,12,.55); z-index:40; display:none; align-items:flex-start; justify-content:center; padding:4vh 2vw; }
+  .fundo.on { display:flex; }
+  .janela { background:var(--bg); width:min(1300px,96vw); max-height:92vh; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; border-top:5px solid var(--dourado); }
+  .janela header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 20px; background:var(--card); border-bottom:1px solid var(--bd); }
+  .janela h2 { margin:0; font-size:18px; }
+  .janela .corpo { padding:14px 20px; overflow:auto; }
+  .janela .wrap { max-height:62vh; }
+  .ajuda h3 { margin:18px 0 6px; font-size:15px; color:var(--ouro-txt); text-transform:uppercase; letter-spacing:.4px; }
+  .ajuda p, .ajuda li { color:var(--tx); max-width:900px; } .ajuda li { margin:4px 0; }
+  .ajuda dl { display:grid; grid-template-columns:220px 1fr; gap:6px 16px; max-width:950px; } .ajuda dt { font-weight:700; } .ajuda dd { margin:0; }
+  .barra { position:fixed; left:250px; right:0; bottom:0; background:var(--card); border-top:3px solid var(--dourado); padding:10px 24px; display:none; gap:12px; align-items:center; z-index:30; }
   .barra.on { display:flex; }
-  .card { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:18px; max-width:440px; }
-  .card input { width:100%; margin:4px 0 12px; }
-  .aviso { background:var(--ambbg); color:var(--amb); border-radius:8px; padding:10px 12px; margin-bottom:12px; }
-  .erro { background:var(--redbg); color:var(--red); border-radius:8px; padding:10px 12px; margin-bottom:12px; }
+  .login { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:22px; max-width:460px; box-shadow:var(--sombra); }
+  .login input { width:100%; margin:4px 0 12px; }
+  .aviso { background:var(--ambbg); color:var(--amb); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-weight:600; }
+  .erro { background:var(--redbg); color:var(--red); border-radius:8px; padding:10px 12px; margin-bottom:14px; }
+  .marca { position:fixed; inset:0; pointer-events:none; z-index:35; background-repeat:repeat; opacity:.9; }
   .oculto { display:none !important; }
-  .pag { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  @media (max-width:900px) { .layout { flex-direction:column; } aside { width:auto; height:auto; position:static; } .barra { left:0; } main, .topo { padding:14px; } .graficos { grid-template-columns:1fr; } .ajuda dl { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
-<header>
-  <div class="topo">
-    <div><h1>Estoque mínimo e lógica de compra</h1><div class="mut" id="estado">Carregando…</div></div>
-    <div class="acoes"><a id="lkPlanilha" class="bt sec oculto" target="_blank">Planilha de dados</a><button id="btAtualizar" class="oculto">Atualizar do CPELOG</button></div>
-  </div>
-  <nav class="abas" id="abas"></nav>
-</header>
-
-<main>
-  <div id="msg"></div>
-
-  <div id="login" class="card oculto">
-    <h2>Acesso ao CPELOG</h2>
-    <p class="mut">O sistema lê os dados do inventário (inventario.cpelog.com.br) com o seu login. A senha fica guardada só nas propriedades deste script.</p>
-    <label>Número de polícia<input id="lgUsuario" autocomplete="username"></label>
-    <label>Senha<input id="lgSenha" type="password" autocomplete="current-password"></label>
-    <button id="btLogin">Entrar e importar</button>
-  </div>
-
-  <div id="app" class="oculto">
-
-    <section data-aba="diag">
-      <div class="bloco">
-        <h2>1. O que falta preencher</h2>
-        <div class="mut" style="margin-bottom:10px">O cálculo de estoque mínimo e da data de compra só sai para itens com consumo. Os prazos funcionam com o padrão do sistema, mas ficam mais precisos com o dado real.</div>
-        <div class="grade" id="passos"></div>
+<div class="marca" id="marca"></div>
+<div class="layout">
+  <aside id="nav"></aside>
+  <div class="conteudo">
+    <div class="topo">
+      <div class="id"><img src="data:image/jpeg;base64,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" alt="PMMG"><div><div class="sup">Estado-Maior do CPE | Estoque e compras</div><h1>Estoque Mínimo CPE</h1></div></div>
+      <div class="dir">
+        <div class="usuario" id="usuario">—</div>
+        <div style="display:flex;gap:8px"><button class="bt-ouro" id="btAjuda">? Como usar o painel</button><button class="bt-ouro oculto" id="btAtualizar">⟳ Atualizar do CPELOG</button></div>
+        <div class="sinc" id="sinc"></div>
       </div>
-
-      <div class="bloco">
-        <h2>2. Situação dos itens</h2>
-        <div class="mut" style="margin-bottom:10px">Clique num quadro para filtrar a lista abaixo.</div>
-        <div class="kpis" id="kpis"></div>
+    </div>
+    <div class="faixa" id="faixa">Carregando…</div>
+    <main>
+      <div id="msg"></div>
+      <div id="login" class="login oculto">
+        <h2 style="margin-top:0">Acesso ao CPELOG</h2>
+        <p class="sub">O painel lê os dados do inventário (inventario.cpelog.com.br) com o seu login. Somente leitura: nada é alterado no CPELOG. A senha fica guardada nas propriedades deste script.</p>
+        <label>Número de polícia<input id="lgUsuario" autocomplete="username"></label>
+        <label>Senha<input id="lgSenha" type="password" autocomplete="current-password"></label>
+        <button class="bt pri" id="btLogin">Entrar e importar</button>
       </div>
-
-      <div class="bloco">
-        <h2>3. Por família de criticidade</h2>
-        <div class="mut">Clique numa família para ver os itens dela.</div>
-        <div class="filtros">
-          <select id="fClasse"><option value="">Todas as classes</option><option>Operacional</option><option>Funcional</option><option>Administrativo</option></select>
-          <select id="fTipo"><option value="">Consumo e permanentes</option><option value="CONSUMO">Consumo</option><option value="PERMANENTE">Permanentes</option></select>
+      <div id="corpoApp" class="oculto">
+        <div class="filtrobar" id="filtrobar">
+          <div class="fg"><label>Classe</label><select id="fClasse"><option value="">Todas</option><option>Operacional</option><option>Funcional</option><option>Administrativo</option></select></div>
+          <div class="fg"><label>Tipo</label><select id="fTipo"><option value="">Todos</option><option value="CONSUMO">Consumo</option><option value="PERMANENTE">Permanentes</option></select></div>
+          <div class="fg"><label>Família</label><select id="fFam" style="max-width:300px"><option value="">Todas</option></select></div>
+          <div class="fg"><label>Situação</label><select id="fSit"><option value="">Todas</option></select></div>
+          <button class="bt" id="btLimpar">Limpar filtros</button>
+          <div class="ativos" id="ativos"></div>
         </div>
-        <div class="wrap" style="max-height:46vh"><table id="tFam"></table></div>
+        <div id="pagina"></div>
       </div>
-
-      <div class="bloco" id="blItens">
-        <h2 id="tituloItens">4. Itens</h2>
-        <div class="filtros">
-          <input id="fBusca" placeholder="Buscar item ou código…" style="min-width:260px">
-          <button class="sec" id="btLimpar">Limpar filtros</button>
-        </div>
-        <div class="wrap"><table id="tItensDiag"></table></div>
-        <div class="pag mut" id="pagDiag"></div>
-      </div>
-    </section>
-
-    <section data-aba="itens">
-      <div class="bloco">
-        <h2>Dados de cada item</h2>
-        <div class="mut">Preencha o consumo (taxa ou histórico) e, quando souber, os prazos reais. <span style="color:var(--pad);font-style:italic">Cinza = padrão do sistema</span>; o que você digitar fica preto e passa a valer.</div>
-        <div class="filtros">
-          <select id="iFamilia" class="selFam"><option value="">Todas as famílias</option></select>
-          <select id="iTipo"><option value="">Consumo e permanentes</option><option value="CONSUMO">Consumo</option><option value="PERMANENTE">Permanentes</option></select>
-          <select id="iFalta"><option value="">Todos</option><option value="consumo">Só itens sem consumo</option><option value="prazo">Só prazos no padrão</option></select>
-          <input id="iBusca" placeholder="Buscar item ou código…" style="min-width:240px">
-        </div>
-        <div class="wrap"><table id="tItens"></table></div>
-        <div class="pag mut" id="pagItens"></div>
-      </div>
-    </section>
-
-    <section data-aba="familias">
-      <div class="bloco">
-        <h2>Famílias e notas dos critérios</h2>
-        <div class="mut">Notas de 1 (baixo) a 5 (alto). A nota final (0-100) e a classe usam os pesos da aba Pesos e parâmetros. Tempo de compra padrão = dias da demanda até a entrega, sem a distribuição.</div>
-        <div class="wrap" style="margin-top:12px"><table id="tFamilias"></table></div>
-      </div>
-    </section>
-
-    <section data-aba="parametros">
-      <div class="bloco"><h2>Pesos e parâmetros</h2><div class="mut">Pesos de 0 a 10 para cada critério, limites de nota das classes e parâmetros do cálculo.</div>
-        <div class="wrap" style="margin-top:12px"><table id="tParametros"></table></div></div>
-    </section>
-
-    <section data-aba="unidades">
-      <div class="bloco"><h2>Unidades e efetivo</h2><div class="mut">Viaturas e frações vêm do CPELOG. O <b>efetivo (nº de policiais)</b> precisa ser informado: ele multiplica a taxa dos itens com base "por policial".</div>
-        <div class="wrap" style="margin-top:12px"><table id="tUnidades"></table></div></div>
-    </section>
-
-    <section data-aba="processos">
-      <div class="bloco"><h2>Processos de compra</h2><div class="mut">Com as datas de processos reais, o prazo médio da família substitui o padrão do sistema. Para incluir processos, use a <a id="lkProc" target="_blank">planilha de dados</a> (aba PROCESSOS). As linhas EXEMPLO são fictícias.</div>
-        <div class="wrap" style="margin-top:12px"><table id="tProcessos"></table></div></div>
-    </section>
+    </main>
   </div>
-</main>
+</div>
 
-<div class="barra" id="barra"><b id="nAlt"></b><button id="btSalvar">Salvar e recalcular</button><button class="sec" id="btDescartar">Descartar</button></div>
+<div class="fundo" id="fundo"><div class="janela">
+  <header><div><h2 id="jTitulo"></h2><div class="sub" id="jSub"></div></div><button class="bt" id="jFechar">Fechar ✕</button></header>
+  <div class="corpo">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><input id="jBusca" placeholder="Buscar material ou código…" style="min-width:280px"><span class="sub">Clique em "ver" para entender o cálculo de cada material.</span></div>
+    <div class="wrap"><table id="jTabela"></table></div><div class="pag" id="jPag"></div>
+  </div>
+</div></div>
+
+<div class="fundo" id="fundoAjuda"><div class="janela">
+  <header><h2>Como usar o painel</h2><button class="bt" id="ajFechar">Fechar ✕</button></header>
+  <div class="corpo ajuda">
+    <p><b>Para que serve.</b> O painel lê os materiais do CPELOG e calcula, para cada um, quanto estoque mínimo manter, até quando abrir o processo de compra e quanto comprar, considerando que a compra pública depende de licitação (por isso não existe estoque zero). A lógica segue o documento <i>A lógica da distribuição na PMMG</i>: criticidade, pulmão de proteção, tempo real de reposição e distribuição.</p>
+
+    <h3>1. Cabeçalho</h3>
+    <dl>
+      <dt>Nome e número</dt><dd>Quem está conectado ao CPELOG. O mesmo nome aparece na marca-d'água: os dados incluem material controlado e são de uso restrito.</dd>
+      <dt>? Como usar o painel</dt><dd>Abre esta explicação.</dd>
+      <dt>⟳ Atualizar do CPELOG</dt><dd>Busca de novo o estoque do Consumo PRO e os bens do BIMG e recalcula tudo (cerca de 1 minuto). Só lê o CPELOG. O que você digitou aqui (efetivo, taxas, prazos, notas) é mantido.</dd>
+      <dt>Sincronizado</dt><dd>Data da última importação do CPELOG. A faixa dourada mostra também a data do último cálculo.</dd>
+    </dl>
+
+    <h3>2. Menu à esquerda</h3>
+    <dl>
+      <dt>Visão geral</dt><dd>Indicadores, gráficos e os materiais mais urgentes.</dd>
+      <dt>Por família</dt><dd>Um card por família de criticidade, com quantos materiais estão em cada situação.</dd>
+      <dt>Comprar agora, Próximos 90 dias, Reserva insuficiente, Acima do máximo, Falta consumo</dt><dd>Listas prontas de cada situação. O número ao lado é a quantidade de materiais.</dd>
+      <dt>Dados dos itens</dt><dd>Onde se informa o consumo de cada material e os prazos reais do processo de compra.</dd>
+      <dt>Unidades e efetivo</dt><dd>Número de policiais por UEOp (multiplica a taxa "por policial"). Viaturas e frações vêm do CPELOG.</dd>
+      <dt>Famílias e notas</dt><dd>Notas de 1 a 5 de cada critério por família e os prazos padrão.</dd>
+      <dt>Pesos e parâmetros</dt><dd>Peso de cada critério e os limites que definem a classe.</dd>
+      <dt>Processos de compra</dt><dd>Datas de processos reais; com elas o prazo médio real substitui o padrão.</dd>
+    </dl>
+
+    <h3>3. Filtros (barra branca)</h3>
+    <p>Classe, Tipo, Família e Situação filtram <b>todos</b> os cards, gráficos e listas da tela. Os filtros ativos aparecem à direita como etiquetas: clique numa etiqueta para retirá-la, ou em <b>Limpar filtros</b> para tirar todos.</p>
+
+    <h3>4. Cards (indicadores)</h3>
+    <dl>
+      <dt>Iniciar compra agora</dt><dd>O saldo já chegou ao estoque mínimo: se o processo não começar agora, o material falta antes da entrega.</dd>
+      <dt>Iniciar em até 30 / 90 dias</dt><dd>A data limite para abrir o processo cai nesse período. Serve para planejar o calendário de compras.</dd>
+      <dt>Reserva técnica insuficiente</dt><dd>Bens permanentes: o que está ESTOCADO é menor que a reserva necessária para repor falhas durante o prazo de compra.</dd>
+      <dt>Acima do máximo</dt><dd>Estoque maior que o teto calculado: indica possível compra defensiva ou excesso.</dd>
+      <dt>Dentro da faixa</dt><dd>Entre o mínimo e o máximo.</dd>
+      <dt>Falta consumo</dt><dd>Materiais de consumo sem taxa nem consumo histórico: o sistema ainda não consegue calcular.</dd>
+      <dt>Base de dados</dt><dd>Quanto já foi preenchido (efetivo, consumo, prazos reais, processos). Quanto mais completo, mais preciso o cálculo.</dd>
+    </dl>
+    <p>Clicar em qualquer card abre uma <b>janela com a lista dos materiais</b>, com busca e o "ver" que explica o cálculo de cada um.</p>
+
+    <h3>5. Gráficos (interativos)</h3>
+    <dl>
+      <dt>Situação dos materiais</dt><dd>Quantos materiais há em cada situação. Clique numa fatia para filtrar a tela por ela.</dd>
+      <dt>Situação por classe</dt><dd>As situações dentro de cada classe (Operacional, Funcional, Administrativo). Clique num pedaço da barra para filtrar por classe e situação.</dd>
+      <dt>Compras a iniciar por mês</dt><dd>Quantos processos precisam começar em cada um dos próximos 12 meses. Clique numa coluna para ver só aquele mês.</dd>
+      <dt>Famílias com mais alertas</dt><dd>As famílias com mais materiais para comprar, com reserva insuficiente ou acima do máximo. Clique numa barra para filtrar pela família.</dd>
+      <dt>De onde vem o prazo</dt><dd>Quantos materiais usam prazo padrão do sistema, prazo informado, histórico de processos ou ata. Clique para filtrar.</dd>
+    </dl>
+    <p>Clique de novo no mesmo item do gráfico para desfazer o filtro.</p>
+
+    <h3>6. Como preencher</h3>
+    <ol>
+      <li><b>Unidades e efetivo:</b> informe o número de policiais de cada UEOp.</li>
+      <li><b>Dados dos itens:</b> para cada material de consumo, escolha a <b>base</b> e informe a <b>taxa por mês</b> (ex.: 0,5 pacote por policial por mês) ou o <b>consumo histórico mensal</b>.</li>
+      <li>Prazos: as cinco fases (fase interna, licitação, contratação, entrega, distribuição) vêm com o <span style="color:var(--pad);font-style:italic">padrão do sistema em cinza</span>. Digite o valor real por cima quando souber; ele fica preto e passa a valer. Apague para voltar ao padrão. Se houver <b>ata de registro de preços</b>, marque "Sim" e informe o prazo de entrega da ata.</li>
+      <li>Clique em <b>Salvar e recalcular</b> (barra que aparece embaixo quando há alterações).</li>
+    </ol>
+
+    <h3>7. Glossário do cálculo</h3>
+    <dl>
+      <dt>Família de criticidade</dt><dd>Grupo de materiais com o mesmo efeito da falta, o mesmo comportamento de consumo e a mesma dinâmica de reposição (ex.: pneus separados de peças de reparo).</dd>
+      <dt>Nota e classe</dt><dd>Média ponderada dos critérios (0 a 100). Operacional = proteção máxima; Funcional = moderada; Administrativo = mínima. Essencialidade 5 é sempre Operacional.</dd>
+      <dt>Consumo/mês</dt><dd>Efetivo (ou viaturas, ou frações) × taxa, ou o consumo histórico informado.</dd>
+      <dt>Prazo (dias)</dt><dd>Tempo real de reposição: da demanda até o material chegar na ponta.</dd>
+      <dt>Estoque mínimo</dt><dd>Consumo durante o prazo + margem de segurança da classe. É o <b>gatilho</b>: ao chegar nele, inicia-se a compra.</dd>
+      <dt>Estoque máximo</dt><dd>Mínimo + consumo do horizonte de cobertura da compra. É o teto contra acúmulo.</dd>
+      <dt>Iniciar compra até</dt><dd>Último dia para abrir o processo sem que o material falte.</dd>
+      <dt>Comprar</dt><dd>Quantidade para voltar ao máximo (consumo) ou completar a reserva (permanentes).</dd>
+      <dt>Reserva técnica</dt><dd>Permanentes: bens de reserva = parque × taxa de indisponibilidade × prazo × fator da classe.</dd>
+      <dt>Cinza / preto</dt><dd>Cinza = valor padrão do sistema (estimativa). Preto = valor informado por você.</dd>
+    </dl>
+
+    <h3>8. Segurança</h3>
+    <p>O painel só lê o CPELOG. Tudo o que é digitado fica na planilha de dados no seu Google Drive (link "Planilha de dados" no menu). Mantenha o app com acesso restrito: os dados incluem armamento e munição.</p>
+  </div>
+</div></div>
+
+<div class="barra" id="barra"><b id="nAlt"></b><button class="bt pri" id="btSalvar">Salvar e recalcular</button><button class="bt" id="btDescartar">Descartar</button></div>
 
 <script>
-var D = null, alt = {}, abaAtual = 'diag', filtro = { kpi: null, fam: null }, pagDiag = 0, pagItens = 0, POR_PAG = 50;
-var ABAS_UI = [['diag', 'Diagnóstico'], ['itens', 'Itens'], ['familias', 'Famílias e notas'], ['parametros', 'Pesos e parâmetros'], ['unidades', 'Unidades e efetivo'], ['processos', 'Processos de compra']];
+var D = null, alt = {}, pagina = 'geral', estadoPag = {}, POR_PAG = 50, janela = null, graficos = {};
+var F = { classe: '', tipo: '', fam: '', sit: '', mes: null, origem: '' };
 var R = { cod: 0, desc: 1, fam: 2, tipo: 3, classe: 4, nota: 5, dem: 6, fonte: 7, lt: 8, origem: 9, ss: 10, min: 11, max: 12, pos: 13, cob: 14, sit: 15, data: 16, sug: 17, just: 18 };
 var SIT = {
-  'INICIAR COMPRA': ['Iniciar compra', 's-r'], 'RESERVA INSUFICIENTE': ['Reserva abaixo do necessário', 's-r'],
-  'EXCESSO': ['Acima do máximo', 's-a'], 'Dentro da faixa': ['OK', 's-g'], 'Sem reserva exigida': ['Sem reserva necessária', 's-c'],
-  'Sem demanda informada': ['Falta consumo', 's-c'], 'FAMÍLIA INEXISTENTE': ['Família inválida', 's-r']
+  'INICIAR COMPRA': ['Iniciar compra', 's-r', '#a3201b'], 'RESERVA INSUFICIENTE': ['Reserva insuficiente', 's-r', '#d66a5f'],
+  'EXCESSO': ['Acima do máximo', 's-a', '#c99632'], 'Dentro da faixa': ['OK', 's-g', '#3f8a4f'], 'Sem demanda informada': ['Falta consumo', 's-c', '#8f8b80'],
+  'Sem reserva exigida': ['Sem reserva necessária', 's-c', '#cfcabd'], 'FAMÍLIA INEXISTENTE': ['Família inválida', 's-r', '#5a1010']
 };
+var ORDEM_SIT = ['INICIAR COMPRA', 'RESERVA INSUFICIENTE', 'EXCESSO', 'Dentro da faixa', 'Sem demanda informada', 'Sem reserva exigida'];
+var CLASSES = ['Operacional', 'Funcional', 'Administrativo'], COR_CLASSE = { Operacional: '#a3201b', Funcional: '#c99632', Administrativo: '#3f8a4f' };
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function fmt(n) { return n === '' || n === null || n === undefined ? '' : (isNaN(n) ? esc(n) : Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 1 })); }
 function dt(s) { return !s ? '' : s === 'IMEDIATO' ? '<b class="num-r">Agora</b>' : new Date(s + 'T12:00').toLocaleDateString('pt-BR'); }
-function quando(s) { return s ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca'; }
-/** Nome curto do material: sem o código do catálogo e só até o primeiro " - ". */
+function quando(s) { return s ? new Date(s).toLocaleString('pt-BR') : 'nunca'; }
 function curto(d) { d = String(d || '').replace(/^\d{6,9}\s*-\s*/, ''); var i = d.indexOf(' - '); d = i > 0 ? d.slice(0, i) : d; d = d.split(' › ').pop(); return d.length > 70 ? d.slice(0, 68) + '…' : d; }
 function chipClasse(c) { return c ? '<span class="chip c-' + esc(c) + '">' + esc(c) + '</span>' : ''; }
 function chipSit(s) { var x = SIT[s] || [s, 's-c']; return s ? '<span class="chip ' + x[1] + '">' + esc(x[0]) + '</span>' : ''; }
 function diasAte(s) { if (!s) return Infinity; if (s === 'IMEDIATO') return -1; return (new Date(s) - new Date()) / 864e5; }
+function mesDe(x) { var s = x[R.data], h = new Date(); var d = s === 'IMEDIATO' ? h : s ? new Date(s + 'T12:00') : null; if (!d) return null; var k = (d.getFullYear() - h.getFullYear()) * 12 + d.getMonth() - h.getMonth(); return k >= 0 && k < 12 ? k : null; }
+function origemDe(x) { var o = String(x[R.origem] || ''); return /^ata/.test(o) ? 'Ata de registro de preços' : /^fases/.test(o) ? 'Informado no item' : /^hist/.test(o) ? 'Histórico de processos' : o ? 'Padrão do sistema' : ''; }
+function nomeMes(k) { var h = new Date(); return new Date(h.getFullYear(), h.getMonth() + k, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); }
+
+var FILTROS = {
+  agora: { t: 'Iniciar compra agora', d: 'Saldo já está no estoque mínimo: o processo de compra deve começar já.', f: function (x) { return x[R.sit] === 'INICIAR COMPRA'; } },
+  d30: { t: 'Iniciar compra em até 30 dias', d: 'Data limite para abrir o processo nos próximos 30 dias.', f: function (x) { var d = diasAte(x[R.data]); return d >= 0 && d <= 30; } },
+  d90: { t: 'Iniciar compra em até 90 dias', d: 'Data limite para abrir o processo nos próximos 90 dias.', f: function (x) { var d = diasAte(x[R.data]); return d >= 0 && d <= 90; } },
+  reserva: { t: 'Reserva técnica insuficiente', d: 'Permanentes: estocado abaixo da reserva necessária para repor falhas durante o prazo de compra.', f: function (x) { return x[R.sit] === 'RESERVA INSUFICIENTE'; } },
+  excesso: { t: 'Acima do máximo', d: 'Estoque maior que o teto calculado: possível excesso.', f: function (x) { return x[R.sit] === 'EXCESSO'; } },
+  ok: { t: 'Dentro da faixa', d: 'Estoque entre o mínimo e o máximo.', f: function (x) { return x[R.sit] === 'Dentro da faixa'; } },
+  sem: { t: 'Falta consumo', d: 'Materiais de consumo sem taxa nem consumo histórico.', f: function (x) { return x[R.sit] === 'Sem demanda informada'; } },
+  todos: { t: 'Todos os materiais', d: 'Materiais importados do CPELOG (respeitando os filtros da barra).', f: function () { return true; } }
+};
+/** Materiais com os filtros globais aplicados. */
+function base() {
+  return D.resultados.linhas.map(function (r) { return r.v; }).filter(function (x) {
+    return (!F.classe || x[R.classe] === F.classe) && (!F.tipo || x[R.tipo] === F.tipo) && (!F.fam || x[R.fam] === F.fam) && (!F.sit || x[R.sit] === F.sit) &&
+      (F.mes === null || mesDe(x) === F.mes) && (!F.origem || origemDe(x) === F.origem);
+  });
+}
+function ordenar(l) { return l.sort(function (a, b) { return diasAte(a[R.data]) - diasAte(b[R.data]) || ORDEM_SIT.indexOf(a[R.sit]) - ORDEM_SIT.indexOf(b[R.sit]) || (b[R.nota] - a[R.nota]); }); }
 
 function chama(fn, args, ok, txt) {
   ocupado(true, txt);
-  var r = google.script.run.withSuccessHandler(function (x) { ocupado(false); ok(x); })
-    .withFailureHandler(function (e) { ocupado(false); $('msg').innerHTML = '<div class="erro">Erro: ' + esc(e.message) + '</div>'; });
+  var r = google.script.run.withSuccessHandler(function (x) { ocupado(false); ok(x); }).withFailureHandler(function (e) { ocupado(false); $('msg').innerHTML = '<div class="erro">Erro: ' + esc(e.message) + '</div>'; });
   r[fn].apply(r, args || []);
 }
-function ocupado(on, txt) {
-  ['btAtualizar', 'btLogin', 'btSalvar'].forEach(function (b) { $(b).disabled = on; });
-  if (on) $('msg').innerHTML = '<div class="aviso">' + esc(txt || 'Processando…') + '</div>'; else if (!$('msg').querySelector('.erro')) $('msg').innerHTML = '';
-}
+function ocupado(on, txt) { ['btAtualizar', 'btLogin', 'btSalvar'].forEach(function (b) { $(b).disabled = on; }); if (on) $('msg').innerHTML = '<div class="aviso">' + esc(txt || 'Processando…') + '</div>'; else if (!$('msg').querySelector('.erro')) $('msg').innerHTML = ''; }
 
-/* ---------- carga ---------- */
-function mostrarEstado(e) {
-  $('estado').textContent = (e.acesso ? 'Conectado ao CPELOG como ' + e.usuario : 'Sem acesso ao CPELOG') + ' · dados de ' + quando(e.ultimoImport) + ' · ' + e.itens + ' itens';
-  $('lkPlanilha').href = $('lkProc').href = e.planilha; $('lkPlanilha').classList.toggle('oculto', !e.acesso);
-  $('btAtualizar').classList.toggle('oculto', !e.acesso);
-  $('login').classList.toggle('oculto', e.acesso); $('app').classList.toggle('oculto', !e.acesso);
+/* ---------- carga e cabeçalho ---------- */
+function marcaDagua(txt) {
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="520" height="300"><text x="20" y="190" transform="rotate(-24 260 150)" font-family="Arial" font-size="17" fill="rgba(140,120,70,0.13)">' + esc(txt) + '</text></svg>';
+  $('marca').style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
 }
+function mostrarEstado(e) {
+  var quem = (e.nome || 'Usuário') + ' · Nº ' + (e.usuario || '—');
+  $('usuario').textContent = e.acesso ? quem : 'Não conectado';
+  $('sinc').textContent = 'Sincronizado com o CPELOG: ' + quando(e.ultimoImport);
+  $('faixa').textContent = e.acesso ? '✓ Dados consultados no CPELOG (somente leitura) · ' + fmt(e.itens) + ' materiais · último cálculo ' + quando(e.ultimoCalculo) : 'Conecte-se ao CPELOG para carregar os dados';
+  $('btAtualizar').classList.toggle('oculto', !e.acesso);
+  $('login').classList.toggle('oculto', e.acesso); $('corpoApp').classList.toggle('oculto', !e.acesso);
+  marcaDagua((e.nome || '') + ' · Nº ' + (e.usuario || '') + ' · ' + new Date().toLocaleDateString('pt-BR') + ' · uso restrito');
+  D_estado = e;
+}
+var D_estado = null;
 function receber(d) {
   D = d; alt = {}; mostrarEstado(d.estado); barra();
   D.res = {}; d.resultados.linhas.forEach(function (r) { D.res[String(r.v[0])] = r.v; });
-  D.fam = {}; d.familias.linhas.forEach(function (r) { D.fam[r.v[0]] = { nome: r.v[1], tipo: r.v[2], classe: r.v[15], nota: r.v[14], lt: r.v[11] }; });
-  document.querySelectorAll('.selFam').forEach(function (s) {
-    var v = s.value; s.length = 1;
-    Object.keys(D.fam).sort().forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = id + ' · ' + D.fam[id].nome; s.appendChild(o); });
-    s.value = v;
-  });
-  render();
+  D.fam = {}; d.familias.linhas.forEach(function (r) { D.fam[r.v[0]] = { nome: r.v[1], tipo: r.v[2], desc: r.v[3], classe: r.v[15], nota: r.v[14], lt: r.v[11] }; });
+  $('fFam').innerHTML = '<option value="">Todas</option>' + Object.keys(D.fam).sort().map(function (id) { return '<option value="' + esc(id) + '">' + esc(id + ' · ' + D.fam[id].nome) + '</option>'; }).join('');
+  $('fSit').innerHTML = '<option value="">Todas</option>' + ORDEM_SIT.map(function (s) { return '<option value="' + esc(s) + '">' + esc(SIT[s][0]) + '</option>'; }).join('');
+  render(); if (janela) renderJanela();
 }
-function iniciar() {
-  $('abas').innerHTML = ABAS_UI.map(function (a) { return '<div class="aba" data-a="' + a[0] + '">' + a[1] + '</div>'; }).join('');
-  $('abas').onclick = function (e) { var a = e.target.dataset.a; if (a) irPara(a); };
-  chama('estadoWeb', [], function (e) { mostrarEstado(e); if (e.acesso) chama('dadosWeb', [], receber, 'Carregando dados…'); }, 'Verificando acesso…');
-}
-function irPara(a, extra) { abaAtual = a; if (extra) extra(); render(); window.scrollTo(0, 0); }
-$('btLogin').onclick = function () {
-  chama('salvarAcesso', [$('lgUsuario').value, $('lgSenha').value], function (e) {
-    mostrarEstado(e); $('lgSenha').value = '';
-    chama('atualizarDoCpelog', [], receber, 'Importando todos os dados do CPELOG (cerca de 1 minuto)…');
-  }, 'Validando login…');
-};
+$('btLogin').onclick = function () { chama('salvarAcesso', [$('lgUsuario').value, $('lgSenha').value], function (e) { mostrarEstado(e); $('lgSenha').value = ''; chama('atualizarDoCpelog', [], receber, 'Importando todos os dados do CPELOG (cerca de 1 minuto)…'); }, 'Validando login…'); };
 $('btAtualizar').onclick = function () { chama('atualizarDoCpelog', [], receber, 'Importando os dados do CPELOG e recalculando (cerca de 1 minuto)…'); };
+$('btAjuda').onclick = function () { $('fundoAjuda').classList.add('on'); };
+$('ajFechar').onclick = function () { $('fundoAjuda').classList.remove('on'); };
+
+/* ---------- filtros globais ---------- */
+function sincFiltros() {
+  $('fClasse').value = F.classe; $('fTipo').value = F.tipo; $('fFam').value = F.fam; $('fSit').value = F.sit;
+  var t = [];
+  if (F.classe) t.push(['classe', 'Classe: ' + F.classe]); if (F.tipo) t.push(['tipo', F.tipo === 'CONSUMO' ? 'Consumo' : 'Permanentes']);
+  if (F.fam) t.push(['fam', 'Família: ' + ((D.fam[F.fam] || {}).nome || F.fam)]); if (F.sit) t.push(['sit', 'Situação: ' + SIT[F.sit][0]]);
+  if (F.mes !== null) t.push(['mes', 'Compra em ' + nomeMes(F.mes)]); if (F.origem) t.push(['origem', 'Prazo: ' + F.origem]);
+  $('ativos').innerHTML = t.length ? 'Filtros: ' + t.map(function (x) { return '<span class="tagf" data-tira="' + x[0] + '">' + esc(x[1]) + ' ✕</span>'; }).join('') : '';
+}
+function filtrar(campo, valor) { F[campo] = (F[campo] === valor) ? (campo === 'mes' ? null : '') : valor; render(); }
+$('ativos').onclick = function (e) { var k = e.target.dataset.tira; if (k) { F[k] = k === 'mes' ? null : ''; render(); } };
+['fClasse', 'fTipo', 'fFam', 'fSit'].forEach(function (id) { $(id).onchange = function () { F[{ fClasse: 'classe', fTipo: 'tipo', fFam: 'fam', fSit: 'sit' }[id]] = this.value; render(); }; });
+$('btLimpar').onclick = function () { F = { classe: '', tipo: '', fam: '', sit: '', mes: null, origem: '' }; render(); };
+
+/* ---------- menu ---------- */
+var MENU = [
+  ['Painel', [['geral', '📊', 'Visão geral'], ['familias-cards', '🗂️', 'Por família']]],
+  ['Situação', [['agora', '🛒', 'Comprar agora', 'r'], ['d90', '⏳', 'Próximos 90 dias', 'a'], ['reserva', '🛡️', 'Reserva insuficiente', 'r'], ['excesso', '📦', 'Acima do máximo', 'a'], ['sem', '❔', 'Falta consumo']]],
+  ['Cadastro', [['itens', '📝', 'Dados dos itens'], ['unidades', '👮', 'Unidades e efetivo'], ['familias', '⚖️', 'Famílias e notas'], ['parametros', '🎚️', 'Pesos e parâmetros'], ['processos', '📅', 'Processos de compra']]],
+  ['Apoio', [['ajuda', '❓', 'Como usar'], ['planilha', '📄', 'Planilha de dados']]]
+];
+function renderNav() {
+  var b = D ? base() : [];
+  $('nav').innerHTML = MENU.map(function (g) {
+    return '<div class="grupo-nav">' + g[0] + '</div>' + g[1].map(function (m) {
+      var n = D && FILTROS[m[0]] ? b.filter(FILTROS[m[0]].f).length : null;
+      return '<div class="item-nav ' + (pagina === m[0] ? 'on' : '') + '" data-p="' + m[0] + '"><span class="ic">' + m[1] + '</span><span>' + m[2] + '</span>' + (n !== null ? '<span class="cont ' + (n ? (m[3] || '') : '') + '">' + fmt(n) + '</span>' : '') + '</div>';
+    }).join('');
+  }).join('');
+}
+$('nav').onclick = function (e) {
+  var el = e.target.closest('.item-nav'); if (!el) return;
+  if (el.dataset.p === 'ajuda') return $('btAjuda').onclick();
+  if (el.dataset.p === 'planilha') { if (D_estado) window.open(D_estado.planilha, '_blank'); return; }
+  pagina = el.dataset.p; render(); window.scrollTo(0, 0);
+};
 
 /* ---------- edição ---------- */
 function campo(aba, linha, col, valor, opts) {
@@ -243,7 +350,7 @@ function campo(aba, linha, col, valor, opts) {
   var k = aba + '|' + linha.l + '|' + (col + 1), v = alt[k] !== undefined ? alt[k] : valor;
   var cls = (opts.padrao && alt[k] === undefined ? 'padrao' : '') + (alt[k] !== undefined ? ' mudou' : '');
   var data = ' data-k="' + esc(k) + '" data-o="' + esc(valor) + '"' + (opts.dica ? ' title="' + esc(opts.dica) + '"' : '');
-  if (opts.lista) return '<select class="' + cls + '"' + data + '>' + opts.lista.map(function (o) { var val = o.v !== undefined ? o.v : o; return '<option value="' + esc(val) + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + esc(o.t || o) + '</option>'; }).join('') + '</select>';
+  if (opts.lista) return '<select class="' + cls + '"' + data + '>' + opts.lista.map(function (o) { var val = (o && o.v !== undefined) ? o.v : o; return '<option value="' + esc(val) + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + esc((o && o.t) || o) + '</option>'; }).join('') + '</select>';
   return '<input class="' + cls + '"' + data + ' value="' + esc(v) + '" inputmode="decimal">';
 }
 document.addEventListener('change', function (e) {
@@ -253,159 +360,243 @@ document.addEventListener('change', function (e) {
 });
 function barra() { var n = Object.keys(alt).length; $('barra').classList.toggle('on', n > 0); $('nAlt').textContent = n + ' alteração(ões) não salva(s)'; }
 $('btDescartar').onclick = function () { alt = {}; barra(); render(); };
-$('btSalvar').onclick = function () {
-  var lista = Object.keys(alt).map(function (k) { var p = k.split('|'); return { aba: p[0], linha: Number(p[1]), coluna: Number(p[2]), valor: alt[k] }; });
-  chama('salvarAlteracoes', [lista], receber, 'Salvando e recalculando…');
-};
+$('btSalvar').onclick = function () { var l = Object.keys(alt).map(function (k) { var p = k.split('|'); return { aba: p[0], linha: Number(p[1]), coluna: Number(p[2]), valor: alt[k] }; }); chama('salvarAlteracoes', [l], receber, 'Salvando e recalculando…'); };
 
-/* ---------- diagnóstico ---------- */
-var KPIS = [
-  { id: 'iniciar', nome: 'Iniciar compra agora', dica: 'Saldo já está no mínimo', f: function (x) { return x[R.sit] === 'INICIAR COMPRA'; }, c: 'num-r' },
-  { id: '90', nome: 'Iniciar compra em até 90 dias', dica: 'Data limite nos próximos 3 meses', f: function (x) { var d = diasAte(x[R.data]); return d >= 0 && d <= 90; }, c: 'num-a' },
-  { id: 'reserva', nome: 'Reserva técnica insuficiente', dica: 'Permanentes: estocado abaixo da reserva', f: function (x) { return x[R.sit] === 'RESERVA INSUFICIENTE'; }, c: 'num-r' },
-  { id: 'excesso', nome: 'Acima do máximo', dica: 'Estoque maior que o teto calculado', f: function (x) { return x[R.sit] === 'EXCESSO'; }, c: 'num-a' },
-  { id: 'ok', nome: 'Dentro da faixa', dica: 'Entre o mínimo e o máximo', f: function (x) { return x[R.sit] === 'Dentro da faixa'; }, c: '' },
-  { id: 'sem', nome: 'Falta consumo', dica: 'Informe taxa ou consumo histórico', f: function (x) { return x[R.sit] === 'Sem demanda informada'; }, c: '' }
-];
-function resultados() {
-  var cl = $('fClasse').value, tp = $('fTipo').value;
-  return D.resultados.linhas.map(function (r) { return r.v; }).filter(function (x) { return (!cl || x[R.classe] === cl) && (!tp || x[R.tipo] === tp); });
-}
-function renderPassos() {
-  var C = D.col;
-  var uni = D.unidades.linhas, comEf = uni.filter(function (r) { return Number(r.v[2]) > 0; }).length;
-  var cons = D.resultados.linhas.filter(function (r) { return r.v[R.tipo] === 'CONSUMO'; });
-  var comDem = cons.filter(function (r) { return Number(r.v[R.dem]) > 0; }).length;
-  var prazoReal = D.itens.linhas.filter(function (r) { return [C.FASE_INTERNA, C.LICITACAO, C.CONTRATACAO, C.ENTREGA].some(function (k) { return r.p.indexOf(k) < 0 && r.v[k] !== ''; }) || String(r.v[C.ATA]).toUpperCase() === 'S'; }).length;
-  var proc = D.processos.linhas.filter(function (r) { return !/^EX/i.test(String(r.v[0])); }).length;
-  var passos = [
-    { t: 'Efetivo das unidades', v: comEf, de: uni.length, txt: 'Nº de policiais por UEOp. Necessário para itens consumidos por policial.', ir: 'unidades' },
-    { t: 'Itens de consumo com consumo', v: comDem, de: cons.length, txt: 'Taxa por policial/viatura/fração ou consumo histórico mensal.', ir: 'itens', extra: function () { $('iFalta').value = 'consumo'; $('iTipo').value = 'CONSUMO'; } },
-    { t: 'Itens com prazo real ou ata', v: prazoReal, de: D.itens.linhas.length, txt: 'Os demais usam o prazo padrão da família (em cinza).', ir: 'itens', extra: function () { $('iFalta').value = 'prazo'; } },
-    { t: 'Processos de compra registrados', v: proc, de: null, txt: 'Com histórico, o prazo médio real substitui o padrão.', ir: 'processos' }
-  ];
-  $('passos').innerHTML = passos.map(function (p, i) {
-    var pct = p.de ? Math.round(p.v / p.de * 100) : (p.v ? 100 : 0);
-    return '<div class="passo ' + (pct < 100 ? 'falta' : '') + '"><div class="mut">' + esc(p.t) + '</div><b>' + fmt(p.v) + '</b>' + (p.de ? ' <span class="mut">de ' + fmt(p.de) + '</span>' : '') +
-      '<div class="prog"><i style="width:' + pct + '%"></i></div><div class="mut">' + esc(p.txt) + '</div><div style="margin-top:6px"><a href="#" data-passo="' + i + '">Preencher →</a></div></div>';
-  }).join('');
-  $('passos').onclick = function (e) { var i = e.target.dataset.passo; if (i === undefined) return; e.preventDefault(); irPara(passos[i].ir, passos[i].extra); };
-}
-function renderKpis(base) {
-  $('kpis').innerHTML = KPIS.map(function (k) { var n = base.filter(k.f).length; return '<div class="kpi ' + (filtro.kpi === k.id ? 'on ' : '') + (n ? '' : 'zero') + '" data-id="' + k.id + '" title="' + esc(k.dica) + '"><b class="' + k.c + '">' + fmt(n) + '</b>' + esc(k.nome) + '<div class="mut">' + esc(k.dica) + '</div></div>'; }).join('');
-}
-function renderFam(base) {
-  var g = {};
-  base.forEach(function (x) {
-    var f = g[x[R.fam]] || (g[x[R.fam]] = { n: 0, agora: 0, d90: 0, res: 0, exc: 0, sem: 0, ok: 0 });
-    f.n++; if (x[R.sit] === 'INICIAR COMPRA') f.agora++; var d = diasAte(x[R.data]); if (d >= 0 && d <= 90) f.d90++;
-    if (x[R.sit] === 'RESERVA INSUFICIENTE') f.res++; if (x[R.sit] === 'EXCESSO') f.exc++; if (x[R.sit] === 'Sem demanda informada') f.sem++; if (x[R.sit] === 'Dentro da faixa') f.ok++;
-  });
-  var ordem = { Operacional: 0, Funcional: 1, Administrativo: 2 };
-  var ids = Object.keys(g).sort(function (a, b) { var fa = D.fam[a] || {}, fb = D.fam[b] || {}; return (ordem[fa.classe] - ordem[fb.classe]) || (g[b].agora + g[b].res - g[a].agora - g[a].res) || (a > b ? 1 : -1); });
-  function n(v, c) { return v ? '<span class="' + (c || '') + '">' + fmt(v) + '</span>' : '<span class="mut">–</span>'; }
-  $('tFam').innerHTML = '<thead><tr><th>Família</th><th>Classe</th><th class="n">Nota</th><th class="n">Itens</th><th class="n">Comprar agora</th><th class="n">Em até 90 dias</th><th class="n">Reserva insuf.</th><th class="n">Acima do máx.</th><th class="n">OK</th><th class="n">Falta consumo</th><th class="n">Prazo padrão (dias)</th></tr></thead><tbody>' +
-    ids.map(function (id) {
-      var f = D.fam[id] || {}, x = g[id];
-      return '<tr class="clic ' + (filtro.fam === id ? 'sel' : '') + '" data-fam="' + esc(id) + '"><td><span class="nome">' + esc(f.nome || id) + '</span> <span class="cod">' + esc(id) + '</span></td><td>' + chipClasse(f.classe) + '</td><td class="n">' + fmt(f.nota) + '</td><td class="n">' + fmt(x.n) + '</td>' +
-        '<td class="n">' + n(x.agora, 'num-r') + '</td><td class="n">' + n(x.d90, 'num-a') + '</td><td class="n">' + n(x.res, 'num-r') + '</td><td class="n">' + n(x.exc, 'num-a') + '</td><td class="n">' + n(x.ok) + '</td><td class="n">' + n(x.sem) + '</td><td class="n">' + fmt(f.lt) + '</td></tr>';
-    }).join('') + '</tbody>';
-}
-function renderItensDiag(base) {
-  var q = $('fBusca').value.toLowerCase(), k = KPIS.filter(function (k) { return k.id === filtro.kpi; })[0];
-  var lista = base.filter(function (x) { return (!filtro.fam || x[R.fam] === filtro.fam) && (!k || k.f(x)) && (!q || (x[R.desc] + ' ' + x[R.cod]).toLowerCase().indexOf(q) >= 0); });
-  lista.sort(function (a, b) { return diasAte(a[R.data]) - diasAte(b[R.data]) || ((SIT[a[R.sit]] || [])[1] === 's-r' ? -1 : 0) - ((SIT[b[R.sit]] || [])[1] === 's-r' ? -1 : 0) || (b[R.nota] - a[R.nota]); });
-  var partes = [];
-  if (filtro.fam) partes.push((D.fam[filtro.fam] || {}).nome || filtro.fam);
-  if (k) partes.push(k.nome.toLowerCase());
-  $('tituloItens').textContent = '4. Itens' + (partes.length ? ': ' + partes.join(' · ') : '') + ' (' + fmt(lista.length) + ')';
-  var tot = lista.length; pagDiag = Math.min(pagDiag, Math.max(Math.ceil(tot / POR_PAG) - 1, 0));
-  var pg = lista.slice(pagDiag * POR_PAG, (pagDiag + 1) * POR_PAG);
-  $('tItensDiag').innerHTML = '<thead><tr><th>Item</th><th>Situação</th><th>Iniciar compra até</th><th class="n">Consumo/mês</th><th class="n">Prazo (dias)</th><th class="n">Saldo</th><th class="n">Mínimo</th><th class="n">Máximo</th><th class="n">Comprar</th><th>Por quê</th></tr></thead><tbody>' +
-    pg.map(function (x) {
+/* ---------- janela com lista ---------- */
+function abrir(titulo, sub, f) { janela = { titulo: titulo, sub: sub, f: f, pag: 0 }; $('jBusca').value = ''; $('fundo').classList.add('on'); renderJanela(); }
+function fechar() { janela = null; $('fundo').classList.remove('on'); $('fundoAjuda').classList.remove('on'); }
+$('jFechar').onclick = fechar; document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fechar(); });
+['fundo', 'fundoAjuda'].forEach(function (id) { $(id).onclick = function (e) { if (e.target === $(id)) fechar(); }; });
+$('jBusca').oninput = function () { janela.pag = 0; renderJanela(); };
+function tabelaMateriais(lista) {
+  return '<thead><tr><th>Material</th><th>Família</th><th>Situação</th><th>Iniciar compra até</th><th class="n">Consumo/mês</th><th class="n">Prazo (dias)</th><th class="n">Saldo</th><th class="n">Mínimo</th><th class="n">Máximo</th><th class="n">Comprar</th><th>Cálculo</th></tr></thead><tbody>' +
+    lista.map(function (x) {
       var perm = x[R.tipo] === 'PERMANENTE';
-      return '<tr><td title="' + esc(x[R.desc]) + '"><div class="nome">' + esc(curto(x[R.desc])) + '</div><div class="sub">' + esc(x[R.cod]) + ' · ' + chipClasse(x[R.classe]) + '</div></td>' +
-        '<td>' + chipSit(x[R.sit]) + '</td><td>' + dt(x[R.data]) + '</td><td class="n">' + (perm ? '<span class="mut">–</span>' : fmt(x[R.dem])) + '</td><td class="n">' + fmt(x[R.lt]) + '</td>' +
-        '<td class="n">' + fmt(x[R.pos]) + '</td><td class="n">' + fmt(x[R.min]) + (perm ? ' <span class="mut">(reserva)</span>' : '') + '</td><td class="n">' + fmt(x[R.max]) + '</td><td class="n">' + (Number(x[R.sug]) > 0 && /INICIAR|RESERVA/.test(x[R.sit]) ? '<b>' + fmt(x[R.sug]) + '</b>' : '<span class="mut">–</span>') + '</td>' +
+      return '<tr><td title="' + esc(x[R.desc]) + '"><div class="nome">' + esc(curto(x[R.desc])) + '</div><div class="sub">' + esc(x[R.cod]) + ' · ' + (perm ? 'Permanente' : 'Consumo') + '</div></td>' +
+        '<td><div class="sub">' + esc((D.fam[x[R.fam]] || {}).nome || x[R.fam]) + '</div>' + chipClasse(x[R.classe]) + '</td><td>' + chipSit(x[R.sit]) + '</td><td>' + dt(x[R.data]) + '</td>' +
+        '<td class="n">' + (perm ? '<span class="sub">–</span>' : fmt(x[R.dem])) + '</td><td class="n">' + fmt(x[R.lt]) + '</td><td class="n">' + fmt(x[R.pos]) + '</td>' +
+        '<td class="n">' + fmt(x[R.min]) + (perm ? ' <span class="sub">reserva</span>' : '') + '</td><td class="n">' + fmt(x[R.max]) + '</td>' +
+        '<td class="n">' + (Number(x[R.sug]) > 0 && /INICIAR|RESERVA/.test(x[R.sit]) ? '<b>' + fmt(x[R.sug]) + '</b>' : '<span class="sub">–</span>') + '</td>' +
         '<td><details><summary>ver</summary><p>' + esc(x[R.just]) + '</p></details></td></tr>';
     }).join('') + '</tbody>';
-  paginar('pagDiag', tot, pagDiag, function (p) { pagDiag = p; renderDiag(); });
 }
-function paginar(id, tot, pag, ir) {
-  var np = Math.max(Math.ceil(tot / POR_PAG), 1);
-  $(id).innerHTML = 'Página ' + (pag + 1) + ' de ' + np + ' ' + (pag > 0 ? '<button class="sec" data-p="' + (pag - 1) + '">‹ anterior</button>' : '') + (pag < np - 1 ? '<button class="sec" data-p="' + (pag + 1) + '">próxima ›</button>' : '');
-  $(id).onclick = function (e) { if (e.target.dataset.p !== undefined) { ir(Number(e.target.dataset.p)); } };
+function renderJanela() {
+  var q = $('jBusca').value.toLowerCase();
+  var l = ordenar(base().filter(function (x) { return janela.f(x) && (!q || (x[R.desc] + ' ' + x[R.cod]).toLowerCase().indexOf(q) >= 0); }));
+  $('jTitulo').textContent = janela.titulo + ' (' + fmt(l.length) + ')'; $('jSub').textContent = (janela.sub || '') + (temFiltro() ? ' · com os filtros da barra' : '');
+  var np = Math.max(Math.ceil(l.length / POR_PAG), 1); janela.pag = Math.min(janela.pag, np - 1);
+  $('jTabela').innerHTML = l.length ? tabelaMateriais(l.slice(janela.pag * POR_PAG, (janela.pag + 1) * POR_PAG)) : '<tr><td class="sub" style="padding:24px">Nenhum material.</td></tr>';
+  paginar('jPag', np, janela.pag, function (p) { janela.pag = p; renderJanela(); });
 }
-function renderDiag() { var base = resultados(); renderPassos(); renderKpis(base); renderFam(base); renderItensDiag(base); }
-$('kpis').onclick = function (e) { var el = e.target.closest('.kpi'); if (!el) return; filtro.kpi = filtro.kpi === el.dataset.id ? null : el.dataset.id; pagDiag = 0; renderDiag(); };
-$('tFam').onclick = function (e) { var tr = e.target.closest('tr[data-fam]'); if (!tr) return; filtro.fam = filtro.fam === tr.dataset.fam ? null : tr.dataset.fam; pagDiag = 0; renderDiag(); $('blItens').scrollIntoView({ behavior: 'smooth' }); };
-$('btLimpar').onclick = function () { filtro = { kpi: null, fam: null }; $('fBusca').value = ''; $('fClasse').value = ''; $('fTipo').value = ''; pagDiag = 0; renderDiag(); };
-['fClasse', 'fTipo'].forEach(function (id) { $(id).onchange = function () { pagDiag = 0; renderDiag(); }; });
-$('fBusca').oninput = function () { pagDiag = 0; renderItensDiag(resultados()); };
+function temFiltro() { return !!(F.classe || F.tipo || F.fam || F.sit || F.mes !== null || F.origem); }
+function paginar(id, np, pag, irPag) {
+  $(id).innerHTML = np > 1 ? 'Página ' + (pag + 1) + ' de ' + np + ' ' + (pag > 0 ? '<button class="bt" data-p="' + (pag - 1) + '">‹ anterior</button>' : '') + (pag < np - 1 ? '<button class="bt" data-p="' + (pag + 1) + '">próxima ›</button>' : '') : '';
+  $(id).onclick = function (e) { if (e.target.dataset.p !== undefined) irPag(Number(e.target.dataset.p)); };
+}
 
-/* ---------- itens (edição) ---------- */
+/* ---------- visão geral ---------- */
+function card(o) {
+  return '<div class="card ' + (o.cor || '') + (o.acao ? ' clic' : '') + (o.v === 0 ? ' zero' : '') + '"' + (o.acao ? ' data-acao="' + esc(o.acao) + '"' : '') + '>' + (o.acao ? '<span class="seta">›</span>' : '') +
+    '<div class="rot">' + esc(o.rot) + '</div><div class="val">' + (o.vHtml || fmt(o.v)) + '</div><div class="det">' + (o.det || '') + '</div>' + (o.extra || '') + '</div>';
+}
+function titulo(t, sub) { return '<div class="titulo"><h2>' + esc(t) + '</h2><span>' + esc(sub || '') + '</span></div>'; }
+function renderGeral() {
+  var b = base(), C = D.col, cons = b.filter(function (x) { return x[R.tipo] === 'CONSUMO'; });
+  var uni = D.unidades.linhas, efet = uni.reduce(function (s, u) { return s + (Number(u.v[2]) || 0); }, 0), vtr = uni.reduce(function (s, u) { return s + (Number(u.v[3]) || 0); }, 0);
+  var comDem = cons.filter(function (x) { return Number(x[R.dem]) > 0; }).length;
+  var prazoReal = D.itens.linhas.filter(function (l) { return [C.FASE_INTERNA, C.LICITACAO, C.CONTRATACAO, C.ENTREGA].some(function (k) { return l.p.indexOf(k) < 0 && l.v[k] !== ''; }) || String(l.v[C.ATA]).toUpperCase() === 'S'; }).length;
+  var proc = D.processos.linhas.filter(function (l) { return !/^EX/i.test(String(l.v[0])); }).length;
+  var n = function (id) { return b.filter(FILTROS[id].f).length; };
+  var h = titulo('Visão geral', 'clique em um indicador para ver os materiais') +
+    '<p class="dica">Dica: clique em uma barra ou fatia dos gráficos para filtrar a tela por aquele item. Clique de novo para desfazer. Dúvidas: botão "? Como usar o painel".</p>';
+  h += '<div class="secao"><h3>Compras e alertas</h3><div class="cards">' +
+    card({ rot: 'Iniciar compra agora', v: n('agora'), det: 'saldo já no estoque mínimo', cor: 'r', acao: 'f:agora' }) +
+    card({ rot: 'Iniciar em até 30 dias', v: n('d30'), det: 'data limite no próximo mês', cor: 'a', acao: 'f:d30' }) +
+    card({ rot: 'Iniciar em até 90 dias', v: n('d90'), det: 'planejar a abertura do processo', cor: 'a', acao: 'f:d90' }) +
+    card({ rot: 'Reserva técnica insuficiente', v: n('reserva'), det: 'permanentes abaixo da reserva', cor: 'r', acao: 'f:reserva' }) +
+    card({ rot: 'Acima do máximo', v: n('excesso'), det: 'possível excesso de estoque', cor: 'a', acao: 'f:excesso' }) +
+    card({ rot: 'Dentro da faixa', v: n('ok'), det: 'entre mínimo e máximo', cor: 'g', acao: 'f:ok' }) +
+    '</div></div>';
+  h += '<div class="secao"><h3>Base de dados</h3><div class="cards">' +
+    card({ rot: 'Materiais monitorados', v: b.length, det: fmt(cons.length) + ' de consumo · ' + fmt(b.length - cons.length) + ' permanentes', acao: 'f:todos' }) +
+    card({ rot: 'Falta consumo', v: n('sem'), det: 'informe taxa ou consumo histórico', acao: 'f:sem' }) +
+    card({ rot: 'Consumo informado', vHtml: fmt(comDem) + ' <span style="font-size:15px;color:var(--mut)">de ' + fmt(cons.length) + '</span>', det: 'itens de consumo com dado', acao: 'p:itens', extra: '<div class="prog"><i style="width:' + Math.round(comDem / Math.max(cons.length, 1) * 100) + '%"></i></div>' }) +
+    card({ rot: 'Efetivo informado', v: efet, det: uni.length + ' UEOps · ' + fmt(vtr) + ' viaturas no CPELOG', acao: 'p:unidades' }) +
+    card({ rot: 'Prazos reais ou com ata', vHtml: fmt(prazoReal) + ' <span style="font-size:15px;color:var(--mut)">de ' + fmt(D.itens.linhas.length) + '</span>', det: 'os demais usam o padrão (cinza)', acao: 'p:itens', extra: '<div class="prog"><i style="width:' + Math.round(prazoReal / Math.max(D.itens.linhas.length, 1) * 100) + '%"></i></div>' }) +
+    card({ rot: 'Processos de compra', v: proc, det: 'histórico de prazos reais', acao: 'p:processos' }) +
+    '</div></div>';
+  h += '<div class="secao"><h3>Gráficos</h3><div class="graficos">' +
+    '<div class="grafico"><div class="rot">Situação dos materiais</div><div class="det">Clique numa fatia para filtrar.</div><div class="tela"><canvas id="gSit"></canvas></div></div>' +
+    '<div class="grafico"><div class="rot">Situação por classe</div><div class="det">Clique num pedaço da barra para filtrar por classe e situação.</div><div class="tela"><canvas id="gClasse"></canvas></div></div>' +
+    '<div class="grafico"><div class="rot">Compras a iniciar por mês</div><div class="det">Próximos 12 meses. Clique numa coluna para ver o mês.</div><div class="tela"><canvas id="gMes"></canvas></div></div>' +
+    '<div class="grafico"><div class="rot">Famílias com mais alertas</div><div class="det">Comprar agora, em até 90 dias, reserva insuficiente e acima do máximo. Clique para filtrar.</div><div class="tela"><canvas id="gFam"></canvas></div></div>' +
+    '<div class="grafico"><div class="rot">De onde vem o prazo de compra</div><div class="det">Padrão do sistema x dado real. Clique para filtrar.</div><div class="tela"><canvas id="gOrigem"></canvas></div></div>' +
+    '<div class="grafico"><div class="rot">Mais urgentes</div><div class="det">Clique para ver o cálculo.</div><div id="urgentes" style="max-height:260px;overflow:auto"></div></div>' +
+    '</div></div>';
+  h += '<div class="secao"><h3>Famílias com alertas</h3><div id="famAlerta"></div></div>';
+  $('pagina').innerHTML = h;
+  var urg = ordenar(b.filter(function (x) { return /INICIAR|RESERVA/.test(x[R.sit]) || diasAte(x[R.data]) <= 90; })).slice(0, 12);
+  $('urgentes').innerHTML = urg.length ? '<table><tbody>' + urg.map(function (x) { return '<tr class="clic" data-acao="item:' + esc(x[R.cod]) + '"><td><div class="nome">' + esc(curto(x[R.desc])) + '</div><div class="sub">' + esc((D.fam[x[R.fam]] || {}).nome || '') + '</div></td><td>' + chipSit(x[R.sit]) + '<div class="sub">' + dt(x[R.data]) + '</div></td></tr>'; }).join('') + '</tbody></table>' : '<p class="sub">Nada urgente com os filtros e dados atuais.</p>';
+  $('famAlerta').innerHTML = cardsFamilias(b, function (g) { return g.alertas > 0; }, 12);
+  desenharGraficos(b);
+}
+
+/* ---------- gráficos (Chart.js) ---------- */
+function destaque(cor, ativo, sel) { return !sel || ativo ? cor : cor + '44'; }
+function grafico(id, cfg) {
+  if (graficos[id]) graficos[id].destroy();
+  var el = $(id); if (!el) return;
+  if (typeof Chart === 'undefined') { el.parentNode.innerHTML = '<p class="sub">Gráficos indisponíveis (não foi possível carregar a biblioteca).</p>'; return; }
+  cfg.options = Object.assign({ responsive: true, maintainAspectRatio: false, animation: { duration: 250 }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Inter' } } } } }, cfg.options || {});
+  graficos[id] = new Chart(el, cfg);
+}
+function desenharGraficos(b) {
+  // 1. situação (rosca)
+  var cont = {}; b.forEach(function (x) { cont[x[R.sit]] = (cont[x[R.sit]] || 0) + 1; });
+  var sits = ORDEM_SIT.filter(function (s) { return cont[s]; });
+  grafico('gSit', { type: 'doughnut', data: { labels: sits.map(function (s) { return SIT[s][0]; }), datasets: [{ data: sits.map(function (s) { return cont[s]; }), backgroundColor: sits.map(function (s) { return destaque(SIT[s][2], F.sit === s, F.sit); }) }] },
+    options: { cutout: '58%', onClick: function (e, el) { if (el.length) filtrar('sit', sits[el[0].index]); }, plugins: { legend: { position: 'right' } } } });
+  // 2. situação por classe (barras empilhadas)
+  grafico('gClasse', { type: 'bar', data: { labels: CLASSES, datasets: ORDEM_SIT.map(function (s) {
+      return { label: SIT[s][0], data: CLASSES.map(function (c) { return b.filter(function (x) { return x[R.classe] === c && x[R.sit] === s; }).length; }),
+        backgroundColor: CLASSES.map(function (c) { return destaque(SIT[s][2], (!F.classe || F.classe === c) && (!F.sit || F.sit === s), F.classe || F.sit); }) };
+    }).filter(function (d) { return d.data.some(Boolean); }) },
+    options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }, onClick: function (e, el) {
+      if (!el.length) return; var ds = graficos.gClasse.data.datasets[el[0].datasetIndex].label, s = ORDEM_SIT.filter(function (k) { return SIT[k][0] === ds; })[0], c = CLASSES[el[0].index];
+      var mesmo = F.classe === c && F.sit === s; F.classe = mesmo ? '' : c; F.sit = mesmo ? '' : s; render(); } } });
+  // 3. compras por mês
+  var meses = []; for (var k = 0; k < 12; k++) meses.push(0); b.forEach(function (x) { var m = mesDe(x); if (m !== null) meses[m]++; });
+  var h = new Date();
+  grafico('gMes', { type: 'bar', data: { labels: meses.map(function (v, k) { return new Date(h.getFullYear(), h.getMonth() + k, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }); }),
+      datasets: [{ label: 'Processos a iniciar', data: meses, backgroundColor: meses.map(function (v, k) { return destaque('#A08F63', F.mes === k, F.mes !== null); }), borderRadius: 4 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, onClick: function (e, el) { if (el.length) filtrar('mes', el[0].index); } } });
+  // 4. famílias com alertas
+  var g = agregado(b), ids = Object.keys(g).filter(function (id) { return g[id].alertas; }).sort(function (a, c) { return g[c].alertas - g[a].alertas; }).slice(0, 10);
+  var partes = [['agora', 'Comprar agora', '#a3201b'], ['res', 'Reserva insuficiente', '#d66a5f'], ['d90', 'Em até 90 dias', '#e0b25a'], ['exc', 'Acima do máximo', '#c99632']];
+  grafico('gFam', { type: 'bar', data: { labels: ids.map(function (id) { var nm = (D.fam[id] || {}).nome || id; return nm.length > 34 ? nm.slice(0, 33) + '…' : nm; }),
+      datasets: partes.map(function (p) { return { label: p[1], data: ids.map(function (id) { return g[id][p[0]]; }), backgroundColor: ids.map(function (id) { return destaque(p[2], F.fam === id, F.fam); }) }; }) },
+    options: { indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true, ticks: { font: { size: 11 } } } }, onClick: function (e, el) { if (el.length) filtrar('fam', ids[el[0].index]); } } });
+  if (!ids.length) { var c4 = $('gFam'); if (c4) c4.parentNode.innerHTML = '<p class="sub">Nenhuma família com alerta nos filtros atuais.</p>'; }
+  // 5. origem do prazo
+  var orig = {}; b.forEach(function (x) { var o = origemDe(x); if (o) orig[o] = (orig[o] || 0) + 1; });
+  var os = ['Padrão do sistema', 'Informado no item', 'Histórico de processos', 'Ata de registro de preços'].filter(function (o) { return orig[o]; }), corO = { 'Padrão do sistema': '#b9b3a3', 'Informado no item': '#373435', 'Histórico de processos': '#A08F63', 'Ata de registro de preços': '#3f8a4f' };
+  grafico('gOrigem', { type: 'doughnut', data: { labels: os, datasets: [{ data: os.map(function (o) { return orig[o]; }), backgroundColor: os.map(function (o) { return destaque(corO[o], F.origem === o, F.origem); }) }] },
+    options: { cutout: '58%', onClick: function (e, el) { if (el.length) filtrar('origem', os[el[0].index]); }, plugins: { legend: { position: 'right' } } } });
+}
+
+/* ---------- famílias ---------- */
+function agregado(b) {
+  var g = {};
+  b.forEach(function (x) {
+    var f = g[x[R.fam]] || (g[x[R.fam]] = { n: 0, agora: 0, d90: 0, res: 0, exc: 0, sem: 0, ok: 0, alertas: 0 });
+    f.n++; if (x[R.sit] === 'INICIAR COMPRA') f.agora++; var d = diasAte(x[R.data]); if (d >= 0 && d <= 90) f.d90++;
+    if (x[R.sit] === 'RESERVA INSUFICIENTE') f.res++; if (x[R.sit] === 'EXCESSO') f.exc++; if (x[R.sit] === 'Sem demanda informada') f.sem++; if (x[R.sit] === 'Dentro da faixa') f.ok++;
+    f.alertas = f.agora + f.d90 + f.res + f.exc;
+  });
+  return g;
+}
+function cardsFamilias(b, filtro, limite) {
+  var g = agregado(b), ordem = { Operacional: 0, Funcional: 1, Administrativo: 2 };
+  var ids = Object.keys(g).filter(function (id) { return !filtro || filtro(g[id]); })
+    .sort(function (a, c) { return (g[c].agora + g[c].res - g[a].agora - g[a].res) || (ordem[(D.fam[a] || {}).classe] - ordem[(D.fam[c] || {}).classe]) || (g[c].alertas - g[a].alertas) || (a > c ? 1 : -1); });
+  if (limite) ids = ids.slice(0, limite);
+  if (!ids.length) return '<p class="sub">Nenhuma família com os filtros atuais.</p>';
+  return '<div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">' + ids.map(function (id) {
+    var f = D.fam[id] || {}, x = g[id], cor = x.agora + x.res ? 'r' : x.d90 + x.exc ? 'a' : x.ok ? 'g' : '';
+    var l = [['Comprar agora', x.agora, 'num-r'], ['Em até 90 dias', x.d90, 'num-a'], ['Reserva insuficiente', x.res, 'num-r'], ['Acima do máximo', x.exc, 'num-a'], ['OK', x.ok, ''], ['Falta consumo', x.sem, '']].filter(function (k) { return k[1]; });
+    return '<div class="card clic ' + cor + '" data-acao="fam:' + esc(id) + '"><span class="seta">›</span><div class="rot">' + esc(f.nome || id) + '</div><div style="margin:6px 0">' + chipClasse(f.classe) + ' <span class="sub">' + esc(id) + ' · ' + fmt(x.n) + ' materiais · prazo ' + fmt(f.lt) + ' dias</span></div>' +
+      '<div class="det" style="color:var(--tx)">' + l.map(function (k) { return esc(k[0]) + ': <span class="' + k[2] + '">' + fmt(k[1]) + '</span>'; }).join(' · ') + '</div></div>';
+  }).join('') + '</div>';
+}
+function renderFamiliasCards() { $('pagina').innerHTML = titulo('Por família de criticidade', 'clique numa família para ver os materiais') + '<p class="dica">Use a barra de filtros para ver só uma classe ou tipo.</p>' + cardsFamilias(base(), null, 0); }
+
+/* ---------- situação ---------- */
+function renderSituacao(id) {
+  var Fi = FILTROS[id], ep = estadoPag[id] || (estadoPag[id] = { q: '', pag: 0 });
+  var l = ordenar(base().filter(function (x) { return Fi.f(x) && (!ep.q || (x[R.desc] + ' ' + x[R.cod]).toLowerCase().indexOf(ep.q.toLowerCase()) >= 0); }));
+  var np = Math.max(Math.ceil(l.length / POR_PAG), 1); ep.pag = Math.min(ep.pag, np - 1);
+  $('pagina').innerHTML = titulo(Fi.t + ' (' + fmt(l.length) + ')', Fi.d) +
+    '<div style="margin:10px 0 12px"><input id="sBusca" placeholder="Buscar material ou código…" style="min-width:300px" value="' + esc(ep.q) + '"></div>' +
+    '<div class="wrap">' + (l.length ? '<table>' + tabelaMateriais(l.slice(ep.pag * POR_PAG, (ep.pag + 1) * POR_PAG)) + '</table>' : '<p class="sub" style="padding:20px">Nenhum material nesta situação.</p>') + '</div><div class="pag" id="sPag"></div>';
+  $('sBusca').onchange = function () { ep.q = this.value; ep.pag = 0; renderSituacao(id); };
+  paginar('sPag', np, ep.pag, function (p) { ep.pag = p; renderSituacao(id); });
+}
+
+/* ---------- cadastro ---------- */
 var BASES = [{ v: 'POLICIAL', t: 'Por policial' }, { v: 'VIATURA', t: 'Por viatura' }, { v: 'UNIDADE', t: 'Por fração' }, { v: 'HISTORICO', t: 'Histórico' }];
 function renderItens() {
-  var C = D.col, fa = $('iFamilia').value, tp = $('iTipo').value, falta = $('iFalta').value, q = $('iBusca').value.toLowerCase();
+  var C = D.col, ep = estadoPag.itens || (estadoPag.itens = { falta: '', q: '', pag: 0 });
   var lista = D.itens.linhas.filter(function (r) {
-    var v = r.v, res = D.res[String(v[C.CODIGO])] || [];
-    if (falta === 'consumo' && !(v[C.TIPO] === 'CONSUMO' && !(Number(res[R.dem]) > 0))) return false;
-    if (falta === 'prazo' && r.p.indexOf(C.LICITACAO) < 0) return false;
-    return (!fa || v[C.FAMILIA] === fa) && (!tp || v[C.TIPO] === tp) && (!q || (v[C.DESCRICAO] + ' ' + v[C.CODIGO]).toLowerCase().indexOf(q) >= 0);
+    var v = r.v, rr = D.res[String(v[C.CODIGO])] || [];
+    if (ep.falta === 'consumo' && !(v[C.TIPO] === 'CONSUMO' && !(Number(rr[R.dem]) > 0))) return false;
+    if (ep.falta === 'prazo' && r.p.indexOf(C.LICITACAO) < 0) return false;
+    return (!F.fam || v[C.FAMILIA] === F.fam) && (!F.tipo || v[C.TIPO] === F.tipo) && (!F.classe || rr[R.classe] === F.classe) && (!F.sit || rr[R.sit] === F.sit) &&
+      (!ep.q || (v[C.DESCRICAO] + ' ' + v[C.CODIGO]).toLowerCase().indexOf(ep.q.toLowerCase()) >= 0);
   });
-  var tot = lista.length; pagItens = Math.min(pagItens, Math.max(Math.ceil(tot / POR_PAG) - 1, 0));
-  lista = lista.slice(pagItens * POR_PAG, (pagItens + 1) * POR_PAG);
-  $('tItens').innerHTML = '<thead><tr class="grupo"><th class="fixa"></th><th colspan="3"></th><th colspan="4">Consumo</th><th colspan="3">Compra</th><th colspan="5">Prazo do processo (dias)</th><th colspan="2">Resultado</th></tr>' +
+  var np = Math.max(Math.ceil(lista.length / POR_PAG), 1); ep.pag = Math.min(ep.pag, np - 1);
+  var famOpts = Object.keys(D.fam).sort().map(function (id) { return { v: id, t: id + ' · ' + D.fam[id].nome }; });
+  $('pagina').innerHTML = titulo('Dados dos itens (' + fmt(lista.length) + ')', 'informe o consumo e os prazos reais') +
+    '<p class="dica">Escolha a base e a taxa por mês, ou o consumo histórico. <i style="color:var(--pad)">Cinza = padrão do sistema</i>; o que você digitar fica preto e passa a valer. Depois clique em Salvar e recalcular.</p>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><select id="iFalta"><option value="">Todos</option><option value="consumo">Só itens sem consumo</option><option value="prazo">Só prazos no padrão</option></select>' +
+    '<input id="iBusca" placeholder="Buscar item ou código…" style="min-width:260px" value="' + esc(ep.q) + '"></div>' +
+    '<div class="wrap"><table><thead><tr class="grupo"><th class="fixa"></th><th colspan="3"></th><th colspan="4">Consumo</th><th colspan="3">Compra</th><th colspan="5">Prazo do processo (dias)</th><th colspan="2">Resultado</th></tr>' +
     '<tr><th class="fixa">Item</th><th>Família</th><th class="n">Saldo</th><th class="n">Parque</th><th>Base</th><th>Taxa/mês</th><th>Histórico/mês</th><th>Desvio</th><th>Em trânsito</th><th>Ata vigente</th><th>Prazo da ata</th><th>Fase interna</th><th>Licitação</th><th>Contratação</th><th>Entrega</th><th>Distribuição</th><th>Situação</th><th class="n">Mínimo</th></tr></thead><tbody>' +
-    lista.map(function (r) {
-      var v = r.v, perm = v[C.TIPO] === 'PERMANENTE', res = D.res[String(v[C.CODIGO])] || [];
+    lista.slice(ep.pag * POR_PAG, (ep.pag + 1) * POR_PAG).map(function (r) {
+      var v = r.v, perm = v[C.TIPO] === 'PERMANENTE', rr = D.res[String(v[C.CODIGO])] || [];
       function f(col, o) { o = o || {}; o.padrao = r.p.indexOf(col) >= 0; return '<td>' + campo('ITENS', r, col, v[col], o) + '</td>'; }
-      var nada = '<td class="mut">–</td>';
+      var nada = '<td class="sub">–</td>';
       return '<tr><td class="fixa" title="' + esc(v[C.DESCRICAO]) + '"><div class="nome">' + esc(curto(v[C.DESCRICAO])) + '</div><div class="sub">' + esc(v[C.CODIGO]) + ' · ' + (perm ? 'Permanente' : 'Consumo') + '</div></td>' +
-        f(C.FAMILIA, { lista: Object.keys(D.fam).sort().map(function (id) { return { v: id, t: id + ' · ' + D.fam[id].nome }; }) }) +
-        '<td class="n">' + fmt(v[C.SALDO]) + '</td><td class="n">' + (perm ? fmt(v[C.PARQUE]) : '<span class="mut">–</span>') + '</td>' +
-        (perm ? nada + nada + nada + nada : f(C.BASE, { lista: BASES }) + f(C.TAXA, { dica: 'Unidades consumidas por mês para cada policial, viatura ou fração' }) + f(C.HIST, { dica: 'Consumo médio mensal observado' }) + f(C.DESVIO, { dica: 'Desvio padrão do consumo mensal (opcional)' })) +
+        f(C.FAMILIA, { lista: famOpts }) + '<td class="n">' + fmt(v[C.SALDO]) + '</td><td class="n">' + (perm ? fmt(v[C.PARQUE]) : '<span class="sub">–</span>') + '</td>' +
+        (perm ? nada + nada + nada + nada : f(C.BASE, { lista: BASES }) + f(C.TAXA, { dica: 'Unidades por mês para cada policial, viatura ou fração' }) + f(C.HIST, { dica: 'Consumo médio mensal observado' }) + f(C.DESVIO, { dica: 'Desvio padrão do consumo mensal (opcional)' })) +
         f(C.TRANSITO) + f(C.ATA, { lista: [{ v: '', t: '—' }, { v: 'S', t: 'Sim' }, { v: 'N', t: 'Não' }] }) + f(C.PRAZO_ATA) +
         f(C.FASE_INTERNA, { dica: 'Da demanda à abertura do processo' }) + f(C.LICITACAO, { dica: 'Da abertura à homologação' }) + f(C.CONTRATACAO, { dica: 'Da homologação ao empenho' }) + f(C.ENTREGA, { dica: 'Do empenho à entrega no almoxarifado' }) + f(C.DISTRIBUICAO, { dica: 'Do almoxarifado à ponta' }) +
-        '<td>' + chipSit(res[R.sit]) + '</td><td class="n">' + fmt(res[R.min]) + '</td></tr>';
-    }).join('') + '</tbody>';
-  paginar('pagItens', tot, pagItens, function (p) { pagItens = p; renderItens(); });
+        '<td>' + chipSit(rr[R.sit]) + '</td><td class="n">' + fmt(rr[R.min]) + '</td></tr>';
+    }).join('') + '</tbody></table></div><div class="pag" id="iPag"></div>';
+  $('iFalta').value = ep.falta;
+  $('iFalta').onchange = function () { ep.falta = this.value; ep.pag = 0; renderItens(); };
+  $('iBusca').onchange = function () { ep.q = this.value; ep.pag = 0; renderItens(); };
+  paginar('iPag', np, ep.pag, function (p) { ep.pag = p; renderItens(); });
 }
-['iFamilia', 'iTipo', 'iFalta'].forEach(function (id) { $(id).onchange = function () { pagItens = 0; renderItens(); }; });
-$('iBusca').oninput = function () { pagItens = 0; renderItens(); };
-
-/* ---------- tabelas de configuração ---------- */
 var NOTA = ['', 1, 2, 3, 4, 5];
-function renderTabela(id, aba, t, cols) {
-  // cols: [{i, t, edit, lista, n}] - colunas a mostrar, na ordem
-  $(id).innerHTML = '<thead><tr>' + cols.map(function (c) { return '<th' + (c.n ? ' class="n"' : '') + '>' + esc(c.t) + '</th>'; }).join('') + '</tr></thead><tbody>' + t.linhas.map(function (r) {
-    return '<tr>' + cols.map(function (c) {
-      var x = r.v[c.i];
-      if (c.edit) return '<td>' + campo(aba, r, c.i, x, { lista: c.lista }) + '</td>';
-      if (c.fmt) return '<td>' + c.fmt(x, r.v) + '</td>';
-      return '<td class="' + (c.n ? 'n' : '') + (c.mut ? ' mut' : '') + '">' + (c.n ? fmt(x) : esc(x)) + '</td>';
-    }).join('') + '</tr>';
-  }).join('') + '</tbody>';
+function tabela(t1, t2, texto, aba, t, cols) {
+  $('pagina').innerHTML = titulo(t1, t2) + '<p class="dica">' + texto + '</p><div class="wrap"><table><thead><tr>' + cols.map(function (c) { return '<th' + (c.n ? ' class="n"' : '') + '>' + esc(c.t) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    t.linhas.map(function (r) { return '<tr>' + cols.map(function (c) { var x = r.v[c.i]; if (c.edit) return '<td>' + campo(aba, r, c.i, x, { lista: c.lista }) + '</td>'; if (c.fmt) return '<td>' + c.fmt(x, r.v) + '</td>'; return '<td class="' + (c.n ? 'n' : '') + (c.mut ? ' sub' : '') + '">' + (c.n ? fmt(x) : esc(x)) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
 }
+
 function render() {
   if (!D) return;
-  document.querySelectorAll('.aba').forEach(function (a) { a.classList.toggle('on', a.dataset.a === abaAtual); });
-  document.querySelectorAll('section[data-aba]').forEach(function (s) { s.classList.toggle('oculto', s.dataset.aba !== abaAtual); });
-  if (abaAtual === 'diag') renderDiag();
-  if (abaAtual === 'itens') renderItens();
-  if (abaAtual === 'familias') renderTabela('tFamilias', 'FAMILIAS', D.familias, [
+  sincFiltros(); renderNav();
+  $('filtrobar').classList.toggle('oculto', ['unidades', 'familias', 'parametros', 'processos'].indexOf(pagina) >= 0);
+  if (pagina === 'geral') renderGeral();
+  else if (pagina === 'familias-cards') renderFamiliasCards();
+  else if (FILTROS[pagina]) renderSituacao(pagina);
+  else if (pagina === 'itens') renderItens();
+  else if (pagina === 'familias') tabela('Famílias e notas', 'critérios de criticidade', 'Notas de 1 (baixo) a 5 (alto). A nota final (0-100) e a classe usam os pesos de "Pesos e parâmetros". Prazo padrão = dias da demanda até a entrega, sem a distribuição.', 'FAMILIAS', D.familias, [
     { i: 0, t: 'ID' }, { i: 1, t: 'Família', fmt: function (x, v) { return '<div class="nome">' + esc(x) + '</div><div class="sub">' + esc(v[3]) + '</div>'; } }, { i: 2, t: 'Tipo', mut: true },
     { i: 4, t: 'Essencialidade', edit: true, lista: NOTA }, { i: 5, t: 'Risco à segurança', edit: true, lista: NOTA }, { i: 6, t: 'Substituição', edit: true, lista: NOTA },
     { i: 7, t: 'Controle', edit: true, lista: NOTA }, { i: 8, t: 'Variabilidade', edit: true, lista: NOTA }, { i: 9, t: 'Duração reposição', edit: true, lista: NOTA },
     { i: 10, t: 'Incerteza reposição', edit: true, lista: NOTA }, { i: 11, t: 'Prazo padrão (dias)', edit: true }, { i: 12, t: 'Base padrão', edit: true, lista: [{ v: '', t: '—' }].concat(BASES) },
     { i: 13, t: 'Indisp. anual (perm.)', edit: true }, { i: 14, t: 'Nota', n: true }, { i: 15, t: 'Classe', fmt: function (x) { return chipClasse(x); } }]);
-  if (abaAtual === 'parametros') renderTabela('tParametros', 'PARAMETROS', D.parametros, [{ i: 0, t: 'Parâmetro', mut: true }, { i: 1, t: 'Valor', edit: true }, { i: 2, t: 'O que é' }]);
-  if (abaAtual === 'unidades') renderTabela('tUnidades', 'UNIDADES', D.unidades, [{ i: 0, t: 'UEOp' }, { i: 2, t: 'Policiais (efetivo)', edit: true }, { i: 3, t: 'Viaturas', edit: true }, { i: 4, t: 'Frações', edit: true }, { i: 5, t: 'Considerar', edit: true, lista: [{ v: 'S', t: 'Sim' }, { v: 'N', t: 'Não' }] }]);
-  if (abaAtual === 'processos') renderTabela('tProcessos', 'PROCESSOS', D.processos, [{ i: 0, t: 'Processo' }, { i: 1, t: 'Código do item', edit: true }, { i: 2, t: 'Família', edit: true },
-    { i: 3, t: 'Demanda', edit: true }, { i: 4, t: 'Abertura', edit: true }, { i: 5, t: 'Homologação', edit: true }, { i: 6, t: 'Empenho', edit: true }, { i: 7, t: 'Entrega', edit: true },
-    { i: 8, t: 'Fase interna', n: true }, { i: 9, t: 'Licitação', n: true }, { i: 10, t: 'Contratação', n: true }, { i: 11, t: 'Entrega', n: true }, { i: 12, t: 'Total (dias)', n: true }]);
+  else if (pagina === 'parametros') tabela('Pesos e parâmetros', 'política de cálculo', 'Pesos de 0 a 10 para cada critério, limites de nota das classes e parâmetros do cálculo.', 'PARAMETROS', D.parametros, [{ i: 0, t: 'Parâmetro', mut: true }, { i: 1, t: 'Valor', edit: true }, { i: 2, t: 'O que é' }]);
+  else if (pagina === 'unidades') tabela('Unidades e efetivo', 'informe o nº de policiais', 'Viaturas e frações vêm do CPELOG. O efetivo multiplica a taxa dos itens consumidos "por policial". Alterar aqui não muda nada no CPELOG.', 'UNIDADES', D.unidades, [
+    { i: 0, t: 'UEOp' }, { i: 2, t: 'Policiais (efetivo)', edit: true }, { i: 3, t: 'Viaturas', edit: true }, { i: 4, t: 'Frações', edit: true }, { i: 5, t: 'Considerar', edit: true, lista: [{ v: 'S', t: 'Sim' }, { v: 'N', t: 'Não' }] }]);
+  else if (pagina === 'processos') tabela('Processos de compra', 'histórico de prazos reais', 'Com as datas de processos reais, o prazo médio da família substitui o padrão do sistema. Para incluir processos, use a planilha de dados (aba PROCESSOS). As linhas EXEMPLO são fictícias.', 'PROCESSOS', D.processos, [
+    { i: 0, t: 'Processo' }, { i: 1, t: 'Código do item', edit: true }, { i: 2, t: 'Família', edit: true }, { i: 3, t: 'Demanda', edit: true }, { i: 4, t: 'Abertura', edit: true }, { i: 5, t: 'Homologação', edit: true },
+    { i: 6, t: 'Empenho', edit: true }, { i: 7, t: 'Entrega', edit: true }, { i: 8, t: 'Fase interna', n: true }, { i: 9, t: 'Licitação', n: true }, { i: 10, t: 'Contratação', n: true }, { i: 11, t: 'Entrega', n: true }, { i: 12, t: 'Total (dias)', n: true }]);
 }
-iniciar();
+
+/* ---------- cliques em cards e listas ---------- */
+document.addEventListener('click', function (e) {
+  var el = e.target.closest('[data-acao]'); if (!el) return;
+  var a = el.dataset.acao, i = a.indexOf(':'), tipo = a.slice(0, i), val = a.slice(i + 1);
+  if (tipo === 'f') abrir(FILTROS[val].t, FILTROS[val].d, FILTROS[val].f);
+  else if (tipo === 'p') { pagina = val; render(); window.scrollTo(0, 0); }
+  else if (tipo === 'fam') { var f = D.fam[val] || {}; abrir((f.nome || val) + ' (' + val + ')', (f.desc || '') + (f.classe ? ' · classe ' + f.classe : ''), function (x) { return x[R.fam] === val; }); }
+  else if (tipo === 'item') abrir('Material ' + val, '', function (x) { return String(x[R.cod]) === val; });
+});
+
+renderNav();
+chama('estadoWeb', [], function (e) { mostrarEstado(e); if (e.acesso) chama('dadosWeb', [], receber, 'Carregando dados…'); }, 'Verificando acesso…');
 </script>
 </body>
 </html>
