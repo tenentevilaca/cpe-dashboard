@@ -197,15 +197,20 @@ function onEdit(e) {
 
 function arred_(v, c) { if (v === null || v === undefined || v === '') return ''; var f = Math.pow(10, c); return Math.round(v * f) / f; }
 
+/** HTML do painel: embutido (versão de arquivo único) ou do arquivo Painel.html. */
+function painelHtml_() {
+  return typeof PAINEL_HTML !== 'undefined' ? HtmlService.createHtmlOutput(PAINEL_HTML) : HtmlService.createHtmlOutputFromFile('Painel');
+}
+
 /** Painel web. */
 function doGet() {
-  return HtmlService.createTemplateFromFile('Painel').evaluate()
+  return painelHtml_()
     .setTitle('Estoque mínimo - diagnóstico')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 function abrirPainel() {
-  var html = HtmlService.createTemplateFromFile('Painel').evaluate().setWidth(1400).setHeight(850);
+  var html = painelHtml_().setWidth(1400).setHeight(850);
   SpreadsheetApp.getUi().showModalDialog(html, 'Diagnóstico de estoque');
 }
 

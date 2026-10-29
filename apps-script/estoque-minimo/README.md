@@ -95,11 +95,11 @@ Funciona de dois jeitos. Em ambos, os dados vêm do CPELOG pela API (somente lei
 **A) Projeto Apps Script avulso, publicado como app da web (recomendado)**
 
 1. Em [script.google.com](https://script.google.com) crie um projeto novo.
-2. Crie os arquivos de script `Calculo`, `Classificacao`, `Configuracao`, `Importacao`, `Codigo`
-   e o arquivo HTML `Painel`, e cole o conteúdo dos arquivos desta pasta (apague o `Código.gs` padrão).
-3. Em **Configurações do projeto**, marque *Mostrar arquivo de manifesto "appsscript.json"* e
-   substitua o conteúdo pelo desta pasta.
-4. **Implantar → Nova implantação → App da Web** (executar como: você; acesso: só você). Autorize.
+2. Abra o `Código.gs` que já vem no projeto, apague tudo e cole **todo** o conteúdo de
+   `unico/EstoqueMinimo.gs` (é o projeto inteiro num arquivo só, com o painel embutido).
+   Não crie outros arquivos e não mexa no manifesto: o Google detecta as permissões sozinho.
+   Clique em **Salvar**.
+3. **Implantar → Nova implantação → App da Web** (executar como: você; acesso: só você). Autorize.
 5. Abra a URL do app. Na primeira vez ele pede o número de polícia e a senha do CPELOG, cria
    sozinho uma planilha no seu Drive para guardar os dados e importa tudo. Depois disso use o
    botão **Atualizar do CPELOG** sempre que quiser os dados mais recentes.
@@ -112,7 +112,12 @@ senão a URL continua servindo a versão antiga.
 
 **B) Ligado a uma planilha**
 
-Abra uma planilha, **Extensões → Apps Script**, cole os mesmos arquivos e recarregue a planilha.
+Abra uma planilha, **Extensões → Apps Script**, cole o mesmo `unico/EstoqueMinimo.gs` no `Código.gs` e recarregue a planilha.
+
+Quem preferir os arquivos separados (`Calculo`, `Classificacao`, `Configuracao`, `Importacao`,
+`Codigo` como *Script* e `Painel` como *HTML*) pode usá-los no lugar do arquivo único, mas nunca
+os dois juntos. Depois de mudar um arquivo separado, regenere o único com
+`node apps-script/estoque-minimo/unico/gerar.js`.
 O menu **Estoque mínimo** faz as mesmas operações (configurar, acesso, importar, recalcular, abrir painel).
 
 Alternativa com [clasp](https://github.com/google/clasp): `clasp create --type webapp` nesta pasta e `clasp push`.

@@ -42,11 +42,14 @@ const ctx = { console, Math, Date, JSON,
   PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] || null, setProperty: (k, v) => { props[k] = v; }, deleteProperty: k => { delete props[k]; } }) },
   CacheService: { getScriptCache: () => ({ get: k => cache[k] || null, put: (k, v) => { cache[k] = v; } }) },
   UrlFetchApp: { fetch: fetchSync, fetchAll: rs => rs.map(r => fetchSync(r.url, r)) },
-  Utilities: { formatDate: d => d.toISOString().slice(0, 10) } };
+  Utilities: { formatDate: d => d.toISOString().slice(0, 10) },
+  HtmlService: { createHtmlOutput: h => ({ html: h, setTitle() { return this; }, addMetaTag() { return this; }, setWidth() { return this; }, setHeight() { return this; } }),
+    createHtmlOutputFromFile: n => ctx.HtmlService.createHtmlOutput(fs.readFileSync(path.join(dir, n + '.html'), 'utf8')) } };
 vm.createContext(ctx);
-for (const f of ['Configuracao.gs', 'Calculo.gs', 'Classificacao.gs', 'Importacao.gs', 'Codigo.gs']) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
+for (const f of (process.env.ARQUIVOS || 'Configuracao.gs,Calculo.gs,Classificacao.gs,Importacao.gs,Codigo.gs').split(',')) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
 const t0 = Date.now();
 const run = code => vm.runInContext(code, ctx);
+console.log('doGet: HTML do painel com', run('doGet()').html.length, 'caracteres');
 console.log('estado inicial', JSON.stringify(run('estadoWeb()')));
 const d1 = run('atualizarDoCpelog()');
 console.log('importação + cálculo', ((Date.now() - t0) / 1000).toFixed(1) + 's', nReq, 'requisições');
